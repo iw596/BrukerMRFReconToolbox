@@ -1,0 +1,123 @@
+function params = LoadBrukerData(path)
+    % Find directory
+    methodFileName = strcat(path,'\','method'); 
+    result = isfile(methodFileName);
+    if (result ==0)
+        error("Method file is not present");
+        return;
+    end
+
+    % Open the method file and get some useful values 
+    filetext = fileread(methodFileName);
+    TextAsCells = regexp(filetext,'##','split');
+    params.System = "Bruker";
+    % Check trajectory
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$RadialTraj'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    if (strcmp(line, 'Yes') == 1)
+        params.Traj = "Radial";
+    else
+        params.Traj = "Cartesian";
+    end
+    
+    if (params.Traj == "Radial")
+        % Extract radial mode if we need it
+        mask = ~cellfun(@isempty, strfind(TextAsCells,'$Trajectory'));
+          line = TextAsCells(mask);
+          line = strtrim(extractAfter(cell2mat(line),'='));  
+          line = splitlines(line);
+          if (strcmp(line(1),"SegmentedTraj") == 1)
+              params.RadialMode = "Segmented";
+              % Get shots and segments if needed
+              mask = ~cellfun(@isempty, strfind(TextAsCells,'$NShots'));
+              line = TextAsCells(mask);
+              line = strtrim(extractAfter(cell2mat(line),'='));
+              params.NShots = str2num(line);
+              mask = ~cellfun(@isempty, strfind(TextAsCells,'$NSegments'));
+              line = TextAsCells(mask);
+              line = strtrim(extractAfter(cell2mat(line),'='));
+              params.NSegments = str2num(line);
+
+          elseif(strcmp(line(1),"LinearTraj") == 1) 
+                params.RadialMode = "Linear";
+          else
+              params.RadialMode = "GoldenAngle";
+          end
+    end
+    
+    % Next check calibration
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PerformCalibration'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    if (strcmp(line, 'Yes') == 1)
+        params.Calibration = true;
+        mask = ~cellfun(@isempty, strfind(TextAsCells,'$NumberCalibrationLines'));
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.NCalibLin = str2num(line);
+
+else
+        params.Calibration = false;
+    end
+    
+    % Get number of read points
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_EncMatrix'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    line = splitlines(line);
+    line = split(line(2),' ');
+    params.NCol = str2num(cell2mat(line(1))); % NCol is Siemens language for number of points in a PE line/radial spoke
+    params.NLin = str2num(cell2mat(line(2)));
+
+    % Extract the FOV
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    line = splitlines(line);
+    line = split(line(2),' ');
+    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))]
+
+
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    line = splitlines(line);
+    params.NRep = str2num(cell2mat(line(1)));
+
+    
+    % Find number of read dephasing points
+   % params.NCha
+
+%    params.data
+
+ %   params.calibData
+
+    %% Load imaging data
+    fileName = strcat(path,'\','rawdata.job0');
+    fid = fopen(fileName,'r','native');
+    fseek(fid,0,'bof');
+    rawdata = fread(fid,'int32');
+    fclose(fid);
+    rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
+    % Reshape the data using extracted parameters
+    rawdata = reshape(rawdata,[params.NCol params.NLin params.NRep]);
+    params.data =rawdata;
+    clear("rawdata");
+
+    %% Load calibration data if present
+    if (params.Calibration == true)
+        fileName = strcat(path,'\','rawdata.job1');
+        fid = fopen(fileName,'r','native');
+        fseek(fid,0,'bof');
+        rawdata = fread(fid,'int32');
+        fclose(fid);
+        rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
+        % Reshape the data using extracted parameters
+        rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
+        params.calibData =rawdata;
+        clear("rawdata");
+    end
+
+    
+end
