@@ -1,0 +1,31 @@
+function M_Echo = FISPSimulation(SeqParams,TissueParams,NIso)
+    T1 = TissueParams.T1;
+    T2 = TissueParams.T2;
+    TI = SeqParams.TI;
+    FA = SeqParams.FA;
+    % Create spin distribution between -pi and pi
+    phi = linspace(-pi,pi,NIso);
+    M = zeros([3,NIso]);
+    Nexp = length(SeqParams.FA);
+    % Create array to store (absolute) result at each TE
+    M_Echo = zeros([1,size(SeqParams.FA,2)]);
+    % Assume our initial magnetization is Mx = 0 My=0 Mz = -1
+    M(3,:) = -1; % Assuming perfect inversion
+    % Propagate signal for inversion time TI
+    [A,B] = freeprecess(TI,T1,T2);
+    M = A * M + B;
+    dt = 1;
+    M_Echo = zeros(1,dt);
+
+    %% Now run simulation for Nexp
+    for i = 1:100
+        % Rotate magnetization by flip angle
+         Rflip = yrot(deg2rad(90));
+         M = Rflip * M;
+        [A,B] = freeprecess(dt,T1,T2);
+        M = A * M + B;
+        M_Echo(i) = abs(complex(M(1),M(2)));
+        % Precess until the echo time
+
+    end
+end
