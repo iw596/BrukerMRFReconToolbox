@@ -1,0 +1,65 @@
+addpath("Simulations\")
+
+
+t1series = [50:10:2000,2020:20:3000,3050:50:5000];
+  
+t2series = [6:5:100,110:10:200,202:2:500];
+
+t1l=length(t1series);
+
+t2l=length(t2series);
+
+
+% b) Create storage and counting variables
+cnt = 0;
+count = t1l*t2l;
+r = zeros(count,2);
+
+
+% c)  keeping only valid pairs
+for it1 = 1:t1l
+    for it2 = 1:t2l
+        if (t1series(it1)>=t2series(it2))
+
+            cnt=cnt+1;
+            r(cnt,1)=t1series(it1);
+            r(cnt,2)=t2series(it2);
+        end
+    end
+end
+T1 = r(:,1);
+T2 = r(:,2);
+
+
+%% Open bruker dataset
+pth = "datasets\48";
+params = LoadBrukerData(pth);
+FAList = ReadFAList("datasets\FAList.txt");
+
+
+%% Set-up sequence parameters
+seqParams.TI = 7.22; % ms
+seqParams.TR = 10;  %ms
+seqParams.TE = 4;   %ms
+seqParams.FA = FAList;
+
+
+
+
+% d) put into the main simulated signal  
+tic
+for ii = 1:cnt
+    tissueParams.T1 = T1(ii);
+    tissueParams.T2 = T2(ii);
+    Msignal = FISPSimulation(seqParams,tissueParams,1);
+    MMsignal= Msignal*1.5e+05;
+    dict(ii,:)= MMsignal;
+
+end
+toc
+%     save
+dict= single(dict);
+
+
+M_Echo = 
+figure(3), plot(M_Echo);

@@ -14,11 +14,15 @@ function params = LoadBrukerData(path)
     % Check trajectory
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$RadialTraj'));
     line = TextAsCells(mask);
-    line = strtrim(extractAfter(cell2mat(line),'='));
-    if (strcmp(line, 'Yes') == 1)
-        params.Traj = "Radial";
-    else
+    if (isempty(line))
         params.Traj = "Cartesian";
+    else
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        if (strcmp(line, 'Yes') == 1)
+            params.Traj = "Radial";
+        else
+            params.Traj = "Cartesian";
+        end
     end
     
     if (params.Traj == "Radial")
@@ -48,19 +52,21 @@ function params = LoadBrukerData(path)
     
     % Next check calibration
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PerformCalibration'));
+    params.Calibration = false;
     line = TextAsCells(mask);
-    line = strtrim(extractAfter(cell2mat(line),'='));
-    if (strcmp(line, 'Yes') == 1)
-        params.Calibration = true;
-        mask = ~cellfun(@isempty, strfind(TextAsCells,'$NumberCalibrationLines'));
-        line = TextAsCells(mask);
+    if (isempty(line) ~=1)
         line = strtrim(extractAfter(cell2mat(line),'='));
-        params.NCalibLin = str2num(line);
+        if (strcmp(line, 'Yes') == 1)
+            params.Calibration = true;
+            mask = ~cellfun(@isempty, strfind(TextAsCells,'$NumberCalibrationLines'));
+            line = TextAsCells(mask);
+            line = strtrim(extractAfter(cell2mat(line),'='));
+            params.NCalibLin = str2num(line);
 
-else
-        params.Calibration = false;
+        else
+            params.Calibration = false;
+        end
     end
-    
     % Get number of read points
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_EncMatrix'));
     line = TextAsCells(mask);
@@ -77,6 +83,7 @@ else
     line = splitlines(line);
     line = split(line(2),' ');
     params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))]
+
 
 
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
@@ -100,8 +107,6 @@ else
     rawdata = fread(fid,'int32');
     fclose(fid);
     rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-    % Reshape the data using extracted parameters
-    rawdata = reshape(rawdata,[params.NCol params.NLin params.NRep]);
     params.data =rawdata;
     clear("rawdata");
 
