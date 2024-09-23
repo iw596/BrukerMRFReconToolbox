@@ -1,10 +1,11 @@
 addpath("Simulations\")
 
 
-t1series = [50:10:2000,2020:20:3000,3050:50:5000];
-  
-t2series = [6:5:100,110:10:200,202:2:500];
+%t1series = [50:10:2000,2020:20:3000,3050:50:5000];
+%t2series = [6:5:100,110:10:200,202:2:500];
 
+t1series = [50:10:1000];
+t2series = [6:5:100];
 t1l=length(t1series);
 
 t2l=length(t2series);
@@ -37,6 +38,12 @@ params = LoadBrukerData(pth);
 FAList = ReadFAList("datasets\FAList.txt");
 
 
+%% Reconstruct data (assuming 128 points,64 lines and 600 FA)
+rawdata  = params.data;
+rawdata = reshape(rawdata, [128 600 64]);
+rawdata = permute(rawdata, [1 3 2]);
+imgs = fftshift(fft2(rawdata));
+
 %% Set-up sequence parameters
 seqParams.TI = 7.22; % ms
 seqParams.TR = 10;  %ms
@@ -48,7 +55,7 @@ seqParams.FA = FAList;
 
 % d) put into the main simulated signal  
 tic
-parfor ii = 1:cnt
+for ii = 1:cnt
     tissueParams.T1 = T1(ii);
     tissueParams.T2 = T2(ii);
     Msignal = FISPSimulation(seqParams,tissueParams,1);
@@ -60,6 +67,38 @@ toc
 %     save
 dict= single(dict);
 
+% Norm
+norm_signal = sqrt(sum(imgs.*conj(imgs)));
 
-M_Echo = 
+
+for k = 1:cnt
+  
+        % norm of  MMsignal and signal
+        norm_MMsignal = sqrt(sum(dict(k,:).*conj(dict(k,:))));
+
+
+        % Normalize the MMsignal
+        normalized_MMsignal(k,:) = abs(dict(k,:)) / norm_MMsignal;
+
+        % Normalize the signal
+        normalized_signal = conj(imgs)/imgs;
+
+    end
+
+
+% Calculating inner product
+inner_product=normalized_MMsignal*normalized_signal';
+
+
+% Find the maximum value and its linear index
+
+maxValue = max(inner_product);
+maxIndices = find(inner_product == maxValue);
+
+% Convert the linear index to 2D indices
+[rowIndex, columnIndex] = ind2sub(size(inner_product), maxIndices);
+
+
+
+%M_Echo = 
 figure(3), plot(M_Echo);
