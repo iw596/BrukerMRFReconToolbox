@@ -1,0 +1,4 @@
+function pattern = GenerateFAPattern(maxFA,minFA,N)
+    pattern = zeros
+end
+

@@ -1,11 +1,11 @@
 addpath("Simulations\")
-
+addpath("recon\")
 
 %t1series = [50:10:2000,2020:20:3000,3050:50:5000];
 %t2series = [6:5:100,110:10:200,202:2:500];
 
-t1series = [50:10:1000];
-t2series = [6:5:100];
+t1series = [50:10:500];
+t2series = [1:1:10,10:10:250,110:10:200];
 t1l=length(t1series);
 
 t2l=length(t2series);
@@ -33,33 +33,33 @@ T2 = r(:,2);
 
 
 %% Open bruker dataset
-pth = "datasets\48";
+pth = "datasets\68";
 params = LoadBrukerData(pth);
-FAList = ReadFAList("datasets\FAList.txt");
+FAList = ReadFAList("datasets\FATest.txt");
 
 
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
-rawdata = reshape(rawdata, [128 600 64]);
+rawdata = reshape(rawdata, [128 600 128]);
 rawdata = permute(rawdata, [1 3 2]);
-imgs = fftshift(fft2(rawdata));
-
+imgs = fftcn(rawdata,[1 2]);
+figure(1); montage(mat2gray(abs(imgs)))
 %% Set-up sequence parameters
-seqParams.TI = 7.22; % ms
-seqParams.TR = 10;  %ms
-seqParams.TE = 4;   %ms
-seqParams.FA = FAList;
+seqParams.TI = 10; % ms
+seqParams.TR = 13;  %ms
+seqParams.TE = 5;   %ms
+seqParams.FA = GenerateFAPattern(45.0,5.0,600);
 
 
 
 
 % d) put into the main simulated signal  
 tic
-for ii = 1:cnt
+for ii = 1:size(T1,1)
     tissueParams.T1 = T1(ii);
     tissueParams.T2 = T2(ii);
-    Msignal = FISPSimulation(seqParams,tissueParams,1);
-    MMsignal= Msignal*1.5e+05;
+    Msignal = FISPSimulation(seqParams,tissueParams,200);
+    MMsignal= Msignal;
     dict(ii,:)= MMsignal;
 
 end
@@ -67,38 +67,39 @@ toc
 %     save
 dict= single(dict);
 
-% Norm
-norm_signal = sqrt(sum(imgs.*conj(imgs)));
 
+% Normalise Dictionary
 
-for k = 1:cnt
-  
-        % norm of  MMsignal and signal
-        norm_MMsignal = sqrt(sum(dict(k,:).*conj(dict(k,:))));
+cnt=length(dict);
+for c = 1:cnt  
+    scaleFactor = sqrt(sum(dict(c,:).*conj(dict(c,:))));
+    normalisedDict(c,:) = abs(dict(c,:)) / scaleFactor;
+end
 
-
-        % Normalize the MMsignal
-        normalized_MMsignal(k,:) = abs(dict(k,:)) / norm_MMsignal;
-
-        % Normalize the signal
-        normalized_signal = conj(imgs)/imgs;
+% Iterate through each voxel
+for i = 64
+    for j = 64
+       % for k = 1:size(mrfsignal, 3)
+       scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
+       normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
+       inner_product=normalisedDict*squeeze(normalized_mrfsignal);
+       % Find best matching pattern
+       [maxValue, max_index] = max(inner_product);
+       matched_indices(i, j) = max_index;
 
     end
-
-
-% Calculating inner product
-inner_product=normalized_MMsignal*normalized_signal';
-
-
-% Find the maximum value and its linear index
-
-maxValue = max(inner_product);
-maxIndices = find(inner_product == maxValue);
-
-% Convert the linear index to 2D indices
-[rowIndex, columnIndex] = ind2sub(size(inner_product), maxIndices);
+end
 
 
 
-%M_Echo = 
-figure(3), plot(M_Echo);
+ttt = abs(dictionaryNormalized(max_index,:));
+r(max_index,1)
+r(max_index,2)
+
+figure(1);
+plot(ttt); hold on; plot(abs(squeeze(normalized_mrfsignal)));
+
+
+
+
+

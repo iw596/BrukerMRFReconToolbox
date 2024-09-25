@@ -103,6 +103,11 @@ function params = LoadBrukerData(path)
     %% Load imaging data
     fileName = strcat(path,'\','rawdata.job0');
     fid = fopen(fileName,'r','native');
+    if (fid == -1)
+        fileName = strcat(path,'\','fid');
+        fid = fopen(fileName,'r','native');
+    end
+
     fseek(fid,0,'bof');
     rawdata = fread(fid,'int32');
     fclose(fid);

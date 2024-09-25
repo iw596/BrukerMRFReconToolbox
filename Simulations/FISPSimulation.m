@@ -18,19 +18,17 @@ function M_Echo = FISPSimulation(SeqParams,TissueParams,NIso)
     % Propagate signal for inversion time TI
     [A,B] = freeprecess(TI,T1,T2);
     M = A * M + B;
-    dt = 1;
-    M_Echo = zeros(1,dt);
 
     %% Now run simulation for Nexp
     for i = 1:Nexp
         % Rotate magnetization by flip angle
-        Rflip = yrot(deg2rad(FA(i)));
+        Rflip = yrot(deg2rad(FA(i))*((-1)^i));
         M = Rflip * M;
         % Free precession until echo time
         [A,B] = freeprecess(TE,T1,T2);
         M = A * M + B;
         % Store (absolute) signal at the echo time (mean of all isochromats)
-        M_Echo(i) = abs(mean(complex(M(1),M(2)),2));
+        M_Echo(i) = mean(squeeze(M(1,:)+1i*M(2,:)))*((-1)^i);
         % Precess until the next TR
         [A,B] = freeprecess(TR - TE,T1,T2);
         M = A * M + B;
