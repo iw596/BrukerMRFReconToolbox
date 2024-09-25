@@ -1,7 +1,5 @@
-function [outputArg1,outputArg2] = xrot(inputArg1,inputArg2)
-%XROT Summary of this function goes here
-%   Detailed explanation goes here
-outputArg1 = inputArg1;
-outputArg2 = inputArg2;
-end
+function Rx=xrot(phi)
+
+Rx = [1 0 0; 0 cos(phi) -sin(phi);0 sin(phi) cos(phi)];
+
 

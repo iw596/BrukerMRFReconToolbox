@@ -6,7 +6,7 @@ function M_Echo = FISPSimulation(SeqParams,TissueParams,NIso)
     TE = SeqParams.TE;
     TR = SeqParams.TR;
     % Create spin distribution between -pi and pi
-    phi = linspace(-pi,pi,NIso);
+   % phi = linspace(-pi,pi,NIso);
     % Create spoiling phase cycles
     spoil = linspace(-pi,pi,NIso);
     M = zeros([3,NIso]);
@@ -20,15 +20,15 @@ function M_Echo = FISPSimulation(SeqParams,TissueParams,NIso)
     M = A * M + B;
 
     %% Now run simulation for Nexp
-    for i = 1:Nexp
+    for ii = 1:Nexp
         % Rotate magnetization by flip angle
-        Rflip = yrot(deg2rad(FA(i))*((-1)^i));
+        Rflip = yrot(deg2rad(FA(ii))*((-1)^ii));
         M = Rflip * M;
         % Free precession until echo time
         [A,B] = freeprecess(TE,T1,T2);
         M = A * M + B;
         % Store (absolute) signal at the echo time (mean of all isochromats)
-        M_Echo(i) = mean(squeeze(M(1,:)+1i*M(2,:)))*((-1)^i);
+        M_Echo(ii) = mean(squeeze(M(1,:)+1i*M(2,:)))*((-1)^ii);
         % Precess until the next TR
         [A,B] = freeprecess(TR - TE,T1,T2);
         M = A * M + B;
