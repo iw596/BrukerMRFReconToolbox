@@ -85,13 +85,21 @@ function params = LoadBrukerData(path)
     params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))]
 
 
-
+    % Extract number of repetitions
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
     line = TextAsCells(mask);
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     params.NRep = str2num(cell2mat(line(1)));
 
+    % Extract inversion times
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_FairTIR_Arr'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.InvTimes = str2double(line(2));
+    end
     
     % Find number of read dephasing points
    % params.NCha

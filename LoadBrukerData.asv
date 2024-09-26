@@ -84,21 +84,22 @@ function params = LoadBrukerData(path)
     line = split(line(2),' ');
     params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))]
 
-    mask = ~cellfun(@isempty, strfind(TextAsCells,'$MRFFAArray'));
-    line = TextAsCells(mask);
-    if (isempty(line) ~= 1)
-        line = strtrim(extractAfter(cell2mat(line),'='));
-        line = splitlines(line);
-        line = split(line(2),' ');
-        params.FAList = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
-    end
 
+    % Extract number of repetitions
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
     line = TextAsCells(mask);
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     params.NRep = str2num(cell2mat(line(1)));
 
+    % Extract inversion times
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_FairTIR_Arr'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.InvTimes = str2double(line)
+    end
     
     % Find number of read dephasing points
    % params.NCha
@@ -110,12 +111,15 @@ function params = LoadBrukerData(path)
     %% Load imaging data
     fileName = strcat(path,'\','rawdata.job0');
     fid = fopen(fileName,'r','native');
+    if (fid == -1)
+        fileName = strcat(path,'\','fid');
+        fid = fopen(fileName,'r','native');
+    end
+
     fseek(fid,0,'bof');
     rawdata = fread(fid,'int32');
     fclose(fid);
     rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-    % Reshape the data using extracted parameters
-    rawdata = reshape(rawdata,[params.NCol params.NLin params.NRep]);
     params.data =rawdata;
     clear("rawdata");
 
