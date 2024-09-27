@@ -98,7 +98,16 @@ function params = LoadBrukerData(path)
     if (isempty(line) ~=1)
         params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
         line = split(line,')');
-        params.InvTimes = str2double(line(2));
+        params.InvTimes = str2double(split(line(2),' '));
+    end
+
+    % Extract inversion times
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$EffectiveTE'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.MSMETimes = str2double(split(line(2),' '));
     end
     
     % Find number of read dephasing points
