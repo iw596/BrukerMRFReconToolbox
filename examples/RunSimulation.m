@@ -166,3 +166,6 @@ figure(6);
 subplot(1,2,1); imagesc(T2RefMap,[0,100]); title("MSME T2 Map");
 subplot(1,2,2); imagesc(T2Map,[0,100]); title("MRF T2 Map");
 
+
+figure(7);
+

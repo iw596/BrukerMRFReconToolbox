@@ -3,10 +3,20 @@
 %% to images at two different off-set frequencies.
 %% params is a struct which contains information about the BS pulse
 
-function [outputArg1,outputArg2] = BlochSiegertB1(imgs,params)
+function [B1Map] = BlochSiegertB1(imgs,pulseShape,params)
+    B1Map = 0;
+    gamma = 42.6; % Gyromagnetic constant of 1H is MHz/T
+    % Calculate pulse B1 using reference power and peak power
+    % Bruker reference power is power required to achieve pi/2 flip
+    % for 1 ms block pulse
+    refB1 = 
+
+
 %BLOCHSIEGERTB1 Summary of this function goes here
 %   Detailed explanation goes here
 outputArg1 = inputArg1;
 outputArg2 = inputArg2;
+
+
 end
 

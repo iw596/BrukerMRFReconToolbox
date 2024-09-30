@@ -110,6 +110,14 @@ function params = LoadBrukerData(path)
         params.MSMETimes = str2double(split(line(2),' '));
     end
     
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RefPowCh1'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    line = splitlines(line);
+    params.RefPow = str2num(cell2mat(line(1)));
+        
+
+    
     % Find number of read dephasing points
    % params.NCha
 
