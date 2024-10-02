@@ -82,7 +82,7 @@ function params = LoadBrukerData(path)
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     line = split(line(2),' ');
-    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))]
+    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
 
 
     % Extract number of repetitions

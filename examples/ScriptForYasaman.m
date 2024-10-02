@@ -1,3 +1,5 @@
+%% Quick script to test Yasaman data
+
 addpath("Simulations\")
 addpath("recon\")
 addpath("B1Mapping\")
@@ -5,8 +7,8 @@ addpath("Fitting\")
 %t1series = [50:10:2000,2020:20:3000,3050:50:5000];
 %t2series = [6:5:100,110:10:200,202:2:500];
 
-t1series = [50:5:700];
-t2series = [10:5:350];
+t1series = [600:50:3000];
+t2series = [50:10:800];
 t1l=length(t1series);
 t2l=length(t2series);
 
@@ -32,30 +34,25 @@ T2 = r(:,2);
 
 
 %% Open bruker MRF dataset
-pth = "datasets\46";
-params = LoadBrukerData(pth);
+%pth = "datasets\18";
+%params = LoadBrukerData(pth);
 %FAList = ReadFAList("datasets\FATest.txt");
-
-
-%% Reconstruct data (assuming 128 points,64 lines and 600 FA)
-rawdata  = params.data;
-rawdata = reshape(rawdata, [128 600 64]);
-rawdata = permute(rawdata, [1 3 2]);
-imgs = ifftcn(rawdata,[1 2]);
-figure(1); montage(mat2gray(abs(imgs)))
-%figure(2); imshow(abs(imgs(:,:,300)),[])
-
-
-%% Open B1 mapping dataset
+fid = fopen("datasets\20240301_sphere_6ml_ddH2O_Exp2_ro64_32x32x4096.bin");
+rawdata = fread(fid,['float64']);
+rawdata = reshape(rawdata,[64,64,4096]);
+fclose(fid);
+figure(1); 
+subplot(2,1,1);imagesc(mat2gray(abs(rawdata(:,:,1)))); axis square;
+subplot(2,1,2);plot(squeeze(rawdata(32,32,:)))
 
 
 %% Set-up sequence parameters
-seqParams.TI = 8; % ms
-seqParams.TR = 13;  %ms
-seqParams.TE = 5;   %ms
-seqParams.FA = GenerateFAPattern(5.0,45.0,600);
+seqParams.TI = 100; % ms
+seqParams.TR = 3;  %ms
+seqParams.TE = 1.5;   %ms
+%seqParams.FA = GenerateFAPattern(5.0,45.0,100);
 
-FA = ReadFAList("examples/FATest.txt");
+seqParams.FA = ReadFAList("datasets/20240301_sphere_6ml_ddH2O_Exp2_flipangle_list.txt");
 
 TE = ones([size(seqParams.FA)]);
 TE(:) = seqParams.TE;
@@ -82,71 +79,42 @@ dict= single(dict);
 
 % Normalise Dictionary
 normalisedDict = [];
-cnt=length(dict);
+cnt=size(dict,1);
 for c = 1:cnt  
     scaleFactor = sqrt(sum(dict(c,:).*conj(dict(c,:))));
     normalisedDict(c,:) = dict(c,:) / scaleFactor;
 end
-
+T1Map = [];
+T2Map  = [];
 % Iterate through each voxel
-for i = 64
-    for j = 1:64
+for i = 32:32
+    for j = 32:32
        % for k = 1:size(mrfsignal, 3)
-       scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
-       normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
-       inner_product=normalisedDict*squeeze(normalized_mrfsignal);
+       scaleFactor = sqrt(sum(rawdata(i,j,:).*conj(rawdata(i,j,:))));
+       normalized_mrfsignal = conj(rawdata(i,j,:))/scaleFactor;
+       inner_product=abs(normalisedDict)*squeeze(rawdata(i,j,:));
        % Find best matching pattern
-       [maxValue, max_index] = max(abs(inner_product));
+       [maxValue, max_index] = max((inner_product));
        matched_indices(i, j) = max_index;
-       if (maxValue < 0.9)
-        T1Map(i,j) = 0;
-        T2Map(i,j) = 0;
-        MRFMask(i,j) = 0;
-
-       else
-         T1Map(i,j) = r(max_index,1);
-         T2Map(i,j) = r(max_index,2);
-         MRFMask(i,j) = 1;
-       end
+       T1Map(i,j) = r(max_index,1);
+       T2Map(i,j) = r(max_index,2);
+       MRFMask(i,j) = 1;
     end
 end
 
-
+figure(3);
+subplot(1,2,1); imagesc(T1Map.*MRFMask);
+subplot(1,2,2); imagesc(T2Map.*MRFMask,[0 200]);
 
 ttt = normalisedDict(max_index,:);
 r(max_index,1)
 r(max_index,2)
 
 figure(1);
-subplot(2,1,1);plot(abs(ttt)); hold on; plot(abs(squeeze(normalized_mrfsignal)));
-subplot(2,1,2);plot(angle(ttt)); hold on; plot(angle(squeeze(normalized_mrfsignal)));
+subplot(2,1,1);plot(abs(ttt)); hold on; plot(abs(squeeze(normalized_mrfsignal))); legend("Dictionary","Measured");
+subplot(2,1,2);plot(angle(ttt)); hold on; plot(angle(squeeze(normalized_mrfsignal)));legend("Dictionary","Measured");
 
 
-%% Gold standard Inversion recovery and MSME T2 mapping
-pth = "datasets/40/pdata/1/2dseq";
-params = LoadBrukerData("datasets/40");
-fid = fopen(pth);
-data = fread(fid,"int16");
-data = reshape(data,[128 128 61]);
-fclose(fid);
-
-%% Generate Mask from first inversion time
-se = strel('disk', 10, 0);
-BW = imbinarize(mat2gray(data(:,:,1)));
-BW = imclose(BW, se);
-BW = imfill(BW, 'holes');
-T1RefMap = T1Fitting(data,params.InvTimes,BW);
-T1DiffMap = (T1RefMap - T1Map)./T1Map * 100;
-
-%% Perform T2 fitting on MSME data
-pth = "datasets/41/pdata/1/2dseq";
-params = LoadBrukerData("datasets/41");
-fid = fopen(pth);
-data = fread(fid,"int16");
-data = reshape(data,[128 128 41]);
-fclose(fid);
-T2RefMap = T2Fitting(data,params.MSMETimes,BW);
-T2DiffMap = (T2RefMap - T2Map)./T2Map * 100;
 
 
 figure(5);
@@ -159,7 +127,4 @@ figure(6);
 subplot(1,3,1); imagesc(T2RefMap.*MRFMask,[0,100]); title("MSME T2 Map"); axis square;
 subplot(1,3,2); imagesc(T2Map,[0,100]); title("MRF T2 Map"); axis square;
 subplot(1,3,3); imagesc(T2DiffMap.*MRFMask,[0 100]); title("Difference Map"); axis square;
-
-
-figure(7);
 

@@ -1,14 +1,13 @@
 addpath("Simulations\")
 addpath("recon\")
 addpath("B1Mapping\")
-
+addpath("Fitting\")
 %t1series = [50:10:2000,2020:20:3000,3050:50:5000];
 %t2series = [6:5:100,110:10:200,202:2:500];
 
-t1series = [50:5:500];
-t2series = [10:5:250];
+t1series = [50:5:700];
+t2series = [10:5:350];
 t1l=length(t1series);
-
 t2l=length(t2series);
 
 
@@ -22,7 +21,6 @@ r = [];
 for it1 = 1:t1l
     for it2 = 1:t2l
         if (t1series(it1)>=t2series(it2))
-
             cnt=cnt+1;
             r(cnt,1)=t1series(it1);
             r(cnt,2)=t2series(it2);
@@ -34,38 +32,28 @@ T2 = r(:,2);
 
 
 %% Open bruker MRF dataset
-pth = "datasets\68";
+pth = "datasets\85";
 params = LoadBrukerData(pth);
 %FAList = ReadFAList("datasets\FATest.txt");
 
 
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
-rawdata = reshape(rawdata, [128 600 128]);
+rawdata = reshape(rawdata, [128 400 64]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = ifftcn(rawdata,[1 2]);
 figure(1); montage(mat2gray(abs(imgs)))
-figure(2); imshow(abs(imgs(:,:,300)),[])
+%figure(2); imshow(abs(imgs(:,:,300)),[])
 
 
 %% Open B1 mapping dataset
-pth = "datasets\70";
-params = LoadBrukerData(pth);
-rawdata  = params.data;
-rawdata = reshape(rawdata, [128 2 64 64]);
-rawdata = permute(rawdata, [1 3 4 2]);
-B1imgs = fftcn(rawdata,[1 2 3]);
-B1imgs = imresize(B1imgs,[128 128]);
-% Fit B1 maps
-B1Map = AFIB1(B1imgs,60,20,100);
-%approx slice 36 I think?
-%figure(4); imagesc(B1Map(:,:,45));
+
 
 %% Set-up sequence parameters
-seqParams.TI = 10; % ms
+seqParams.TI = 9.38; % ms
 seqParams.TR = 13;  %ms
 seqParams.TE = 5;   %ms
-seqParams.FA = GenerateFAPattern(45.0,5.0,600);
+seqParams.FA = GenerateFAPattern(5.0,45.0,400);
 
 FA = ReadFAList("examples/FATest.txt");
 
@@ -102,7 +90,7 @@ end
 
 % Iterate through each voxel
 for i = 1:128
-    for j = 1:128
+    for j = 1:64
        % for k = 1:size(mrfsignal, 3)
        scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
        normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
@@ -113,9 +101,12 @@ for i = 1:128
        if (maxValue < 0.9)
         T1Map(i,j) = 0;
         T2Map(i,j) = 0;
+        MRFMask(i,j) = 0;
+
        else
          T1Map(i,j) = r(max_index,1);
          T2Map(i,j) = r(max_index,2);
+         MRFMask(i,j) = 1;
        end
     end
 end
@@ -132,11 +123,11 @@ subplot(2,1,2);plot(angle(ttt)); hold on; plot(angle(squeeze(normalized_mrfsigna
 
 
 %% Gold standard Inversion recovery and MSME T2 mapping
-pth = "datasets/64/pdata/1/2dseq";
-params = LoadBrukerData("datasets/64");
+pth = "datasets/40/pdata/1/2dseq";
+params = LoadBrukerData("datasets/40");
 fid = fopen(pth);
 data = fread(fid,"int16");
-data = reshape(data,[128 128 31]);
+data = reshape(data,[128 128 61]);
 fclose(fid);
 
 %% Generate Mask from first inversion time
@@ -144,27 +135,30 @@ se = strel('disk', 10, 0);
 BW = imbinarize(mat2gray(data(:,:,1)));
 BW = imclose(BW, se);
 BW = imfill(BW, 'holes');
-
-
 T1RefMap = T1Fitting(data,params.InvTimes,BW);
+T1DiffMap = (T1RefMap - T1Map)./T1Map * 100;
 
 %% Perform T2 fitting on MSME data
-pth = "datasets/65/pdata/1/2dseq";
-params = LoadBrukerData("datasets/65");
+pth = "datasets/41/pdata/1/2dseq";
+params = LoadBrukerData("datasets/41");
 fid = fopen(pth);
 data = fread(fid,"int16");
-data = reshape(data,[128 128 20]);
+data = reshape(data,[128 128 41]);
 fclose(fid);
 T2RefMap = T2Fitting(data,params.MSMETimes,BW);
+T2DiffMap = (T2RefMap - T2Map)./T2Map * 100;
 
 
 figure(5);
-subplot(1,2,1); imagesc(T1RefMap,[0,300]); title("Inversion Recovery T1 Map");
-subplot(1,2,2); imagesc(T1Map,[0,300]); title("MRF T1 Map");
+subplot(1,3,1); imagesc(T1RefMap); title("Inversion Recovery T1 Map"); axis square;
+subplot(1,3,2); imagesc(T1Map); title("MRF T1 Map"); axis square;
+subplot(1,3,3); imagesc(T1DiffMap.*MRFMask,[0 100]); title("Difference Map"); axis square;
+
 
 figure(6);
-subplot(1,2,1); imagesc(T2RefMap,[0,100]); title("MSME T2 Map");
-subplot(1,2,2); imagesc(T2Map,[0,100]); title("MRF T2 Map");
+subplot(1,3,1); imagesc(T2RefMap); title("MSME T2 Map"); axis square;
+subplot(1,3,2); imagesc(T2Map,[0,100]); title("MRF T2 Map"); axis square;
+subplot(1,3,3); imagesc(T2DiffMap.*MRFMask,[0 100]); title("Difference Map"); axis square;
 
 
 figure(7);

@@ -6,10 +6,13 @@
 function [B1Map] = BlochSiegertB1(imgs,pulseShape,params)
     B1Map = 0;
     gamma = 42.6; % Gyromagnetic constant of 1H is MHz/T
-    % Calculate pulse B1 using reference power and peak power
-    % Bruker reference power is power required to achieve pi/2 flip
+    % Calculate pulse B1 required to achieve pi/2 flip
     % for 1 ms block pulse
-    refB1 = 
+    refB1 = (pi)./(2*pi*42.6e-3*1e-3);
+    % Calculate peak voltage assuming 50 ohm load
+    refPeakVolage = sqrt(params.RefPow * 50); 
+    
+    % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
 
 
 %BLOCHSIEGERTB1 Summary of this function goes here

@@ -39,10 +39,11 @@ Msig = zeros(1,Nex);
 %M = Atd*M+Btd*on;
 
 M = [zeros(3,Nf)]; % initial inversion signal
-M(3,:) = -1;
+%M(3,:) = -1;
 %Precess the spins over time delay before imaging
-[Atd,Btd] = freeprecess(Tdelay,T1,T2,df);
-M = Atd*M+Btd*on;
+%[Atd,Btd] = freeprecess(Tdelay,T1,T2,df);
+%M = Atd*M+Btd*on;
+M(3,:) = 1;
 for m = 1:Nex
     
     %Get the flip and precession matrices
@@ -62,7 +63,7 @@ for m = 1:Nex
     %Precess through the rest of the imaging experiment
 	M=Atr*M+Btr*on;
     
-    for k=1:Nf
-        M(:,k) = zrot(phi(k))*M(:,k);
-    end  
+    %for k=1:Nf
+     %   M(:,k) = zrot(phi(k))*M(:,k);
+    %end  
 end;
