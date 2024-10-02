@@ -3,9 +3,9 @@
 %% to images at two different off-set frequencies.
 %% params is a struct which contains information about the BS pulse
 
-function [B1Map] = BlochSiegertB1(imgs,pulseShape,pulseDuration,params)
+function [B1Map] = BlochSiegertB1(imgs,pulseShape,params)
     B1Map = 0;
-    gamma = 42.6*10^6; % Gyromagnetic constant of 1H is MHz/T
+    gamma = 42.6; % Gyromagnetic constant of 1H is MHz/T
     % Calculate pulse B1 required to achieve pi/2 flip
     % for 1 ms block pulse
     refB1 = (pi/2)./(2*pi*42.6*10^6*1e-3); % Peak B1 in T
@@ -17,9 +17,8 @@ function [B1Map] = BlochSiegertB1(imgs,pulseShape,pulseDuration,params)
     peakB1 = (refB1./refPeakVolage) .*  pulsePeakVoltage; % in T
     
     % Calculate KBS
-    B = trapz(linspace(0,pulseDuration,length(pulseShape)),pulseShape);
+    B = trapz
 
-    kbs = pi *gamma.^2 * B./params.BSFreqOffset;
-    
+
 end
 

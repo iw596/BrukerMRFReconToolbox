@@ -116,8 +116,27 @@ function params = LoadBrukerData(path)
     line = splitlines(line);
     params.RefPow = str2num(cell2mat(line(1)));
         
-
     
+    % Extract Bloch Siegert frequency offset in Hz
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSFreqOffset'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.BSFreqOffset = str2num(cell2mat(line(1)));
+    end
+   
+    % Extract Bloch Siegert pulse power (watts)
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSPulsePower'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.BSPulsePower = str2num(cell2mat(line(1)));
+    end
+
     % Find number of read dephasing points
    % params.NCha
 
