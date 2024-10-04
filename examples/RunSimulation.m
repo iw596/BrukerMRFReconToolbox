@@ -59,9 +59,11 @@ FA = ReadFAList("examples/FATest.txt");
 
 TE = ones([size(seqParams.FA)]);
 TE(:) = seqParams.TE;
-
+seqParams.TE = TE;
 TR = ones([size(seqParams.FA)]);
 TR(:) = seqParams.TR;
+seqParams.TR = TR;
+
 % d) put into the main simulated signal  
 tic
 dict = [];
@@ -69,7 +71,7 @@ for ii = 1:size(T1,1)
     tissueParams.T1 = T1(ii);
     tissueParams.T2 = T2(ii);
   %  Msignal = FISPSimulation(seqParams,tissueParams,250);
-    Msignal = YasamanFISPMRF(seqParams.FA,T1(ii),T2(ii),TE,TR,0,length(seqParams.FA),seqParams.TI);
+    Msignal = FISPSimulation(seqParams,tissueParams,200);
     
     MMsignal= Msignal;
     dict(ii,:)= MMsignal;

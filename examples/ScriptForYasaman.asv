@@ -92,22 +92,26 @@ for i = 1:64
        % for k = 1:size(mrfsignal, 3)
        scaleFactor = sqrt(sum(rawdata(i,j,:).*conj(rawdata(i,j,:))));
        normalized_mrfsignal = conj(rawdata(i,j,:))/scaleFactor;
-       inner_product=abs(abs(normalisedDict)*squeeze(normalized_mrfsignal(:,:,:)));
+       inner_product=abs(normalisedDict*squeeze(normalized_mrfsignal(:,:,:)));
        % Find best matching pattern
        [maxValue, max_index] = max((inner_product));
        matched_indices(i, j) = max_index;
 
+       if (maxValue > 0.9)
        T1Map(i,j) = r(max_index,1);
        T2Map(i,j) = r(max_index,2);
        MRFMask(i,j) = 1;
-
-
+       else
+        T1Map(i,j) = r(max_index,1);
+        T2Map(i,j) = r(max_index,2);
+        MRFMask(i,j) = 0;
+       end
     end
 end
 
 figure(3);
 subplot(1,2,1); imagesc(T1Map.*MRFMask);
-subplot(1,2,2); imagesc(T2Map.*MRFMask);
+subplot(1,2,2); imagesc(T2Map.*MRFMask,[0 200]);
 
 ttt = normalisedDict(max_index,:);
 r(max_index,1)
