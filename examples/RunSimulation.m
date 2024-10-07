@@ -5,8 +5,8 @@ addpath("Fitting\")
 %t1series = [50:10:2000,2020:20:3000,3050:50:5000];
 %t2series = [6:5:100,110:10:200,202:2:500];
 
-t1series = [50:5:700];
-t2series = [10:5:350];
+t1series = [50:10:1000];
+t2series = [10:5:500];
 t1l=length(t1series);
 t2l=length(t2series);
 
@@ -53,9 +53,8 @@ figure(1); montage(mat2gray(abs(imgs)))
 seqParams.TI = 9.38; % ms
 seqParams.TR = 13;  %ms
 seqParams.TE = 5;   %ms
-seqParams.FA = GenerateFAPattern(5.0,45.0,400);
+seqParams.FA = GenerateFAPattern(5,45,400);
 
-FA = ReadFAList("examples/FATest.txt");
 
 TE = ones([size(seqParams.FA)]);
 TE(:) = seqParams.TE;
@@ -71,7 +70,7 @@ for ii = 1:size(T1,1)
     tissueParams.T1 = T1(ii);
     tissueParams.T2 = T2(ii);
   %  Msignal = FISPSimulation(seqParams,tissueParams,250);
-    Msignal = FISPSimulation(seqParams,tissueParams,200);
+    Msignal = FISPSimulation(seqParams,tissueParams,100);
     
     MMsignal= Msignal;
     dict(ii,:)= MMsignal;
@@ -115,13 +114,15 @@ end
 
 
 
+
+
 ttt = normalisedDict(max_index,:);
 r(max_index,1)
 r(max_index,2)
 
 figure(1);
 subplot(2,1,1);plot(abs(ttt)); hold on; plot(abs(squeeze(normalized_mrfsignal)));
-subplot(2,1,2);plot(angle(ttt)); hold on; plot(angle(squeeze(normalized_mrfsignal)));
+subplot(2,1,2);plot(angle(ttt)); hold on; plot(angle(squeeze(imgs(i,j,:))));
 
 
 %% Gold standard Inversion recovery and MSME T2 mapping

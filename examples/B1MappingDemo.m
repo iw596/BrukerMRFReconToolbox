@@ -7,16 +7,22 @@ pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 pulse = pulse./max(pulse);
 pth = "datasets\7";
 params = LoadBrukerData(pth);
-
 data = reshape(params.data,[128,2,128]);
 data = permute(data,[1 3 2]);
-
 imgs = ifftcn(data,[1 2]);
 
+%% Calculate the phase images for both slices
+img1Phs = angle(imgs(:,:,1));
+img2Phs = angle(imgs(:,:,2));
+
+gamma = 2*pi*4258; % Rad/Gauss
+pulseShape = pulse;
+pulseLength = 8e-3;
+offset = 2*pi*4000;
+dT = pulseLength/2048;
+kbs = gamma * gamma * trapz((abs(pulseShape).^2)./(2*offset))*dT' % rads/Gauss^2
+
+
+
+
 % Generate phase images for both offsets
-
-phsImg1 = angle(imgs(:,:,1));
-phsImg2 = angle(imgs(:,:,2));
-
-tmp = (unwrap(flipud(angle(imgs(:,:,1))))-unwrap(flipud(angle(imgs(:,:,2)))));
-[B1Map] = BlochSiegertB1(imgs,pulse,8e-3,params)
