@@ -1,6 +1,5 @@
 
-%% Function to read FA list stored in IW's FA text files, first entry in text file is
-%% header information
+%% Function t
 function FAList = ReadFAList(pth)
     fileID = fopen(pth,'r');
     % Read first line
@@ -11,11 +10,8 @@ function FAList = ReadFAList(pth)
     counter = 1;
     while ischar(tline)
         tline = fgetl(fileID);
-        val = str2double(tline);
-        if (~isnan(val))
-            FAList(counter) = str2double(tline);
-            counter = counter + 1;
-        end
+        FAList(counter) = str2double(tline);
+        counter = counter + 1;
     end
     fclose(fileID);
 end

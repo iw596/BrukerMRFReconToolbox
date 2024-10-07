@@ -32,17 +32,18 @@ T2 = r(:,2);
 
 
 %% Open bruker MRF dataset
-pth = "datasets\85";
+pth = "datasets\48";
 params = LoadBrukerData(pth);
-%FAList = ReadFAList("datasets\FATest.txt");
+FAList = ReadFAList("datasets\MRFFAPattern.txt");
 
 
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
-rawdata = reshape(rawdata, [128 400 64]);
+rawdata = reshape(rawdata, [128 length(FAList) 64]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = ifftcn(rawdata,[1 2]);
-figure(1); montage(mat2gray(abs(imgs)))
+figure(1); montage(mat2gray(abs(imgs)));
+figure(2);plot(abs(squeeze(imgs(64,32,:))));
 %figure(2); imshow(abs(imgs(:,:,300)),[])
 
 
@@ -50,10 +51,11 @@ figure(1); montage(mat2gray(abs(imgs)))
 
 
 %% Set-up sequence parameters
-seqParams.TI = 9.38; % ms
+seqParams.TI = 8; % ms
 seqParams.TR = 13;  %ms
 seqParams.TE = 5;   %ms
-seqParams.FA = GenerateFAPattern(5,45,400);
+seqParams.InversionApplied = 1;
+seqParams.FA = FAList;
 
 
 TE = ones([size(seqParams.FA)]);
@@ -70,7 +72,7 @@ for ii = 1:size(T1,1)
     tissueParams.T1 = T1(ii);
     tissueParams.T2 = T2(ii);
   %  Msignal = FISPSimulation(seqParams,tissueParams,250);
-    Msignal = FISPSimulation(seqParams,tissueParams,100);
+    Msignal = FISPSimulation(seqParams,tissueParams,300);
     
     MMsignal= Msignal;
     dict(ii,:)= MMsignal;
@@ -90,12 +92,12 @@ for c = 1:cnt
 end
 
 % Iterate through each voxel
-for i = 1:128
-    for j = 1:64
+for i = 64:64
+    for j = 32:32
        % for k = 1:size(mrfsignal, 3)
        scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
        normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
-       inner_product=normalisedDict*squeeze(normalized_mrfsignal);
+       inner_product=abs(normalisedDict*squeeze(normalized_mrfsignal));
        % Find best matching pattern
        [maxValue, max_index] = max(abs(inner_product));
        matched_indices(i, j) = max_index;
@@ -111,6 +113,11 @@ for i = 1:128
        end
     end
 end
+
+
+figure(4);
+subplot(1,2,1);imagesc(T1Map);title("T1 Map");
+subplot(1,2,2);imagesc(T2Map);title("T2 Map");
 
 
 

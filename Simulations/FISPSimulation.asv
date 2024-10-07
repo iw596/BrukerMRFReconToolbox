@@ -6,7 +6,7 @@ function M_Echo = FISPSimulation(SeqParams,TissueParams,NIso)
     TE = SeqParams.TE;
     TR = SeqParams.TR;
     %Create spin distribution between -4pi and 4pi
-    phi = linspace(-1*pi,1*pi,NIso);
+    phi = linspace(-6*pi,6*pi,NIso);
     M = zeros([3,NIso]);
     Nexp = length(SeqParams.FA);
    %  % Create array to store (absolute) result at each TE
