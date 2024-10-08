@@ -5,7 +5,7 @@ addpath("Fitting\")
 %t1series = [50:10:2000,2020:20:3000,3050:50:5000];
 %t2series = [6:5:100,110:10:200,202:2:500];
 
-t1series = [50:10:1000];
+t1series = [50:10:5000];
 t2series = [10:5:500];
 t1l=length(t1series);
 t2l=length(t2series);

@@ -10,16 +10,16 @@ function FAPattern = GenerateFAPattern(NLobes,NPoints,minFA,maxFA,addRamp,fileNa
             curPoint = curPoint + 1;
         end
     end
-    % If addRamp = 1 then we add a rapidly alternating train of FA, this
+    % If addRamp = 1 then we add a rapidly ramping train of FA, this
     % helps estimate B1
     
     if (addRamp == 1)
         initialZeros = zeros(10,1);
-        peakFAs = ones(15,1) * 90;
+        ramp = linspace(0,65,15);
         minFAs = zeros(15,1);
         FAPattern = cat(1,FAPattern,initialZeros);
         for i = 1:6
-            FAPattern = cat(1,FAPattern,peakFAs,minFAs);
+            FAPattern = cat(1,FAPattern,ramp.',minFAs);
         end
 
     end
