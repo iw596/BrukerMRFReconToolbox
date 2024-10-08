@@ -46,7 +46,8 @@ offset = 2*pi*4000;
 dT = pulseLength/2048;
 kbs = gamma * gamma * trapz((abs(pulseShape).^2)./(2*offset))*dT'; % rads/Gauss^2
 ttt = sqrt(phaseImage./ kbs);
-figure; imagesc((abs(ttt)./peakB1).*BW)
+ttt = medfilt2(abs(ttt),[5,5]);
+figure; imagesc(abs(ttt)./peakB1.*BW,[0.5,1])
 
 %B1Map_full = sqrt(phaseImage / kbs);
 %flipAngleMap_full = B1Map_full * gamma*sum(pulseShape)*dT*180/pi / 1200 *100;
