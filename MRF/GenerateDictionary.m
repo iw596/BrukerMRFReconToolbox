@@ -1,6 +1,6 @@
 %% Function to generate (using Bloch simulation) an MRF dictionary
 %% if file path is provided then data will be saved 
-function dict = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,NIso,pth)
+function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,NIso,pth)
     if (nargin < 10)
         saveDictionary = 0;
     else
@@ -34,8 +34,7 @@ function dict = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,N
     
     % Run Bloch simulation
     
-    for i = 1:NDictionaryEntries
-        i
+    parfor i = 1:NDictionaryEntries
         T1 = LUT(i,1);
         T2 = LUT(i,2);
         B1 = LUT(i,3);
