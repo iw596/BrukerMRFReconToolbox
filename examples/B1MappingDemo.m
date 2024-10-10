@@ -5,7 +5,7 @@ addpath("recon\")
 pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 % Normalise pulse amplitude
 pulse = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\19";
+pth = "datasets\BlochSiegertData\21";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
@@ -29,7 +29,7 @@ BW = imbinarize(mat2gray(abs(imgs(:,:,1))));
 BW = imclose(BW, se);
 BW = imfill(BW, 'holes');
 
-phaseImage = 2 * atan2(imag(imgs(:,:,1)./imgs(:,:,2)),real(imgs(:,:,1)./imgs(:,:,2)));
+phaseImage = atan2(imag(imgs(:,:,1)./imgs(:,:,2)),real(imgs(:,:,1)./imgs(:,:,2)));
 
 
 gamma = 42.58 * 10^6; % Hz/T
@@ -42,7 +42,7 @@ BHat = trapz((abs(pulseShape).^2))*dT'; % Normalized pulse-envelope squared inte
 
 ttt = sqrt((phaseImage.*offset)./(2*pi*BHat));
 ttt = ttt./(gamma * peakB1);
-figure; imagesc(abs(ttt).*BW,[0.5,1])
+figure; imagesc(medfilt2(abs(ttt),[5,5]).*BW,[0.5,1])
 
 kbs = gamma * gamma * trapz((abs(pulseShape).^2)./(2*offset))*dT'; % rads/Gauss^2
 ttt = sqrt(phaseImage./ kbs);

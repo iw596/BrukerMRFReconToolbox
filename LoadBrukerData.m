@@ -75,7 +75,9 @@ function params = LoadBrukerData(path)
     line = split(line(2),' ');
     params.NCol = str2num(cell2mat(line(1))); % NCol is Siemens language for number of points in a PE line/radial spoke
     params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
-    
+    if (length(line) > 2)
+        params.NPar = str2num(cell2mat(line(3))); % NLin is Siemens language for Phase encoding in 3d dimension
+    end
 
     % Extract the FOV
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov'));
