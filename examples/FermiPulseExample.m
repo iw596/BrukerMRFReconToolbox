@@ -17,5 +17,17 @@ fprintf(fileID, '##MINX= %f\n',min(abs(pulse)));
 fprintf(fileID, '##MAXX= %f\n',max(abs(pulse)));
 fprintf(fileID, '##MINY= 0.000000e+00\n');
 fprintf(fileID, '##MAXY= 0.000000e+00\n');
-
+fprintf(fileID, '##$SHAPE_EXMODE= Excitation\n');
+fprintf(fileID, '##$SHAPE_TOTROT= 9.000000e+01\n');
+fprintf(fileID, '##$SHAPE_BWFAC= 1.86\n');
+fprintf(fileID, '##$SHAPE_INTEGFAC= 0.50\n');
+fprintf(fileID, '##$SHAPE_REPHFAC= 50\n');
+fprintf(fileID, '##$SHAPE_TYPE= conventional\n');
+fprintf(fileID, '##$SHAPE_MODE= 0\n');
+fprintf(fileID, '##NPOINTS= %d\n',NPoints);
+fprintf(fileID, '##XYPOINTS= (XY..XY)\n');
+for i = 1:NPoints
+    fprintf(fileID,'%f, %f\n',pulse(i),0.0);
+end
+fprintf(fileID,'##END=');
 fclose(fileID);

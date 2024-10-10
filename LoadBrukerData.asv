@@ -74,7 +74,8 @@ function params = LoadBrukerData(path)
     line = splitlines(line);
     line = split(line(2),' ');
     params.NCol = str2num(cell2mat(line(1))); % NCol is Siemens language for number of points in a PE line/radial spoke
-    params.NLin = str2num(cell2mat(line(2)));
+    params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
+    
 
     % Extract the FOV
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov'));
@@ -82,7 +83,7 @@ function params = LoadBrukerData(path)
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     line = split(line(2),' ');
-    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))]
+    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
 
 
     % Extract number of repetitions
@@ -98,9 +99,56 @@ function params = LoadBrukerData(path)
     if (isempty(line) ~=1)
         params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
         line = split(line,')');
-        params.InvTimes = str2double(line)
+        params.InvTimes = str2double(split(line(2),' '));
+    end
+
+    % Extract inversion times
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$EffectiveTE'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.MSMETimes = str2double(split(line(2),' '));
+    end
+
+    % Extract information about slice spoiler
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$SliceSpoiler'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        tmp = cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once'));
+        tmp = strsplit(tmp,',');
+        % Split comma separated values
+        sliceSpoiler.duration = ; % Spoiler duration in ms
+
     end
     
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RefPowCh1'));
+    line = TextAsCells(mask);
+    line = strtrim(extractAfter(cell2mat(line),'='));
+    line = splitlines(line);
+    params.RefPow = str2num(cell2mat(line(1)));
+        
+    
+    % Extract Bloch Siegert frequency offset in Hz
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSFreqOffset'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.BSFreqOffset = str2num(cell2mat(line(1)));
+    end
+   
+    % Extract Bloch Siegert pulse power (watts)
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSPulsePower'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.BSPulsePower = str2num(cell2mat(line(1)));
+    end
+
     % Find number of read dephasing points
    % params.NCha
 

@@ -74,7 +74,8 @@ function params = LoadBrukerData(path)
     line = splitlines(line);
     line = split(line(2),' ');
     params.NCol = str2num(cell2mat(line(1))); % NCol is Siemens language for number of points in a PE line/radial spoke
-    params.NLin = str2num(cell2mat(line(2)));
+    params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
+    
 
     % Extract the FOV
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov'));
@@ -108,6 +109,18 @@ function params = LoadBrukerData(path)
         params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
         line = split(line,')');
         params.MSMETimes = str2double(split(line(2),' '));
+    end
+
+    % Extract information about slice spoiler
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$SliceSpoiler'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        tmp = cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once'));
+        tmp = strsplit(tmp,',');
+        % Split comma separated values
+        sliceSpoiler.duration = str2num(tmp{3}); % Spoiler duration in ms
+        sliceSpoiler.NCycles = str2num(tmp{2});
+        params.sliceSpoiler = sliceSpoiler;
     end
     
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RefPowCh1'));
