@@ -47,7 +47,7 @@ b1 = sqrt(deltaOmega./(2*kbs));
 % ttt = ttt./(gamma * peakB1);
 % figure; imagesc(medfilt2(abs(ttt),[5,5]).*BW,[0.5,1])
 % gamma = 4258;
-% kbs = gamma * gamma * trapz((abs(pulseShape).^2)./(2*2*pi*offset))*dT'; % rads/Gauss^2
+% kbs = gamma * gamma * trapz((abs(pulseShape).^2)./(2*offset))*dT'; % rads/Gauss^2
 % ttt = sqrt(phaseImage./ kbs);
 % ttt = medfilt2(abs(ttt),[5,5]);
 
