@@ -15,7 +15,7 @@ B1Map = B1Map*180/pi;
 B1Map = B1Map/flip;
 
 % Smooth image with median filter kernel
-B1Map = medfilt3(B1Map,[5, 5, 5]);
+%B1Map = medfilt3(B1Map,[5, 5, 5]);
 
 end
 
