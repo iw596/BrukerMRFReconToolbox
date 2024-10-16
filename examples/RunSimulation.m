@@ -92,8 +92,8 @@ for c = 1:cnt
 end
 
 % Iterate through each voxel
-for i = 64:64
-    for j = 32:32
+for i = 1:128
+    for j = 1:64
        % for k = 1:size(mrfsignal, 3)
        scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
        normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
