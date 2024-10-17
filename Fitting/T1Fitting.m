@@ -1,6 +1,9 @@
 %% Function to fit T1 to (magnitude) images acquired at a variety inversion time TI
 function map = T1Fitting(imgs,TI,mask)
-    
+    if (nargin < 3)
+        mask = ones(size(imgs));
+    end
+
     map = size([imgs]);
     options.Algorithm = 'levenberg-marquardt';
     for ii = 1:size(imgs,1)

@@ -1,9 +1,13 @@
 function  map = T2Fitting(imgs,TE,mask)
+
+    if (nargin < 3)
+        mask = ones(size(imgs(:,:,1)));
+    end
     % Drop first echo
-    imgs = imgs(:,:,2:end);
+    %imgs = imgs(:,:,2:end);
     options.Algorithm = 'levenberg-marquardt';
 
-    TE = TE(2:end);
+   % TE = TE(2:end);
     for ii = 1:size(imgs,1)
         for jj = 1:size(imgs,2)
             if (mask(ii,jj) == 1)

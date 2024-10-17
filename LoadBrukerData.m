@@ -108,7 +108,7 @@ function params = LoadBrukerData(path)
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$EffectiveTE'));
     line = TextAsCells(mask);
     if (isempty(line) ~=1)
-        params.NInv = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        params.NEcho = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
         line = split(line,')');
         params.MSMETimes = str2double(split(line(2),' '));
     end

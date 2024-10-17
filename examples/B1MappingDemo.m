@@ -8,31 +8,77 @@ addpath("lib\")
 % Try and open exc pulse
 pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 % Normalise pulse amplitude
-pulse = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\8";
+B1Envelope = pulse./max(pulse);
+pth = "datasets\BlochSiegertData\10";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
 data = permute(data,[1 3 2]);
 imgs = ifftcn(data,[1 2]);
+Vpulse = sqrt(params.BSPulsePower * 50); % Peak voltage assuming 50ohm load
+Vref = sqrt(params.RefPow * 50); % Peak voltage assuming 50ohm load
+
+
+gyromagnetic_ratio_7T = 42.58;
+theta = pi/2; %rad/s
+gyromagnetic_ratio_7T = gyromagnetic_ratio_7T*10^6*2*pi; %rad/Tesla; Gyromagnetic ratio of 1H at 7T.
+t_pulse = 1*10^-3; %seconds
+B1_ref_90 = (theta)/(gyromagnetic_ratio_7T*t_pulse); %Tesla
+f_BS = 2*pi*params.BSFreqOffset;
+t_BS = 8e-3;
+
+%Pint from Fermi pulse
+B1_normalized = 0.3769;
+% Solve for K_BS
+K_BS = gyromagnetic_ratio_7T.^2*t_BS*B1_normalized/(2*f_BS);
 
 
 
+%% Create Binary mask
+ se = strel('disk', 20, 0);
+ BW = imbinarize(mat2gray(abs(imgs(:,:,1))));
+ BW = imclose(BW, se);
+ BW = imfill(BW, 'holes');
 
-PhaseDiff=angle(imgs(:,:,1).*conj(imgs(:,:,2)));
 
+ B1pk = sqrt(PhaseDiff./( K_BS));% .* 100;
+figure; imagesc(BW.*abs(B1pk./B1_ref_90))
+
+%dwrf = params.BSFreqOffset;
+%PhaseDiff=angle(imgs(:,:,1).*conj(imgs(:,:,2)));
+%PhaseDiff = PhaseDiff * 0.5;
 % Perform ROMEO phase unwrapping
-parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
-mkdir(parameters.output_dir) ;
-parameters.mask = 'nomask';
-[uwpPhaseDiff] = ROMEO(PhaseDiff, parameters);
-rmdir(parameters.output_dir, 's') % remove the temporary ROMEO output folder
+%parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
+%mkdir(parameters.output_dir) ;
+%parameters.mask = 'nomask';
+%[uwpPhaseDiff] = ROMEO(PhaseDiff, parameters);
+%rmdir(parameters.output_dir, 's') % remove the temporary ROMEO output folder
+%uwpPhaseDiff = uwpPhaseDiff/2;
+%%   [B1classic KBS]=gadgetron.FIL.utils.ComputeBSSB1Map(uwpPhaseDiff/2,RefVoltage,BSPulseVoltage,BSPulseDuration,OffsetFrequencyHz);
 
 
 
 
 
 
+
+B1nom = (pi/2)/(gamma * 1e-3);
+
+bsB1 = (B1nom./Vref) .*  Vpulse; % in T
+
+B1pk = sqrt((PhaseDiff)./(2 * pi* K_BS));% .* 100;
+
+% Divide by Refernce B1 to get fraction relative to 
+
+
+ttt = BW.*(abs(B1pk./B1_ref_90.*90))./220;
+
+ttt = medfilt2(ttt,[5,5]);
+
+
+ppp = abs((AFIB1Map(:,:,16) - ttt))./(0.5*(ttt+AFIB1Map(:,:,16)));
+ppp = ppp.*100;
+figure; imagesc(ppp.*BW(:,:,16))
 % %% Calculate peak B1 of BS pulse
 % refB1 = (pi/2)./(2*pi*42.6*10^6*1e-3); % Peak B1 in T
 % % Calculate reference peak voltage assuming 50 ohm load
