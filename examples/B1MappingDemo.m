@@ -1,6 +1,10 @@
 addpath("FileIO\")
 addpath("B1Mapping\")
 addpath("recon\")
+addpath("ROMEO\");
+addpath("NIfTI_20140122\")
+addpath("lib\")
+
 % Try and open exc pulse
 pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 % Normalise pulse amplitude
@@ -18,7 +22,11 @@ imgs = ifftcn(data,[1 2]);
 PhaseDiff=angle(imgs(:,:,1).*conj(imgs(:,:,2)));
 
 % Perform ROMEO phase unwrapping
-
+parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
+mkdir(parameters.output_dir) ;
+parameters.mask = 'nomask';
+[uwpPhaseDiff] = ROMEO(PhaseDiff, parameters);
+rmdir(parameters.output_dir, 's') % remove the temporary ROMEO output folder
 
 
 
