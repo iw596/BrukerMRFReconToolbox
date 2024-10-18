@@ -5,7 +5,7 @@ addpath("Fitting\")
 
 
 %% Open bruker MRF dataset
-pth = "datasets\MRF\29";
+pth = "datasets\MRF\17";
 params = LoadBrukerData(pth);
 
 
@@ -61,6 +61,20 @@ figure(3);
 subplot(1,2,1); imagesc(T1Map.*mask); axis square;
 subplot(1,2,2); imagesc(T2Map.*mask); axis square;
 
+
+T1MRFMean = mean(nonzeros(T1Map.*mask))
+T1MRFStd = T1Map.*mask;
+T1MRFStd(T1MRFStd==0) = nan; % Set to nan wherever there is a 0.
+T1MRFStd = std(T1MRFStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
+
+T2MRFMean = mean(nonzeros(T2Map.*mask))
+T2MRFStd = T2Map.*mask;
+T2MRFStd(T2MRFStd==0) = nan; % Set to nan wherever there is a 0.
+T2MRFStd = std(T2MRFStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
+
+
+
+
 %% Load T1 FAIR RARE
 pth = "datasets\22";
 params = LoadBrukerData(pth);
@@ -69,6 +83,11 @@ data = fread(fid,"int16");
 data = reshape(data,[params.NCol 64 params.NInv]);
 fclose(fid);
 T1RefMap = T1Fitting(data,params.InvTimes);
+T1RefMean = mean(nonzeros(T1RefMap.*mask))
+T1RefStd = T1RefMap.*mask;
+T1RefStd(T1RefStd==0) = nan; % Set to nan wherever there is a 0.
+T1RefStd = std(T1RefStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
+
 
 
 %% Load T2 MSME
@@ -79,6 +98,11 @@ data = fread(fid,"int16");
 data = reshape(data,[128 params.NLin params.NEcho]);
 fclose(fid);
 T2RefMap = T2Fitting(data,params.MSMETimes);
+T2RefMean = mean(nonzeros(T2RefMap.*mask))
+T2RefStd = T2RefMap.*mask;
+T2RefStd(T2RefStd==0) = nan; % Set to nan wherever there is a 0.
+T2RefStd = std(T2RefStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
+
 
 
 

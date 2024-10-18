@@ -9,7 +9,7 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\10";
+pth = "datasets\BlochSiegertData\8";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
@@ -37,12 +37,12 @@ K_BS = gyromagnetic_ratio_7T.^2*t_BS*B1_normalized/(2*f_BS);
 %% Create Binary mask
  se = strel('disk', 20, 0);
  BW = imbinarize(mat2gray(abs(imgs(:,:,1))));
- BW = imclose(BW, se);
- BW = imfill(BW, 'holes');
+ %BW = imclose(BW, se);
+ %BW = imfill(BW, 'holes');
 
 
  B1pk = sqrt(PhaseDiff./( K_BS));% .* 100;
-figure; imagesc(BW.*abs(B1pk./B1_ref_90))
+figure; imagesc(BW.*(abs(B1pk./B1_ref_90) * 90)./232.5); axis square;
 
 %dwrf = params.BSFreqOffset;
 %PhaseDiff=angle(imgs(:,:,1).*conj(imgs(:,:,2)));
