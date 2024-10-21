@@ -1,7 +1,7 @@
 %% Function to generate (using Bloch simulation) an MRF dictionary
 %% if file path is provided then data will be saved 
-function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,NIso,pth)
-    if (nargin < 10)
+function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,sp,NIso,pth)
+    if (nargin < 11)
         saveDictionary = 0;
     else
         saveDictionary = 1;
@@ -38,7 +38,7 @@ function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCy
         T1 = LUT(i,1);
         T2 = LUT(i,2);
         B1 = LUT(i,3);
-        dict(i,:) = MRF_FISP_BlochSim(T1,T2,B1.*FA,TR,TE,TI,spoilingCycles,NIso);
+        dict(i,:) = MRF_FISP_BlochSim(T1,T2,B1.*FA,TR,TE,TI,spoilingCycles,sp,NIso);
     end
     
     if (saveDictionary == 1)

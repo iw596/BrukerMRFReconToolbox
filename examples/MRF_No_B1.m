@@ -5,7 +5,7 @@ addpath("Fitting\")
 
 
 %% Open bruker MRF dataset
-pth = "datasets\MRF\17";
+pth = "datasets\MRF\28";
 params = LoadBrukerData(pth);
 
 
@@ -34,13 +34,14 @@ mask = imfill(mask, 'holes');
 % Normalise Dictionary
 normalisedDict = [];
 cnt=length(dict);
-for c = 1:cnt  
+parfor c = 1:cnt  
     scaleFactor = sqrt(sum(dict(c,:).*conj(dict(c,:))));
     normalisedDict(c,:) = dict(c,:) / scaleFactor;
 end
 
 % Iterate through each voxel
-for i = 1:128
+parfor i = 1:128
+    i
     for j = 1:64
        % for k = 1:size(mrfsignal, 3)
        scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
