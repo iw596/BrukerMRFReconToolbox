@@ -1,0 +1,70 @@
+addpath("FileIO\")
+addpath("B1Mapping\")
+addpath("recon\")
+addpath("ROMEO\");
+addpath("NIfTI_20140122\")
+addpath("lib\")
+
+% Try and open exc pulse
+pulse = ReadRFPulseFile("datasets\IWFermiPuilse.exc");
+% Normalise pulse amplitude
+B1Envelope = pulse./max(pulse);
+pth = "datasets\BlochSiegertData\23";
+%pth = "datasets\21";
+params = LoadBrukerData(pth);
+data = reshape(params.data,[params.NCol,2,params.NLin]);
+data = permute(data,[1 3 2]);
+imgs = ifftcn(data,[1 2]);
+Vpulse = sqrt(params.BSPulsePower * 50); % Peak voltage assuming 50ohm load
+Vref = sqrt(params.RefPow * 50); % Peak voltage assuming 50ohm load
+
+B1ref = (pi/2)./(2*pi*42.6*10^6*1e-3); % Peak B1 in T
+B1nom = (B1ref./Vref) .*  Vpulse; % in T
+
+imgPos = imgs(:,:,1);
+imgNeg = imgs(:,:,2);
+
+gamma = 2.*pi.*42.57e6; % rad Hz / T
+
+dwRF = 2.*pi.*params.BSFreqOffset;
+
+
+bsPosPhase = angle(imgPos);
+bsNegPhase = angle(imgNeg);
+
+powerIntegral = 0.650376473268939;
+
+kbs = (2*pi*4258).^2 * 8e-3*powerIntegral/(2*dwRF)
+
+
+PhaseDiff= 0.5 * atan2(imag(conj(imgNeg).*imgPos), real(conj(imgNeg).*imgPos));
+
+B1 = sqrt(PhaseDiff./kbs);
+
+% time vector
+%Pint from Fermi pulse
+%powerIntegral = 0.3769;
+% Solve for K_BS
+
+
+
+PhaseDiff=angle(imgPos.*conj(imgNeg));
+% unwrap phase difference using ROMEO phase uwnrapping
+parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
+mkdir(parameters.output_dir) ;
+parameters.mask = 'nomask';
+[uwpPhaseDiff] = ROMEO(PhaseDiff, parameters);
+rmdir(parameters.output_dir, 's') % remove the temporary ROMEO output folder
+
+
+CorrFactor=DurPulse*1e6/8192; %% based on Sequence code
+t0 = 3e-3*CorrFactor;          % pulse width, s, as per sequence
+a = 0.16e-3*CorrFactor;        % timing parameter s.t. as a -> 0 Fermi -> Hard pulse
+
+% time vector
+dt=0.01e-3;
+t = -(DurPulse/2):dt:(DurPulse/2);
+
+
+% Fermi pulse centred at time t = 0:
+B1Envelope = 1 ./ (1 + exp( (abs(t) - t0) ./ a));

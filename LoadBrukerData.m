@@ -113,6 +113,14 @@ function params = LoadBrukerData(path)
         params.MSMETimes = str2double(split(line(2),' '));
     end
 
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$EPIC_FlipAngleList'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NEPICFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.EPICFA = str2double(split(line(2),' '));
+    end
+
     % Extract information about slice spoiler
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$SliceSpoiler'));
     line = TextAsCells(mask);
@@ -166,27 +174,27 @@ function params = LoadBrukerData(path)
         fileName = strcat(path,'\','fid');
         fid = fopen(fileName,'r','native');
     end
-
-    fseek(fid,0,'bof');
-    rawdata = fread(fid,'int32');
-    fclose(fid);
-    rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-    params.data =rawdata;
-    clear("rawdata");
-
-    %% Load calibration data if present
-    if (params.Calibration == true)
-        fileName = strcat(path,'\','rawdata.job1');
-        fid = fopen(fileName,'r','native');
+    if (fid ~= -1)
         fseek(fid,0,'bof');
         rawdata = fread(fid,'int32');
         fclose(fid);
         rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-        % Reshape the data using extracted parameters
-        rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
-        params.calibData =rawdata;
+        params.data =rawdata;
         clear("rawdata");
+    
+        %% Load calibration data if present
+        if (params.Calibration == true)
+            fileName = strcat(path,'\','rawdata.job1');
+            fid = fopen(fileName,'r','native');
+            fseek(fid,0,'bof');
+            rawdata = fread(fid,'int32');
+            fclose(fid);
+            rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
+            % Reshape the data using extracted parameters
+            rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
+            params.calibData =rawdata;
+            clear("rawdata");
+        end
     end
-
     
 end
