@@ -1,12 +1,13 @@
 addpath('MRF\')
 addpath('Simulations\')
 
-T1List = [50:1:250];
-T2List = [10:1:80];
-FA = ReadFAList("datasets\MRFFAPattern.txt");
-figure; plot(FA); title("Flip Angle Pattern"); ylabel("Flip Angle [degrees]")
-TI = 8; %  Inversion Time ms
-TR = 13; % Repetition time ms
+T1List = [50:5:350];
+T2List = [10:5:320];
+[FA,TR] = ReadMR("datasets\MRFFAPattern.txt");
+figure; 
+subplot(1,2,1);plot(FA); title("Flip Angle Pattern"); ylabel("Flip Angle [degrees]")
+subplot(1,2,2);
+TI = 20; %  Inversion Time ms
 TE = 5.5;  % Echo time ms
 spoilingCycles = 4; % 6 pi spoiling 
 B1 = [0.9:0.01:1.10]; % i.e. no B1 correction

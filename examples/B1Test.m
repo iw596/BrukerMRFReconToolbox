@@ -9,7 +9,7 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\IWFermiPuilse.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\23";
+pth = "datasets\BlochSiegertData\10";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
@@ -40,6 +40,8 @@ kbs = (2*pi*4258).^2 * 8e-3*powerIntegral/(2*dwRF)
 PhaseDiff= 0.5 * atan2(imag(conj(imgNeg).*imgPos), real(conj(imgNeg).*imgPos));
 
 B1 = sqrt(PhaseDiff./kbs);
+figure; imagesc(abs(B1)./(B1nom*10000))
+
 
 % time vector
 %Pint from Fermi pulse
