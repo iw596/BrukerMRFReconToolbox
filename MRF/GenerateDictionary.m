@@ -32,8 +32,7 @@ function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCy
         error("Lengths of FA and TR are not equal!");
     end
     
-    % Run Bloch simulation
-    
+    % Run Bloch simulation 
     parfor i = 1:NDictionaryEntries
         T1 = LUT(i,1);
         T2 = LUT(i,2);
@@ -45,8 +44,5 @@ function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCy
         pth = pth + '\\dictionary';
         save(pth,'dict','LUT');
     end
-
-    
-
 end
 

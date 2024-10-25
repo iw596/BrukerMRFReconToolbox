@@ -25,7 +25,7 @@ function FAPattern = GenerateFAPattern(NLobes,NPoints,minFA,maxFA,lobeGap,addRam
     
     if (addRamp == 1)
         initialZeros = zeros(10,1);
-        ramp = linspace(0,65,15);
+        ramp = linspace(0,45,15);
         minFAs = zeros(15,1);
         for i = 1:6
             FAPattern = cat(1,FAPattern,ramp.',minFAs);

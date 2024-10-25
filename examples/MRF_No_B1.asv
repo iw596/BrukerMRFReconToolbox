@@ -5,7 +5,7 @@ addpath("Fitting\")
 
 
 %% Open bruker MRF dataset
-pth = "datasets\MRFData\28";
+pth = "datasets\MRF\28";
 params = LoadBrukerData(pth);
 
 

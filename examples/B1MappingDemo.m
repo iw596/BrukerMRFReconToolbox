@@ -9,7 +9,95 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
+<<<<<<< Updated upstream
 pth = "datasets\BlochSiegertData\9";
+=======
+
+
+% Amplitude integral will be sum of all pulse elements
+ampInt = sum(B1Envelope)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pth = "datasets\BlochSiegertData\5";
+>>>>>>> Stashed changes
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
@@ -17,10 +105,34 @@ data = permute(data,[1 3 2]);
 imgs = ifftcn(data,[1 2]);
 Vpulse = sqrt(params.BSPulsePower * 50); % Peak voltage assuming 50ohm load
 Vref = sqrt(params.RefPow * 50); % Peak voltage assuming 50ohm load
+B1Ref = (pi/2)./(2*pi*42.6*10^6*1e-3); % Peak B1 in T
+BSSB1 = (B1Ref./Vref) .*  Vpulse; % in T
+
+gamma = 2*pi*42.58e6;           %rad/s/T
+deltat = 1e-6;                  %s 
+deltaOmega = 2 * pi * params.BSFreqOffset;
+Kbs = sum( pulse.^2) * gamma^2 * deltat / (deltaOmega);
+imgPos = imgs(:,:,1);
+imgNeg = imgs(:,:,2);
+PhaseDiff = -angle(imgs(:,:,1).*conj(imgs(:,:,2)));
+PhaseDiff = PhaseDiff./2; % Combining phases from BSS+ and BSS- 
+B1Map_full = sqrt(PhaseDiff / (Kbs));
+
+alphaBS = 300;
+
+flipAngleMap_full = B1Map_full *180/pi / alphaBS *100;
+
+
+
+
+
+
+
 
 B1ref = (pi/2)./(2*pi*42.6*10^6*1e-3); % Peak B1 in T
 B1nom = (B1ref./Vref) .*  Vpulse; % in T
 
+<<<<<<< Updated upstream
 
 
 magB1 = abs(pulse);
@@ -38,10 +150,13 @@ t_pulse = 1*10^-3; %seconds
 B1_ref_90 = (theta)/(gyromagnetic_ratio_7T*t_pulse); %Tesla
 f_BS = 2*pi*params.BSFreqOffset;
 t_BS = 8e-3;
+=======
+>>>>>>> Stashed changes
 
 %Pint from Fermi pulse
 B1_normalized = 0.3769;
 % Solve for K_BS
+<<<<<<< Updated upstream
 gamma = 26745; % in rad/G
 
 imgPos = imgs(:,:,1);
@@ -77,6 +192,8 @@ figure; imagesc(BW.*map./(1.9562e-05 * 10000));
 
 
 
+=======
+>>>>>>> Stashed changes
 
 
 
@@ -86,13 +203,18 @@ figure; imagesc(BW.*map./(1.9562e-05 * 10000));
  %BW = imclose(BW, se);
  %BW = imfill(BW, 'holes');
 
+PhaseDiff = -angle(imgs(:,:,1).*conj(imgs(:,:,2)));
+PhaseDiff = PhaseDiff./2; % Combining phases from BSS+ and BSS- 
+GAMMA_RAD       = 267.52218744e6;  % rad/(sT);
+powerIntegral = 0.3769;
+KBS = GAMMA_RAD*GAMMA_RAD * powerIntegral * 1e-6./(2 * f_BS);
+K_BS = GAMMA_RAD.^2*t_BS*B1_normalized/(2*f_BS);
 
- B1pk = sqrt(PhaseDiff./( K_BS));% .* 100;
-figure; imagesc(BW.*(abs(B1pk./B1_ref_90) * 90)./232.5); axis square;
+B1pk = sqrt(PhaseDiff / K_BS);
+figure; imagesc(BW.*(abs(B1pk))); axis square;
 
 %dwrf = params.BSFreqOffset;
-%PhaseDiff=angle(imgs(:,:,1).*conj(imgs(:,:,2)));
-%PhaseDiff = PhaseDiff * 0.5;
+
 % Perform ROMEO phase unwrapping
 %parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
 %mkdir(parameters.output_dir) ;
@@ -106,13 +228,12 @@ figure; imagesc(BW.*(abs(B1pk./B1_ref_90) * 90)./232.5); axis square;
 
 
 
-
-
+GAMMA_RAD.^2/(2*f_BS) .* trapz(linspace(0,6e-3,1000),abs(H))
 B1nom = (pi/2)/(gamma * 1e-3);
 
 bsB1 = (B1nom./Vref) .*  Vpulse; % in T
 
-B1pk = sqrt((PhaseDiff)./(2 * pi* K_BS));% .* 100;
+B1pk = sqrt((PhaseDiff)./(2 * pi* K_BS));
 
 % Divide by Refernce B1 to get fraction relative to 
 
@@ -147,8 +268,7 @@ figure; imagesc(ppp.*BW(:,:,16))
 % bsFreqOffset = 2*pi * params.BSFreqOffset;
 % dT = 8e-3/2048;
 % kbs = sum(pulse)*dT * gamma^2 * 1./(2*bsFreqOffset)
-% imgPos = imgs(:,:,1);
-% imgNeg = imgs(:,:,2);
+
 % 
 % phaseImage = angle(imgNeg) - angle(imgPos);
 % phaseImage(phaseImage<0) = phaseImage(phaseImage<0) + 2*pi;
