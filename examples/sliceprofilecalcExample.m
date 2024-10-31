@@ -21,7 +21,7 @@ rf = (pi/2) * ttt;
 x = cm2gt(spatialPos,Gz,6.66666666);
 %x2 = [-20:0.01:20];
 spatialPos2 = gt2cm(x,Gz,6.666);
-profile= abs(ab2ex(abr((rf),x)));
+profile= ab2ex(abr((rf),x));
 save("Dictionaries\Sinc10Profile.mat","spatialPos2","profile");
 
 

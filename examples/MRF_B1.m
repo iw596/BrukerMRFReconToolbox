@@ -32,7 +32,9 @@ mask = imbinarize(mat2gray(abs(mask)));
 mask = imclose(mask, se);
 mask = imfill(mask, 'holes');
 
-
+dict = load("Dictionaries\LargeB1Dict.mat");
+LUT = dict.LUT;
+dict= dict.dict;
 % Normalise Dictionary
 normalisedDict = [];
 cnt=length(dict);
@@ -47,24 +49,42 @@ end
 parfor i = 1:128
     i
     for j = 1:64
-       % Find closest B1 value in LUT and restrict dictionary search to this area
-       measuredB1Val = squeeze(AFIB1Map(i,j,16));
-       [val,idx] = min(abs(measuredB1Val-squeeze(LUT(:,3))));
-       closestB1 = LUT(idx,3);
-       idx=find(LUT(:,3) == closestB1);
-       subDict = normalisedDict(idx,:);
-       subLUT = LUT(idx,:)
-       % for k = 1:size(mrfsignal, 3)
-       scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
-       normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
-       inner_product=abs(subDict*squeeze(normalized_mrfsignal));
-       % Find best matching pattern
-       [maxValue, max_index] = max(abs(inner_product));
-       matched_indices(i, j) = max_index;
-       T1Map(i,j) = subLUT(max_index,1);
-       T2Map(i,j) = subLUT(max_index,2);
-       B1Map(i,j) = subLUT(max_index,3);
-       MRFMask(i,j) = 1;
-
+        if (mask(i,j) == 1)
+            % Find closest B1 value in LUT and restrict dictionary search to this area
+            measuredB1Val = squeeze(AFIB1Map(i,j,16));
+            [val,idx] = min(abs(measuredB1Val-squeeze(LUT(:,3))));
+            closestB1 = LUT(idx,3);
+            idx=find(LUT(:,3) == closestB1);
+            subDict = normalisedDict(idx,:);
+            subLUT = LUT(idx,:)
+            % for k = 1:size(mrfsignal, 3)
+            scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
+            normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
+            inner_product=abs(subDict*squeeze(normalized_mrfsignal));
+            % Find best matching pattern
+            [maxValue, max_index] = max(abs(inner_product));
+            matched_indices(i, j) = max_index;
+            T1Map(i,j) = subLUT(max_index,1);
+            T2Map(i,j) = subLUT(max_index,2);
+            B1Map(i,j) = subLUT(max_index,3);
+            MRFMask(i,j) = 1;
+        else
+            T1Map(i,j) = 0;
+            T2Map(i,j) = 0;
+            B1Map(i,j) = 0;
+            MRFMask(i,j) = 0;
+        end
     end
 end
+
+
+T1MRFMean = mean(nonzeros(T1Map.*mask))
+T1MRFStd = T1Map.*mask;
+T1MRFStd(T1MRFStd==0) = nan; % Set to nan wherever there is a 0.
+T1MRFStd = std(T1MRFStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
+
+T2MRFMean = mean(nonzeros(T2Map.*mask))
+T2MRFStd = T2Map.*mask;
+T2MRFStd(T2MRFStd==0) = nan; % Set to nan wherever there is a 0.
+T2MRFStd = std(T2MRFStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
+

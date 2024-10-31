@@ -34,11 +34,11 @@ function [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCy
     
     % Run Bloch simulation
     
-    parfor i = 1:NDictionaryEntries
-        T1 = LUT(i,1);
-        T2 = LUT(i,2);
-        B1 = LUT(i,3);
-        dict(i,:) = MRF_FISP_BlochSim(T1,T2,B1.*FA,TR,TE,TI,spoilingCycles,sp,NIso);
+    parfor ii = 1:NDictionaryEntries
+        T1 = LUT(ii,1);
+        T2 = LUT(ii,2);
+        B1 = LUT(ii,3);
+        dict(ii,:) = MRF_FISP_BlochSim(T1,T2,B1.*FA,TR,TE,TI,spoilingCycles,sp,NIso);
     end
     
     if (saveDictionary == 1)
