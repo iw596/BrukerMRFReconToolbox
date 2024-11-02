@@ -9,7 +9,7 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\FERMI_BlochSiegert.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\7";
+pth = "datasets\BlochSiegertData\8";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);

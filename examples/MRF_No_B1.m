@@ -5,7 +5,7 @@ addpath("Fitting\")
 
 
 %% Open bruker MRF dataset
-pth = "datasets\MRFDataset1\MRF_Exp28";
+pth = "datasets\MRFData\17";
 params = LoadBrukerData(pth);
 
 
@@ -33,7 +33,7 @@ mask = imfill(mask, 'holes');
 
 % Normalise Dictionary
 normalisedDict = [];
-cnt=length(dict);
+cnt=size(dict,1);
 parfor c = 1:cnt  
     scaleFactor = sqrt(sum(dict(c,:).*conj(dict(c,:))));
     normalisedDict(c,:) = dict(c,:) / scaleFactor;
@@ -59,8 +59,8 @@ parfor i = 1:128
 end
 
 figure(3);
-subplot(1,2,1); imagesc(T1Map.*mask); axis square;
-subplot(1,2,2); imagesc(T2Map.*mask); axis square;
+subplot(1,2,1); imagesc(T1Map); axis square;
+subplot(1,2,2); imagesc(T2Map); axis square;
 
 
 T1MRFMean = mean(nonzeros(T1Map.*mask))
