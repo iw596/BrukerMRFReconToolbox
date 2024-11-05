@@ -1,5 +1,6 @@
 function MEcho = MRF_FISP_BlochSim(T1,T2,FA,TR,TE,TI,NSpoilCycles,sp,NIso)
     M = zeros([3,NIso]);
+    % Assume angles of isochromats
     phi = linspace(-NSpoilCycles/2 * pi,NSpoilCycles/2*pi,NIso); 
     MEcho = zeros(size(FA,1),1);
     if (TI > 0)

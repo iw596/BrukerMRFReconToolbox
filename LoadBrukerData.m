@@ -160,6 +160,28 @@ function params = LoadBrukerData(path)
         params.BSPulsePower = str2num(cell2mat(line(1)));
     end
 
+    % Extract AFI ratio if available
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$AFITRRatio'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.AFIRatio = str2num(cell2mat(line(1)));
+    end
+
+    % Extract repetition time and convert to seconds if available
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RepetitionTime'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.TR = str2num(cell2mat(line(1)))/1000;
+    end
+
+    
+
     % Find number of read dephasing points
    % params.NCha
 

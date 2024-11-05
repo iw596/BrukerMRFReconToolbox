@@ -6,7 +6,7 @@ addpath("Fitting\")
 
 %% Open bruker MRF dataset
 %pth = "datasets\MRF_ISMRM_Dataset\17";
-pth = "datasets\MRFDataset1\MRF_Exp28";
+pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\32";
 params = LoadBrukerData(pth);
 
 
@@ -14,7 +14,7 @@ params = LoadBrukerData(pth);
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
 %[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
-FA = ReadFAList("datasets\MRFDataset1\MRFFAPattern.txt");
+FA = ReadMRFList("datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\MRFPattern.txt");
 rawdata = reshape(rawdata, [params.NCol length(FA) params.NLin]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = fftcn(rawdata,[1 2]);
@@ -29,8 +29,8 @@ figure(2);plot(abs(squeeze(imgs(64,32,:))));
 se = strel('disk', 20, 0);
 mask = mean(imgs,3);
 mask = imbinarize(mat2gray(abs(mask)));
-mask = imclose(mask, se);
-mask = imfill(mask, 'holes');
+%mask = imclose(mask, se);
+%mask = imfill(mask, 'holes');
 
 
 % Normalise Dictionary
@@ -66,8 +66,8 @@ end
 
 figure(3);
 %subplot(1,3,1); imagesc(flipdim(rot90(abs(mean(imgs,3))),2));axis square;
-subplot(1,2,1); imagesc(flipdim(rot90(T1Map.*mask),2),[190 200]); axis square;
-subplot(1,2,2); imagesc(flipdim(rot90(T2Map.*mask),2),[50 65]); axis square;
+subplot(1,2,1); imagesc(flipdim(rot90(T1Map.*mask),2)); axis square;
+subplot(1,2,2); imagesc(flipdim(rot90(T2Map.*mask),2)); axis square;
 
 
 T1MRFMean = mean(nonzeros(T1Map.*mask))
@@ -84,7 +84,7 @@ T2MRFStd = std(T2MRFStd, 0, 'all', 'omitnan') % Compute st dev along the third d
 
 
 %% Load T1 FAIR RARE
-pth = "datasets\22";
+pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\18";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -96,10 +96,16 @@ T1RefStd = T1RefMap.*mask;
 T1RefStd(T1RefStd==0) = nan; % Set to nan wherever there is a 0.
 T1RefStd = std(T1RefStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.
 
+figure(4);
+%subplot(1,3,1); imagesc(flipdim(rot90(abs(mean(imgs,3))),2));axis square;
+subplot(1,2,1); imagesc(flipdim(flipdim(T1RefMap.*mask,2),1)); axis square;
+subplot(1,2,2); imagesc(flipdim(rot90(T1Map),2)); axis square;
+
+save("MRF_Syringes","T1Map","T2Map","mask");
 
 
 %% Load T2 MSME
-pth = "datasets\21";
+pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\24";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -130,7 +136,4 @@ subplot(1,3,3);imagesc((T2Map - T2RefMap).*mask); title("Difference Map"); axis 
 
 figure(12);
 imagesc(B1Map.*mask); title("Reference B1 Map"); axis square;
-
-
-
 

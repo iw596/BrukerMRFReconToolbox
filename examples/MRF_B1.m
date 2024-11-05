@@ -9,7 +9,7 @@ data = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
 data = permute(data,[1 3 4 2]);
 imgs = ifftcn(data,[1 2 3]);
 AFIB1Map = AFIB1(imgs,60,20,100);
-figure(1); imagesc(squeeze(AFIB1Map(:,:,16))); axis square;
+figure(1); imagesc(medfilt2(squeeze(AFIB1Map(:,:,16)),[5,5]).*mask,[0.9 1.1]); axis square;
 
 
 %%%% Now load and reconstruct Bruker MRF data
