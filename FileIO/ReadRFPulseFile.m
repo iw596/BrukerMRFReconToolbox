@@ -8,7 +8,7 @@ function [shape,phase] = ReadRFPulseFile(filepath)
     % Read exc file line by line
     
     while ~feof(fileID)
-        line = fgetl(fileID)
+        line = fgetl(fileID);
         if (contains(line,"##NPOINTS="))
             nPoints = str2num(extractAfter(line,"##NPOINTS="));
             break;
