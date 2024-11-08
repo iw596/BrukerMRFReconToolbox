@@ -6,7 +6,7 @@ addpath("Fitting\")
 
 %% Open bruker MRF dataset
 %pth = "datasets\MRF_ISMRM_Dataset\17";
-pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\32";
+pth = "datasets\20241105_131736_TubeArray_IW_05112024_TubeArray_1_3\9";
 params = LoadBrukerData(pth);
 
 
