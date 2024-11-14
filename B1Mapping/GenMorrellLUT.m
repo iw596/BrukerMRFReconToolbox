@@ -20,13 +20,13 @@ function LUT = GenMorrellLUT(alpha, omega)
     
     MxyPos = MxPlus + 1i.*MyPlus;
     MxyNeg = MxNeg + 1i.*MyNeg;
-
-    phaseDiff = angle(MxyPos) - angle(MxyNeg);
+    phaseDiff = angle(MxyNeg) - angle(MxyPos);
+    LUT  = [alphaMesh(:),omegaMesh(:),phaseDiff(:)];
     %phaseDiff = atan2(imag(MxyPos./MxyNeg),real(MxyPos./MxyNeg));
-    figure(5);
-    surf(rad2deg(alphaMesh),rad2deg(omegaMesh),phaseDiff);
-    ylabel("Off Resonance Angle");
-    xlabel("Flip Angle");
+ %   figure(5);
+%    surf(rad2deg(alphaMesh),rad2deg(omegaMesh),phaseDiff);
+  %  ylabel("Off Resonance Angle");
+  %  xlabel("Flip Angle");
     
 
 end

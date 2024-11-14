@@ -4,19 +4,19 @@ addpath("B1Mapping\")
 addpath("recon\")
 
 % Load 45 degree dataset
-pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\DAM_45";
+pth = "datasets\DAM_B1_Data\42";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,params.NLin,params.NPar]);
 DAMImg1 = ifftcn(data,[1 2 3]);
 
 % Load 90 degree dataset
-pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\DAM_90";
+pth = "datasets\DAM_B1_Data\43";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,params.NLin,params.NPar]);
 DAMImg2 = ifftcn(data,[1 2 3]);
 
 B1= DAMB1(DAMImg1,DAMImg2);
-figure; imagesc(B1(:,:,15), [0.9,1.1]);
+figure; imagesc(B1(:,:,32), [0.9,1.1]);
 
 
 % Load AFI data
