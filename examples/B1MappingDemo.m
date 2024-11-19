@@ -10,36 +10,31 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\IWFermiPuilse.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\23";
+pth = "datasets\BlochSiegertData\18";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
 data = permute(data,[1 3 2]);
 imgs = ifftcn(data,[1 2]);
-Vpulse = sqrt(params.BSPulsePower * 50); % Peak voltage assuming 50ohm load
-Vref = sqrt(params.RefPow * 50); % Peak voltage assuming 50ohm load
-
-B1ref = (pi/2)./(2*pi*42.6*10^6*1e-3); % Peak B1 in T
-B1nom = (B1ref./Vref) .*  Vpulse; % in T
 
 imgPos = imgs(:,:,1);
 imgNeg = imgs(:,:,2);
 
-PhaseDiff=angle(imgPos.*conj(imgNeg));
+PhaseDiff=angle(imgNeg .* conj(imgPos));
 % unwrap phase difference using ROMEO phase uwnrapping
 parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
 mkdir(parameters.output_dir) ;
 parameters.mask = 'nomask';
 [uwpPhaseDiff] = ROMEO(PhaseDiff, parameters);
 rmdir(parameters.output_dir, 's') % remove the temporary ROMEO output folder
+Pint = 0.650376473268939;
+
+GAMMA_RAD       = 4258*2*pi
+dT       = 1e-6
+KBS = GAMMA_RAD.^2 * trapz(linspace(0,8e-3,2048),B1Envelope.^2)./(2*2*pi*4000)
 
 
-KBSPulse = sum(B1Envelope.^2)./length(B1Envelope);
-K = (2*pi*params.BSFreqOffset)./(2*8e-3 * (2*pi*42.6*10^6).^2 * KBSPulse);
-B1_hp = sqrt(uwpPhaseDiff * K);
-
-
-B1_BS_Peak_measured = sqrt(uwpPhaseDiff/(2*K_BS));
+B1_BS_Peak_measured = sqrt(PhaseDiff/(KBS));
 Calculated_Power_BlochSiegert = (((B1ref./B1_BS_Peak_measured)^2)*params.BSPulsePower);
 
 
