@@ -10,7 +10,7 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\IWFermiPuilse.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\18";
+pth = "datasets\BlochSiegertData\17";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
@@ -20,7 +20,7 @@ imgs = ifftcn(data,[1 2]);
 imgPos = imgs(:,:,1);
 imgNeg = imgs(:,:,2);
 
-PhaseDiff=angle(imgNeg .* conj(imgPos));
+PhaseDiff=angle(imgPos .* conj(imgNeg));
 % unwrap phase difference using ROMEO phase uwnrapping
 parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder
 mkdir(parameters.output_dir) ;

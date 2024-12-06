@@ -22,6 +22,8 @@ function LUT = GenMorrellLUT(alpha, omega)
     MxyNeg = MxNeg + 1i.*MyNeg;
     phaseDiff = angle(MxyNeg) - angle(MxyPos);
     LUT  = [alphaMesh(:),omegaMesh(:),phaseDiff(:)];
+    figure(5);
+    plot((phaseDiff))
     %phaseDiff = atan2(imag(MxyPos./MxyNeg),real(MxyPos./MxyNeg));
  %   figure(5);
 %    surf(rad2deg(alphaMesh),rad2deg(omegaMesh),phaseDiff);
