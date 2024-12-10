@@ -2,14 +2,14 @@ addpath("MRF\")
 addpath("Utils\")
 
 %% Example script to generate FA pattern
-NLobes = 4;
-NPoints = 180;
+NLobes = 5;
+NPoints = 200;
 
 % Ramp up max peaks
-maxFA = round(linspace(10,35,NLobes));
+maxFA = round(linspace(10,50,NLobes));
 maxFA(end+1:end+length(maxFA)-1) = maxFA(end-1:-1:1)./1.5;
 minFA = 5;
-lobeGap  = 30;
+lobeGap  = 20;
 
 faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFFAPattern.txt";
 FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
@@ -24,17 +24,17 @@ TRPattern = GenerateTRPattern(length(FAPattern),persistence, octaves,TRMin,TRMax
 figure(10); 
 subplot(2,1,1); plot(FAPattern); ylabel("Flip angle"); xlabel("Time point");
 subplot(2,1,2); plot(TRPattern); ylabel("TR (s)"); xlabel("Time point");
-
+TRPattern(:) = 20e-3;
 
 fileName = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFPattern.txt";
 
 Y = round(FAPattern,1);
-%Z = round(TRPattern*1000,1);
+Z = round(TRPattern*1000,1);
 % Write to file
 fID = fopen(fileName,'w+');
 fwrite(fID,sprintf("#%d\n",length(FAPattern)));
 for i = 1:length(FAPattern)
-    %fprintf(fID,'%f,%f\n',Y(i),Z(i));
-    fprintf(fID,'%f\n',Y(i));
+    fprintf(fID,'%f,%f\n',Y(i),Z(i));
+%    fprintf(fID,'%f\n',Y(i));
 end
 fclose(fID);
