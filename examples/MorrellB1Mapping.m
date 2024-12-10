@@ -4,7 +4,7 @@ addpath("recon\")
 
 
 
-pth = "datasets\PhaseB1\45";
+pth = "datasets\20241205_164758_NaClPhantom_IW_NaCl_05122024_1_5\5";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
 data = permute(data,[1 3 4 2]);
@@ -38,7 +38,7 @@ for i = 1:size(phaseDiffImg,1)
     end
 end
 
-figure; imagesc(abs(squeeze(rad2deg(faMap(:,:,8))./90)),[0.9 1.1]); axis square;
+figure; imagesc(abs(squeeze(rad2deg(faMap(:,:,32))./90)),[0.9 1.1]); axis square;
 
 
 
