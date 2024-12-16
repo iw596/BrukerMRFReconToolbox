@@ -15,7 +15,7 @@ function MEcho = MRF_FISP_BlochSim(T1,T2,FA,TR,TE,TI,NSpoilCycles,sp,NIso)
     for i = 1:length(FA)
         for s = 1:length(sp)
             % Apply RF rotation
-            R = xrot(deg2rad(FA(i) * sp(s)));
+            R = throt(FA(i) * sp(s),0);
             M(:,s) = R*M(:,s);
         end
             % Precess until echo time

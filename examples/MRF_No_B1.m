@@ -6,7 +6,7 @@ addpath("Fitting\")
 
 %% Open bruker MRF dataset
 %pth = "datasets\MRF_ISMRM_Dataset\17";
-pth = "datasets\MRFDataset1\MRF_Exp28";
+pth = "datasets\Yasaman_MRF10122024\MRF_IWFISP";
 params = LoadBrukerData(pth);
 
 
@@ -14,14 +14,14 @@ params = LoadBrukerData(pth);
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
 %[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
-FA = ReadFAList("datasets\MRFDataset1\MRFFAPattern.txt");
+[FA,~] = ReadMRFList("datasets\Yasaman_MRF10122024\MRFPattern.txt");
 rawdata = reshape(rawdata, [params.NCol length(FA) params.NLin]);
 rawdata = permute(rawdata, [1 3 2]);
-imgs = fftcn(rawdata,[1 2]);
+imgs = ifftcn(rawdata,[1 2]);
 %imgs = fftshift(fft2((rawdata)));
 figure; imagesc(abs(mean(imgs,3)));
 figure(1); montage(mat2gray(abs(imgs)));
-figure(2);plot(abs(squeeze(imgs(64,32,:))));
+figure(2);plot(abs(squeeze(imgs(64,64,:))));
 %figure(2); imshow(abs(imgs(:,:,300)),[])
 
 
@@ -46,12 +46,10 @@ end
 % Iterate through each voxel
 parfor i = 1:128
     i
-    for j = 1:64
+    for j = 1:128
        % for k = 1:size(mrfsignal, 3)
        scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
        normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
-       %normalized_mrfsignal = (imgs(i,j,:))/scaleFactor;
-       %normalized_mrfsignal = squeeze(imgs(i,j,:)./norm(squeeze(imgs(i,j,:))));
        inner_product=abs((normalisedDict)*(squeeze(normalized_mrfsignal)));
        % Find best matching pattern
        [maxValue, max_index] = max(abs(inner_product));
@@ -66,8 +64,8 @@ end
 
 figure(3);
 %subplot(1,3,1); imagesc(flipdim(rot90(abs(mean(imgs,3))),2));axis square;
-subplot(1,2,1); imagesc(flipdim(rot90(T1Map.*mask),2),[190 200]); axis square;
-subplot(1,2,2); imagesc(flipdim(rot90(T2Map.*mask),2),[50 65]); axis square;
+subplot(1,2,1); imagesc(T1Map.*mask); axis square;
+subplot(1,2,2); imagesc(T2Map.*mask); axis square;
 
 
 T1MRFMean = mean(nonzeros(T1Map.*mask))

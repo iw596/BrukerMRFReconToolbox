@@ -1,17 +1,18 @@
 addpath('MRF\')
 addpath('Simulations\')
 addpath('FileIO\')
-T1List = [300:50:4000];
-T2List = [1:1:50 50:10:900];
-[FA,TR] = ReadMRFList("datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\MRFPattern.txt");
+T1List = [10:10:3000];
+T2List = [1:5:500];
+[FA,~] = ReadMRFList("datasets\Yasaman_MRF10122024\MRFPattern.txt");
 figure; plot(FA); title("Flip Angle Pattern"); ylabel("Flip Angle [degrees]")
-TI = 15; %  Inversion Time ms
+TR = 15;
+TI = 20; %  Inversion Time ms
 TE = 5;  % Echo time ms
-spoilingCycles = 2; % 6 pi spoiling 
-%B1 = [0.85:0.02:1.15]; % i.e. no B1 correction
+spoilingCycles = 4; % 6 pi spoiling 
+%B1 = [0.8:0.02:1.15]; % i.e. no B1 correction
 B1 = [1]; % i.e. no B1 correction
 % Load slice profile
-NIso = 200;
+NIso = 500;
 sp = ones(NIso,1);
 % sp = load("Dictionaries\Sinc10Profile.mat");
 % sp = abs(sp.profile);
@@ -19,4 +20,4 @@ sp = ones(NIso,1);
 % NIso = length(sp); % Numbe of isochromats used in bloch simulation
 [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,sp,NIso);
 
-save("Dictionaries/Large_Syringes_NoB1Dict","dict","LUT",'-v7.3');
+save("Dictionaries/YasamanDictionary","dict","LUT",'-v7.3');

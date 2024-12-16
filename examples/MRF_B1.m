@@ -3,39 +3,50 @@ addpath("FileIO\")
 addpath("B1Mapping\")
 addpath("recon\")
 
-pth = "datasets\MRFDataset1\AFI_Exp7";
+pth = "datasets\Yasaman_MRF10122024\14";
 params = LoadBrukerData(pth);
-data = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
-data = permute(data,[1 3 4 2]);
-imgs = ifftcn(data,[1 2 3]);
-AFIB1Map = AFIB1(imgs,60,20,100);
-figure(1); imagesc(medfilt2(squeeze(AFIB1Map(:,:,16)),[5,5]).*mask,[0.9 1.1]); axis square;
+AFIdata = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
+AFIdata = permute(AFIdata, [1 3 4 2]);
+AFIImgs = ifftcn(AFIdata,[1 2 3]);
 
+%% Create binary mask from mean of images
+se = strel('disk', 20, 0);
+AFIMask = mean(AFIImgs,4);
+AFIMask = imbinarize(mat2gray(abs(AFIMask)));
+AFIMask = imclose(AFIMask, se);
+AFIMask = imfill(AFIMask, 'holes');
 
-%%%% Now load and reconstruct Bruker MRF data
-pth = "datasets\MRFDataset1\MRF_Exp28";
+AFIB1 =  FitAFIB1(AFIImgs,60,params.TR,params.TR * params.AFIRatio);
+AFIB1 = medfilt3(AFIB1,[5 5 1]);
+figure; imagesc(medfilt2(abs(AFIB1(:,:,24)).*AFIMask(:,:,24),[5 5]), [0.8 1.2]); colormap("turbo")
+
+%% Open bruker MRF dataset
+%pth = "datasets\MRF_ISMRM_Dataset\17";
+pth = "datasets\Yasaman_MRF10122024\MRF_IWFISP";
 params = LoadBrukerData(pth);
+
 
 
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
-FA = ReadFAList("datasets\MRFFAPattern.txt");
+%[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
+[FA,~] = ReadMRFList("datasets\Yasaman_MRF10122024\MRFPattern.txt");
 rawdata = reshape(rawdata, [params.NCol length(FA) params.NLin]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = ifftcn(rawdata,[1 2]);
-figure(2); montage(mat2gray(abs(imgs)));
-figure(3); plot(abs(squeeze(imgs(64,32,:))));
+%imgs = fftshift(fft2((rawdata)));
+figure; imagesc(abs(mean(imgs,3)));
+figure(1); montage(mat2gray(abs(imgs)));
+figure(2);plot(abs(squeeze(imgs(64,64,:))));
+%figure(2); imshow(abs(imgs(:,:,300)),[])
 
+
+%% Create binary mask from mean of images
 se = strel('disk', 20, 0);
 mask = mean(imgs,3);
 mask = imbinarize(mat2gray(abs(mask)));
 mask = imclose(mask, se);
-mask = imfill(mask, 'holes');
-
-dict = load("Dictionaries\LargeB1Dict.mat");
-LUT = dict.LUT;
-dict= dict.dict;
-% Normalise Dictionary
+mask = imfill(mask, 'holes');% Normalise Dictionary
 normalisedDict = [];
 cnt=length(dict);
 parfor c = 1:cnt  
@@ -44,14 +55,14 @@ parfor c = 1:cnt
 end
 
 
-
+AFIB1Resized = imresize(AFIB1(:,:,24),[128,128]);
 % Iterate through each voxel
 parfor i = 1:128
     i
-    for j = 1:64
+    for j = 1:128
         if (mask(i,j) == 1)
             % Find closest B1 value in LUT and restrict dictionary search to this area
-            measuredB1Val = squeeze(AFIB1Map(i,j,16));
+            measuredB1Val = AFIB1Resized(i,j);
             [val,idx] = min(abs(measuredB1Val-squeeze(LUT(:,3))));
             closestB1 = LUT(idx,3);
             idx=find(LUT(:,3) == closestB1);
@@ -76,6 +87,11 @@ parfor i = 1:128
         end
     end
 end
+
+figure(3);
+%subplot(1,3,1); imagesc(flipdim(rot90(abs(mean(imgs,3))),2));axis square;
+subplot(1,2,1); imagesc(T1Map.*mask); axis square;
+subplot(1,2,2); imagesc(T2Map.*mask); axis square;
 
 
 T1MRFMean = mean(nonzeros(T1Map.*mask))
