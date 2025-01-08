@@ -97,14 +97,16 @@ T1RefStd = std(T1RefStd, 0, 'all', 'omitnan'); % Compute st dev along the third 
 
 
 %% Load T2 MSME
-pth = "datasets\21";
+pth = "datasets\MRF_17122024\61";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
 data = reshape(data,[128 params.NLin params.NEcho]);
 fclose(fid);
 T2RefMap = T2Fitting(data,params.MSMETimes);
-T2RefMean = mean(nonzeros(T2RefMap.*mask))
+T2RefMap = T2RefMap.*mask;
+T2RefMap(abs(T2RefMap)>1000) = nan;
+T2RefMean = mean(nonzeros(T2RefMap.*mask),'omitmissing')
 T2RefStd = T2RefMap.*mask;
 T2RefStd(T2RefStd==0) = nan; % Set to nan wherever there is a 0.
 T2RefStd = std(T2RefStd, 0, 'all', 'omitnan'); % Compute st dev along the third dimension, ignoring nans.

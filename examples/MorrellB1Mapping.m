@@ -38,9 +38,11 @@ for i = 1:size(phaseDiffImg,1)
     end
 end
 faMap = medfilt3(faMap,[5, 5, 1]);
-figure; imagesc(abs(squeeze(rad2deg(faMap(:,:,32).*mask(:,:,24))./90)),[0.8 1.2]); axis square;colormap("turbo")
-
-
+b1MapPhase = rad2deg(faMap)./90;
+figure(10); imagesc(abs((b1MapPhase(:,:,24).*mask(:,:,24))),[0.8 1.2]); axis square;colormap("turbo")
+axis square; colormap("turbo"); title("Morrell B1 Map","FontSize",20);
+c = colorbar;
+c.FontSize = 16
 
 figure(1);
 subplot(2,2,1); imshow(abs(imgs(:,:,8,1)),[]);

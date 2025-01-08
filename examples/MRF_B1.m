@@ -90,9 +90,12 @@ end
 
 figure(3);
 %subplot(1,3,1); imagesc(flipdim(rot90(abs(mean(imgs,3))),2));axis square;
-subplot(1,2,1); imagesc(T1Map.*mask); axis square;
-subplot(1,2,2); imagesc(T2Map.*mask); axis square;
-
+subplot(1,2,1); imagesc(T1Map.*mask,[20,200]); axis square; colormap("turbo"); title("T1 MRF","FontSize",24)
+c = colorbar;
+c.FontSize = 16;
+subplot(1,2,2); imagesc(T2Map.*mask); axis square;colormap("turbo"); title("T2 MRF","FontSize",24)
+c = colorbar;
+c.FontSize = 16;
 
 T1MRFMean = mean(nonzeros(T1Map.*mask))
 T1MRFStd = T1Map.*mask;

@@ -4,19 +4,19 @@ addpath("B1Mapping\")
 addpath("recon\")
 
 % Load 45 degree dataset
-pth = "datasets\Yasaman_MRF10122024\12";
+pth = "datasets\MRF_17122024\DAM_FLASH45";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,params.NLin,params.NPar]);
 DAMImg1 = ifftcn(data,[1 2 3]);
 
 % Load 90 degree dataset
-pth = "datasets\Yasaman_MRF10122024\13";
+pth = "datasets\MRF_17122024\DAM_FLASH90";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,params.NLin,params.NPar]);
 DAMImg2 = ifftcn(data,[1 2 3]);
 
 B1= DAMB1(DAMImg1,DAMImg2,45);
-figure; imagesc(abs(B1(:,:,24)), [0.8,1.5]);
+figure; imagesc(abs(B1(:,:,32)), [0.9,1.1]); colormap("turbo")
 
 
 % Load AFI data
