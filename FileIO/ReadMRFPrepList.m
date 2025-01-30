@@ -18,7 +18,11 @@ function prepList = ReadMRFPrepList(filePth)
         if (tline ~= -1)
             vals = split(tline);
             if (~isempty(vals))
-                prepList(counter,1) = int32(str2double(cell2mat(vals(1))));
+                if (strcmp(cell2mat(vals(1)),"T1Prep") == 1)
+                    prepList(counter,1) = 0;
+                elseif (strcmp(cell2mat(vals(1)),"T2Prep") == 1)
+                    prepList(counter,1) = 1;
+                end
                 prepList(counter,2) = str2double(cell2mat(vals(2)));
                 counter = counter + 1;
             end
