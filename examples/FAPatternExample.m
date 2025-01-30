@@ -3,13 +3,13 @@ addpath("Utils\")
 
 %% Example script to generate FA pattern
 NLobes = 5;
-NPoints = 150;
+NPoints = 100;
 
 % Ramp up max peaks
-maxFA = round(linspace(10,55,NLobes));
+maxFA = round(linspace(10,35,NLobes));
 maxFA(end+1:end+length(maxFA)-1) = maxFA(end-1:-1:1)./1.5;
 minFA = 5;
-lobeGap  = 25;
+lobeGap  = 5;
 
 faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFFAPattern.txt";
 FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
