@@ -7,8 +7,8 @@ addpath("MRF\")
 
 
 %% First we need to generate our look-up table of T1 and T2 values
-T1Range = [100:100:1000];
-T2Range = [10:10:100];
+T1Range = [10:10:500];
+T2Range = [10:10:400];
 
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -25,15 +25,15 @@ for ii = 1:length(T1Range)
 end
 
 % Read FA train
-[FA,~] = ReadMRFList("datasets\MRFSpoilingTests\MRFPattern.txt");
+[FA,~] = ReadMRFList("datasets\LowFATesting\MRFPattern.txt");
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\MRFSpoilingTests\PrepList.txt");
+prepList = ReadMRFPrepList("datasets\LowFATesting\MRFPrepList1.txt");
 % Read method file
-params = LoadBrukerData("datasets\MRFSpoilingTests\20");
+params = LoadBrukerData("datasets\LowFATesting\45");
 
 
 NSpin = 200;
-phi = linspace(-pi,pi,NSpin);
+phi = linspace(-4*pi,4*pi,NSpin);
 dict = zeros(length(prepList) * length(FA),length(LUT));
 TR = params.TR * 1000;
 TE = 4;
