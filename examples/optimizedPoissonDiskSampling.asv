@@ -1,0 +1,264 @@
+% function [samplingMask, sampledPointsCount] = optimizedPoissonDiskSampling(gridSize, targetPoints, centralRadius, peripheralRadius, biasFactor)
+%     % Initialize the mask and sampled points
+%     samplingMask = zeros(gridSize);
+%     sampledPoints = [];
+%     totalPoints = prod(gridSize);
+% 
+%     % Define center of the grid
+%     center = round(gridSize / 2);
+% 
+%     % Compute radial distances
+%     [X, Y] = ndgrid(1:gridSize(1), 1:gridSize(2));
+%     gridPoints = [X(:), Y(:)];
+%     distances = sqrt((gridPoints(:, 1) - center(1)).^2 + (gridPoints(:, 2) - center(2)).^2);
+%     maxDistance = max(distances);
+% 
+%     % Compute density weights: Hybrid weighting function
+%     densityWeights = exp(-biasFactor * distances / maxDistance) + 0.1; % Exponential decay with offset
+% 
+%     % Normalize probabilities
+%     probabilities = densityWeights / sum(densityWeights);
+% 
+%     % Initialize counters
+%     sampledPointsCount = 0;
+%     cumulativeProbs = cumsum(probabilities);
+% 
+%     % Start sampling process
+%     while sampledPointsCount < targetPoints
+%         % Randomly select a candidate point based on weighted probabilities
+%         randomValue = rand * cumulativeProbs(end);
+%         candidateIdx = find(cumulativeProbs >= randomValue, 1);
+%         candidate = gridPoints(candidateIdx, :);
+% 
+%         % Determine minimum distance based on region
+%         if distances(candidateIdx) <= maxDistance * 0.3 % Central region
+%             minDistance = centralRadius;
+%         else
+%             minDistance = peripheralRadius;
+%         end
+% 
+%         % Check distance constraints
+%         if isempty(sampledPoints) || all(vecnorm(sampledPoints - candidate, 2, 2) >= minDistance)
+%             % Add candidate to the sampled points
+%             sampledPoints = [sampledPoints; candidate];
+%             samplingMask(candidate(1), candidate(2)) = 1;
+%             sampledPointsCount = sampledPointsCount + 1;
+%         end
+% 
+%         % Remove the candidate from gridPoints
+%         gridPoints(candidateIdx, :) = [];
+%         probabilities(candidateIdx) = [];
+%         cumulativeProbs = cumsum(probabilities);
+% 
+%         % Break if no points remain
+%         if isempty(gridPoints)
+%             break;
+%         end
+%     end
+% 
+%     % Display the results
+%     disp(['Total sampled points: ', num2str(sampledPointsCount)]);
+%     disp(['Target points: ', num2str(targetPoints)]);
+% end
+
+% function samplingMask = poissonDiskCentralOptimized(gridSize, centralRadius, peripheralRadius, centralFactor, peripheralFactor, targetPoints)
+%     % Initialize parameters
+%     totalGridPoints = prod(gridSize);
+%     samplingMask = zeros(gridSize);
+%     sampledPoints = [];
+% 
+%     % Central bias weighting
+%     [X, Y] = ndgrid(1:gridSize(1), 1:gridSize(2));
+%     center = gridSize / 2;
+%     distances = sqrt((X - center(1)).^2 + (Y - center(2)).^2);
+% 
+%     % Central and peripheral weighting
+%     centralBias = exp(-centralFactor * (distances / max(distances(:))));
+%     peripheralBias = exp(-peripheralFactor * (distances / max(distances(:))));
+% 
+%     % Normalize probabilities
+%     totalBias = centralBias + peripheralBias;
+%     probabilities = totalBias / sum(totalBias(:));
+% 
+%     % Adjust minimum distance for central and peripheral regions
+%     centralMinDist = centralRadius / sqrt(centralFactor);
+%     peripheralMinDist = peripheralRadius / sqrt(peripheralFactor);
+% 
+%     % Sampling process
+%     cumulativeProbs = cumsum(probabilities(:));
+%     numSampled = 0;
+%     maxAttempts = 1000; % Limit iterations to avoid infinite loops
+% 
+%     while numSampled < targetPoints && maxAttempts > 0
+%         % Randomly select a candidate point based on probabilities
+%         randValue = rand * cumulativeProbs(end);
+%         candidateIdx = find(cumulativeProbs >= randValue, 1);
+%         [candidateX, candidateY] = ind2sub(gridSize, candidateIdx);
+%         candidate = [candidateX, candidateY];
+% 
+%         % Calculate distances to already sampled points
+%         if ~isempty(sampledPoints)
+%             distancesToSampled = sqrt(sum((sampledPoints - candidate).^2, 2));
+%         else
+%             distancesToSampled = inf; % First point has no neighbors
+%         end
+% 
+%         % Apply minimum distance constraints
+%         if distances(candidateIdx) <= centralRadius
+%             minDist = centralMinDist;
+%         else
+%             minDist = peripheralMinDist;
+%         end
+% 
+%         % Check if the candidate satisfies minimum distance criteria
+%         if all(distancesToSampled >= minDist)
+%             sampledPoints = [sampledPoints; candidate];
+%             samplingMask(candidateX, candidateY) = 1;
+%             numSampled = numSampled + 1;
+%         end
+% 
+%         maxAttempts = maxAttempts - 1; % Reduce the attempt count
+%     end
+% 
+%     % Display results
+%     disp(['Achieved sampled points: ', num2str(numSampled)]);
+%     disp(['Target points: ', num2str(targetPoints)]);
+% end
+% function [samplingMask, numSampled] = optimizedPoissonDiskSampling(gridSize, targetPoints, centralRadius, peripheralRadius, biasFactor)
+%     % Initialize parameters
+%     totalGridPoints = prod(gridSize);
+%     samplingMask = zeros(gridSize);
+%     sampledPoints = [];
+% 
+%     % Central bias weighting
+%     [X, Y] = ndgrid(1:gridSize(1), 1:gridSize(2));
+%     center = gridSize / 2;
+%     distances = sqrt((X - center(1)).^2 + (Y - center(2)).^2);
+% 
+%     % Central and peripheral weighting
+%     centralFactor = biasFactor; % Adjust central weighting factor dynamically
+%     peripheralFactor = biasFactor / 2; % Example: scale peripheral bias
+%     centralBias = exp(-centralFactor * (distances / max(distances(:))));
+%     peripheralBias = exp(-peripheralFactor * (distances / max(distances(:))));
+% 
+%     % Normalize probabilities
+%     totalBias = centralBias + peripheralBias;
+%     probabilities = totalBias / sum(totalBias(:));
+% 
+%     % Adjust minimum distance for central and peripheral regions
+%     centralMinDist = centralRadius / sqrt(centralFactor);
+%     peripheralMinDist = peripheralRadius / sqrt(peripheralFactor);
+% 
+%     % Sampling process
+%     cumulativeProbs = cumsum(probabilities(:));
+%     numSampled = 0;
+%     maxAttempts = 10000; % Limit iterations to avoid infinite loops
+% 
+%     while numSampled < targetPoints && maxAttempts > 0
+%         % Randomly select a candidate point based on probabilities
+%         randValue = rand * cumulativeProbs(end);
+%         candidateIdx = find(cumulativeProbs >= randValue, 1);
+%         [candidateX, candidateY] = ind2sub(gridSize, candidateIdx);
+%         candidate = [candidateX, candidateY];
+% 
+%         % Calculate distances to already sampled points
+%         if ~isempty(sampledPoints)
+%             distancesToSampled = sqrt(sum((sampledPoints - candidate).^2, 2));
+%         else
+%             distancesToSampled = inf; % First point has no neighbors
+%         end
+% 
+%         % Apply minimum distance constraints
+%         if distances(candidateIdx) <= centralRadius
+%             minDist = centralMinDist;
+%         else
+%             minDist = peripheralMinDist;
+%         end
+% 
+%         % Check if the candidate satisfies minimum distance criteria
+%         if all(distancesToSampled >= minDist)
+%             sampledPoints = [sampledPoints; candidate];
+%             samplingMask(candidateX, candidateY) = 1;
+%             numSampled = numSampled + 1;
+%         end
+% 
+%         maxAttempts = maxAttempts - 1; % Reduce the attempt count
+%     end
+% 
+%     % Display results
+%     disp(['Achieved sampled points: ', num2str(numSampled)]);
+%     disp(['Target points: ', num2str(targetPoints)]);
+% end
+function [samplingMask, sampledPointsCount] = optimizedPoissonDiskSampling(gridSize, targetPoints, initialRadius, centralBiasFactor)
+    % Optimized Poisson Disk Sampling with Central Bias
+
+    % Initialize variables
+    samplingMask = zeros(gridSize); % Initialize the sampling mask
+    sampledPoints = []; % Initialize sampled points array
+    gridPoints = createGridPoints(gridSize); % Generate grid points
+
+    % Calculate central bias weights
+    center = gridSize / 2;
+    distancesFromCenter = sqrt((gridPoints(:, 1) - center(1)).^2 + (gridPoints(:, 2) - center(2)).^2);
+    centralWeights = exp(-centralBiasFactor * distancesFromCenter / max(distancesFromCenter));
+
+    % Normalize weights
+    probabilities = centralWeights / sum(centralWeights);
+
+    % Initialize parameters
+    numSampled = 0;
+    maxAttempts = 1000 * targetPoints; % Limit attempts to prevent infinite loops
+    % 
+    % % Start sampling loop
+    % while numSampled < targetPoints && maxAttempts > 0
+    %     % Sample a candidate point
+    %     cumulativeProbs = cumsum(probabilities);
+    %     randomValue = rand * cumulativeProbs(end);
+    %     candidateIdx = find(cumulativeProbs >= randomValue, 1);
+    %     candidate = gridPoints(candidateIdx, :);
+    % 
+    %     % Debugging info
+    %     disp(['Size of sampledPoints: ', mat2str(size(sampledPoints))]);
+    %     disp(['Size of candidate: ', mat2str(size(candidate))]);
+    % 
+    %     % Check minimum distance constraint
+    %     if isempty(sampledPoints)
+    %         distances = inf; % Infinite distance to accept the first candidate
+    %     else
+    %         distances = sqrt(sum((sampledPoints - candidate).^2, 2)); % Compute distances
+    %     end
+
+    
+        if all(distances >= initialRadius)
+            % Accept the candidate point
+            sampledPoints = [sampledPoints; candidate];
+            samplingMask(candidate(1), candidate(2)) = 1;
+            numSampled = numSampled + 1;
+        end
+
+        % Remove the candidate from gridPoints and update probabilities
+        gridPoints(candidateIdx, :) = [];
+        probabilities(candidateIdx) = [];
+        probabilities = probabilities / sum(probabilities); % Re-normalize
+
+        % Decrement attempts
+        maxAttempts = maxAttempts - 1;
+    end
+
+    % Output the number of sampled points
+    sampledPointsCount = numSampled;
+    disp(['Achieved sampled points: ', num2str(numSampled)]);
+    disp(['Target points: ', num2str(targetPoints)]);
+
+    % Display warning if not enough points were sampled
+    if numSampled < targetPoints
+        warning('Sampling did not reach the target number of points. Consider adjusting parameters.');
+    end
+end
+
+function gridPoints = createGridPoints(gridSize)
+    % Create grid points for the sampling process
+    [X, Y] = ndgrid(1:gridSize(1), 1:gridSize(2));
+    gridPoints = [X(:), Y(:)];
+end
+

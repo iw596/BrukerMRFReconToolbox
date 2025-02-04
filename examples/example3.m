@@ -1,0 +1,162 @@
+
+%% Step 1: Load k-Space Data and Generate Undersampled Data
+% Load fully sampled k-space data
+addpath("Simulations\")
+addpath("recon\")
+addpath("B1Mapping\")
+addpath("Fitting\")
+addpath("FileIO\")
+
+pth = "datasets\MRF_IWFISP";
+params = LoadBrukerData(pth);
+FA = ReadMRFList("datasets\MRFPattern.txt");
+plot(FA);
+rawdata  = params.data;
+rawdata = reshape(rawdata, [params.NCol length(FA) params.NLin]);
+rawdata = permute(rawdata, [1 3 2]);
+kspace=rawdata;
+% % Generate Poisson disk sampling mask 
+% undersamplingFactor = 2; % Retain 50% of k-space
+% radius = 4; % Minimum spacing between points
+% % Call the function
+% samplingMask = poissonDiskMask([128, 128], undersamplingFactor, radius);
+% % Apply the mask to fully sampled k-space to create undersampled data
+% undersampled_kspace = kspace .* repmat(samplingMask, [1, 1, size(kspace, 3)]);
+% % Save undersampled k-space data for future use
+% save('undersampled_kspace_data.mat', 'undersampled_kspace');
+% disp('Undersampled k-space data generated and saved.');
+% % Visualize the sampling mask 
+% figure;
+% imagesc(samplingMask); colormap('gray'); axis image;
+% title('Poisson Disk Sampling Mask');
+
+% Generate Poisson disk sampling mask 
+undersamplingFactor = 2; % Retain 50% of k-space
+radius = 4; % Minimum spacing between points
+
+% Dynamically adjust radius if necessary
+totalPoints = round(prod([128, 128]) / undersamplingFactor);
+maxRadius = sqrt(prod([128, 128]) / pi / totalPoints);
+if radius > maxRadius
+    disp(['Radius adjusted to ', num2str(maxRadius)]);
+    radius = maxRadius;
+end
+
+% Call the function
+samplingMask = poissonDiskMask([128, 128], undersamplingFactor, radius);
+
+% Debug: Check number of sampled points
+actualSampledPoints = sum(samplingMask(:));
+disp(['Requested points: ', num2str(totalPoints)]);
+disp(['Sampled points: ', num2str(actualSampledPoints)]);
+if actualSampledPoints < totalPoints * 0.5
+    warning('Significantly fewer points sampled than requested. Check undersampling parameters.');
+end
+
+% Apply the mask to fully sampled k-space to create undersampled data
+undersampled_kspace = kspace .* repmat(samplingMask, [1, 1, size(kspace, 3)]);
+
+% Save undersampled k-space data for future use
+save('undersampled_kspace_data.mat', 'undersampled_kspace');
+disp('Undersampled k-space data generated and saved.');
+
+% Visualize the sampling mask 
+figure;
+imagesc(samplingMask); colormap('gray'); axis image;
+title('Poisson Disk Sampling Mask');
+
+%% Step 2: Reconstruction
+% Reconstruct spatial domain images from k-space using IFT
+imgs = ifftcn(rawdata, [1 2]); % Fully sampled reconstruction
+undersampled_imgs = ifftcn(undersampled_kspace, [1 2]); % Undersampled reconstruction
+% Visualize reconstructions
+figure;
+subplot(1, 2, 1); montage(mat2gray(abs(imgs))); title('Fully Sampled Reconstruction');
+subplot(1, 2, 2); montage(mat2gray(abs(undersampled_imgs))); title('Undersampled Reconstruction');
+% Compare temporal signals for the center voxel
+centerVoxel = [64, 64];
+figure;
+plot(abs(squeeze(imgs(centerVoxel(1), centerVoxel(2), :))), 'b', 'LineWidth', 1.5); hold on;
+plot(abs(squeeze(undersampled_imgs(centerVoxel(1), centerVoxel(2), :))), 'r--', 'LineWidth', 1.5);
+legend('Fully Sampled', 'Undersampled');
+xlabel('Time Frame'); ylabel('Signal Magnitude');
+title('Temporal Signal Evolution at Center Voxel');
+%% Step 3: Dictionary Creation (Load Precomputed Dictionary)
+% Load dictionary and lookup table
+load('MRF_Dictionary.mat', 'dict', 'LUT', 'T1List', 'T2List');
+dictionary = dict; % Assign the numeric matrix
+% Confirm dictionary size
+disp(['Dictionary size: ', mat2str(size(dict))]);
+disp(['Number of T1 values: ', num2str(numel(T1List))]);
+disp(['Number of T2 values: ', num2str(numel(T2List))]);
+% Normalize the dictionary (column-based normalization)
+dict = dict ./ vecnorm(dict, 2, 1);
+%% Step 4: Perform  Matching for Both Datasets
+datasets = {'Fully Sampled', 'Undersampled'};
+dataInputs = {imgs, undersampled_imgs};
+for d = 1:2
+    % Select dataset
+    datasetName = datasets{d};
+    data = dataInputs{d};
+    % Extract voxel-wise temporal signals
+    [Nx, Ny, Nt] = size(data);
+    signals = reshape(data, Nx*Ny, Nt); % Reshape to voxel-wise signals
+    % signals = signals ./ vecnorm(signals, 2, 2); % Normalize signals
+    signals = signals ./ max(vecnorm(signals, 2, 2), eps); % Use eps to avoid zero division
+
+
+    % Initialize T1 and T2 maps
+    T1_map = zeros(Nx, Ny);
+    T2_map = zeros(Nx, Ny);
+
+    % Perform dictionary matching
+    disp(['Performing dictionary matching for: ', datasetName]);
+     % Use vectorized matching
+    mask_flattened = mask(:); % Flatten the mask for voxel indexing
+    for voxel = find(mask_flattened)' % Only process voxels within the mask
+
+        % Extract signal for the voxel
+        signal = signals(voxel, :)';
+
+        % Compute dot product with dictionary
+        % correlations = dictionary' * signal;
+        % correlations = dictionary * signal;
+
+        correlations = dictionary * signal; % Ensure numeric output
+[maxValue, best_match_index] = max(abs(correlations)); % Track max value for debugging
+
+
+
+        % Find the best match
+        [~, best_match_index] = max(correlations);
+
+        % Map to T1 and T2 values using LUT
+        % T1_map(voxel) = LUT(1, best_match_index);
+        % T2_map(voxel) = LUT(2, best_match_index);
+
+        if best_match_index <= size(LUT, 1)
+    T1_map(voxel) = LUT(best_match_index, 1);
+    T2_map(voxel) = LUT(best_match_index, 2);
+else
+    warning('Index exceeds LUT bounds. Skipping this voxel.');
+end
+
+
+        
+        % Store the maximum dot product value (optional for analysis)
+        dotProductMaximums(voxel) = maxValue;
+    end
+
+   
+     % Reshape T1 and T2 maps back to spatial dimensions
+    T1_map = reshape(T1_map, Nx, Ny) .* mask;
+    T2_map = reshape(T2_map, Nx, Ny) .* mask;
+
+    % Save results
+    save([datasetName '_T1_T2_Maps.mat'], 'T1_map', 'T2_map');
+
+    % Visualize results
+    figure;
+    subplot(1, 2, 1); imagesc(T1_map); colorbar; title([datasetName ' T1 Map']);
+    subplot(1, 2, 2); imagesc(T2_map); colorbar; title([datasetName ' T2 Map']);
+end

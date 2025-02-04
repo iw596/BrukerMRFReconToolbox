@@ -1,0 +1,85 @@
+%% Step 1: Load k-Space Data and Generate Undersampled Data
+% Load fully sampled k-space data
+addpath("Simulations\")
+addpath("recon\")
+addpath("B1Mapping\")
+addpath("Fitting\")
+addpath("FileIO\")
+
+pth = "datasets\MRF_IWFISP";
+params = LoadBrukerData(pth);
+FA = ReadMRFList("datasets\MRFPattern.txt");
+plot(FA);
+rawdata  = params.data;
+rawdata = reshape(rawdata, [params.NCol length(FA) params.NLin]);
+rawdata = permute(rawdata, [1 3 2]);
+kspace=rawdata;
+
+%% Parameters
+Nx = 128;            % Number of frequency-encoding points (columns)
+Ny = 128;            % Number of phase-encoding lines (rows)
+numCentralLines = 20;  % Number of central lines to fully sample
+
+% Percentage of outer lines to sample (e.g., 30% of the outer region)
+outerSamplingFraction = 0.3;
+
+%% Define Central Fully Sampled Lines
+% Determine the central line indices
+centerLine = round(Ny / 2);
+halfCentral = floor(numCentralLines / 2);
+centralIndices = (centerLine - halfCentral):(centerLine + halfCentral);
+
+%% Define Outer Region Lines
+% Outer lines are those not included in the central region
+allLines = 1:Ny;
+outerIndices = setdiff(allLines, centralIndices);
+
+% Determine the number of outer lines to sample
+numOuterToSample = round(outerSamplingFraction * numel(outerIndices));
+
+% Randomly select outer indices (you can use 'randsample' for random selection)
+selectedOuterIndices = sort(randsample(outerIndices, numOuterToSample));
+
+%% Create the Final Undersampling Mask
+% Initialize a mask of zeros
+undersampling_mask = zeros(Ny, Nx);
+
+% Fully sample the central lines
+undersampling_mask(centralIndices, :) = 1;
+
+% Sample the selected outer lines (set the entire row to 1)
+undersampling_mask(selectedOuterIndices, :) = 1;
+
+%% Visualization of the Sampling Mask
+figure;
+imagesc(undersampling_mask);
+colormap(gray);
+axis image;
+title('Line-Based Undersampling Mask');
+xlabel('k_x (Frequency Encoding)');
+ylabel('k_y (Phase Encoding)');
+
+%% (Optional) Apply the Mask to Fully Sampled k-Space Data
+% If you have fully sampled k-space data in a variable 'kspace_full' (size: Ny x Nx)
+% you can apply the mask as follows:
+% kspace_undersampled = kspace_full .* undersampling_mask;
+% Assuming you already have:
+%  - A fully sampled k-space data matrix: kspace_full (size: Ny x Nx)
+%  - A line-based undersampling mask: undersampling_mask (same size as kspace_full)
+
+% Apply the undersampling mask to fully sampled k-space data
+kspace_undersampled = kspace_full .* undersampling_mask;
+
+% Optional: Visualize the magnitude of k-space before and after undersampling
+figure;
+subplot(1,2,1);
+imagesc(abs(kspace_full));
+colormap(gray);
+axis image;
+title('Fully Sampled k-space');
+
+subplot(1,2,2);
+imagesc(abs(kspace_undersampled));
+colormap(gray);
+axis image;
+title('Undersampled k-space');

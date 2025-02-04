@@ -24,4 +24,3 @@ sp = ones(NIso,1);
 [dict,LUT] = GenerateDictionary(FA,TR,TE,TI,T1List,T2List,B1,spoilingCycles,sp,NIso);
 
 % save("Dictionaries/Large_Syringes_NoB1Dict","dict","LUT",'-v7.3');
-save('MRF_Dictionary.mat', 'dict', 'LUT', 'T1List', 'T2List');
