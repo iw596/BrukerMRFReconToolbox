@@ -6,7 +6,7 @@ addpath("Fitting\")
 
 %% Open bruker MRF dataset
 %pth = "datasets\MRF_ISMRM_Dataset\17";
-pth = "datasets\MRFDataset1\MRF_Exp28";
+pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\31";
 params = LoadBrukerData(pth);
 
 
@@ -14,7 +14,7 @@ params = LoadBrukerData(pth);
 %% Reconstruct data (assuming 128 points,64 lines and 600 FA)
 rawdata  = params.data;
 %[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
-FA = ReadFAList("datasets\MRFDataset1\MRFFAPattern.txt");
+FA = ReadFAList("datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\MRFFAPattern.txt");
 rawdata = reshape(rawdata, [params.NCol length(FA) params.NLin]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = fftcn(rawdata,[1 2]);
@@ -40,7 +40,6 @@ cnt=size(dict,1);
 parfor c = 1:cnt  
     scaleFactor = sqrt(sum(dict(c,:).*conj(dict(c,:))));
     normalisedDict(c,:) = dict(c,:) / scaleFactor;
-    %normalisedDict(c,:) =  dict(c,:)./norm(squeeze( dict(c,:)));
 end
 
 % Iterate through each voxel
