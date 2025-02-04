@@ -11,7 +11,7 @@ T1Range = [10:10:500];
 T2Range = [10:10:400];
 
 % Exclude T2 > T1
-NDictionaryEntries = 0 ;
+NDictiosinaryEntries = 0 ;
 % Prepare look-up table containing all valid pairs
 LUT = [];
 for ii = 1:length(T1Range)
