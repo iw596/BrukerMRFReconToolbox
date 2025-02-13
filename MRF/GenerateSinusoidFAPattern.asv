@@ -1,8 +1,0 @@
-function FA = GenerateSinusoidFAPattern(peakFA,minFA,NLobes,NPoints)
-
-% Generate random number between minFA+1 to peakFA
-for i = 1:NLobes
-    lobePeak = randi([roun,500]);
-end
-
-end

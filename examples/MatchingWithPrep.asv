@@ -63,21 +63,10 @@ data = reshape(data,[params.NCol 128 params.NInv]);
 fclose(fid);
 T1RefMap = T1Fitting(data,params.InvTimes);
 
-%% Load T2 MSMSE
-pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\34";
-params = LoadBrukerData(pth);
-fid = fopen(pth + '\pdata\1\2dseq');
-data = fread(fid,"int16");
-data = reshape(data,[params.NCol 128 params.NEcho]);
-fclose(fid);
-T2RefMap = T2Fitting(data,params.MSMETimes);
-
 
 figure(1); 
 subplot(1,2,1); imagesc(T1Map,[0,2500]); colormap("turbo"); colorbar; title("MRF T1 Map")
 subplot(1,2,2); imagesc(T1RefMap,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map")
 
 
-figure(2); 
-subplot(1,2,1); imagesc(T2Map,[0,1000]); colormap("turbo"); colorbar; title("MRF T2 Map")
-subplot(1,2,2); imagesc(T2RefMap,[0,1000]); colormap("turbo"); colorbar; title("Ref T2 Map")
+figure(2); imagesc(T2Map.*mask); colormap("turbo"); colorbar; title("MRF T2 Map")

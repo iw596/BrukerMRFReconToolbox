@@ -179,8 +179,8 @@ function params = LoadBrukerData(path)
         line = splitlines(line);
         params.TR = str2num(cell2mat(line(1)))/1000;
     end
-
-    
+    matches = regexp(TextAsCells,'^$ExcPulse1Shape\d+$','match');
+    B = [matches{:}];
 
     % Find number of read dephasing points
    % params.NCha

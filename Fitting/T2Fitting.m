@@ -14,7 +14,7 @@ function  map = T2Fitting(imgs,TE,mask)
                 s = squeeze(imgs(ii,jj,:));
                 fitFunc = @(x)((x(1).* exp(-TE./x(2))) - s);
 
-                [C] = lsqnonlin(fitFunc,[1,50],[],[],options);
+                [C] = lsqnonlin(fitFunc,[50,50],[],[],options);
                 map(ii,jj) = C(2);
             else
                 map(ii,jj) = 0.0;
