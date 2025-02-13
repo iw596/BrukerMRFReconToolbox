@@ -7,8 +7,8 @@ addpath("MRF\")
 
 
 %% First we need to generate our look-up table of T1 and T2 values
-T1Range = [10:10:500];
-T2Range = [10:10:500];
+T1Range = [10:10:400];
+T2Range = [10:10:300];
 
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -25,19 +25,19 @@ for ii = 1:length(T1Range)
 end
 
 % Read FA train
-[FA,~] = ReadMRFList("datasets\MRFLowFA\MRFPattern.txt");
+[FA,~] = ReadMRFList("datasets\32\MRFPattern.txt");
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\MRFLowFA\PrepList.txt");
+prepList = ReadMRFPrepList("datasets\32\PrepList.txt");
 % Read method file
-params = LoadBrukerData("datasets\MRFLowFA\42");
+params = LoadBrukerData("datasets\32");
 
 
 NSpin = 200;
 phi = linspace(-pi,pi,NSpin);
 dict = zeros(length(prepList) * length(FA),length(LUT));
 TR = params.TR * 1000;
-TE = 4;
-
+TE = 1.42;
+dict = [];
 for i = 1:size(LUT,1)
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
@@ -66,7 +66,7 @@ for i = 1:size(LUT,1)
             M = A*M + B;
 
             % Apply spoiling as rotation in z direction
-            for j = 1:NSpin
+            parfor j = 1:NSpin
                 M(:,j) = zrot(phi(j)) * M(:,j);
             end
             
