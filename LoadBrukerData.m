@@ -179,7 +179,14 @@ function params = LoadBrukerData(path)
         line = splitlines(line);
         params.TR = str2num(cell2mat(line(1)))/1000;
     end
-
+    
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$ExcPulse1Shape'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.ExcRFShape = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.ExcRFShape = str2double(split(line(2),' '));
+    end
     
 
     % Find number of read dephasing points
