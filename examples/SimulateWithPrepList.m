@@ -7,31 +7,33 @@ addpath("MRF\")
 
 
 %% First we need to generate our look-up table of T1 and T2 values
-T1Range = [10:10:400];
-T2Range = [10:10:300];
-
+T1Range = [10:5:200, 200:100:2600];
+T2Range = [10:5:100, 100:10:500];
+B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
 % Prepare look-up table containing all valid pairs
 LUT = [];
-for ii = 1:length(T1Range)
-    for jj = 1:length(T2Range)
-        % Only keep physically feasible pairs (i.e. T1 > T2)
-        if (T1Range(ii)>=T2Range(jj))
-            LUT(NDictionaryEntries+1,[1:2]) = [T1Range(ii),T2Range(jj)];
-            NDictionaryEntries = NDictionaryEntries + 1;
+for kk = 1:length(B1Range)
+    for ii = 1:length(T1Range)
+        for jj = 1:length(T2Range)
+            % Only keep physically feasible pairs (i.e. T1 > T2)
+            if (T1Range(ii)>=T2Range(jj))
+                LUT(NDictionaryEntries+1,[1:3]) = [T1Range(ii),T2Range(jj),B1Range(kk)];
+                NDictionaryEntries = NDictionaryEntries + 1;
+            end
         end
     end
 end
 
 % Read FA train
-[FA,~] = ReadMRFList("datasets\32\MRFPattern.txt");
+[FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\32\PrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPrepList.txt");
 % Read method file
-params = LoadBrukerData("datasets\32");
+params = LoadBrukerData("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35");
 
-
+tic
 NSpin = 200;
 phi = linspace(-pi,pi,NSpin);
 dict = zeros(length(prepList) * length(FA),length(LUT));
@@ -39,12 +41,15 @@ TR = params.TR * 1000;
 TE = 1.42;
 dict = [];
 for i = 1:size(LUT,1)
+    i
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
+    B1Tmp = LUT(i,3);
     % Set-up starting magnetization
     M = zeros([3,NSpin]);
     M(3,:) = 1;
     curEntry = 1;
+ 
     % Run through prep modules
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
@@ -54,7 +59,7 @@ for i = 1:size(LUT,1)
         end
         % Run through the FA train
         for f = 1:length(FA)
-            R = throt(FA(f),0);
+            R = throt(FA(f).*B1Tmp,0);
             M = R*M;
             % Precess to TE
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
@@ -66,14 +71,15 @@ for i = 1:size(LUT,1)
             M = A*M + B;
 
             % Apply spoiling as rotation in z direction
-            parfor j = 1:NSpin
+            for j = 1:NSpin
                 M(:,j) = zrot(phi(j)) * M(:,j);
             end
             
             curEntry = curEntry + 1;
         end
-        % Wait for 100ms
-        [A,B] = freeprecess(100,T1Tmp,T2Tmp);
+        % Wait for 500ms
+        [A,B] = freeprecess(500,T1Tmp,T2Tmp);
         M = A*M + B;
     end
 end
+toc

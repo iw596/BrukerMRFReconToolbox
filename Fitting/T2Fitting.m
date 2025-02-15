@@ -12,9 +12,19 @@ function  map = T2Fitting(imgs,TE,mask)
         for jj = 1:size(imgs,2)
             if (mask(ii,jj) == 1)
                 s = squeeze(imgs(ii,jj,:));
-                fitFunc = @(x)((x(1).* exp(-TE./x(2))) - s);
+                yDat = abs(s);
+                yDat = yDat./max(s);
+                fT2 = @(a)(a(1)*exp(-TE/a(2)) + a(3)  - yDat);
+                t2Init_dif = TE(1) - TE(end-1);
+                t2Init = t2Init_dif/log(yDat(end-1)/yDat(1));
+                
+                if t2Init<=0 || isnan(t2Init),
+                    t2Init=30;
+                end
+                pdInit = max(yDat(:))*1.5;
 
-                [C] = lsqnonlin(fitFunc,[1,50],[],[],options);
+      
+                [C] = lsqnonlin(fT2,[pdInit t2Init 0],[],[],options);
                 map(ii,jj) = C(2);
             else
                 map(ii,jj) = 0.0;

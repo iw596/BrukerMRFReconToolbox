@@ -7,7 +7,7 @@ addpath("MRF\")
 
 
 %% First we need to generate our look-up table of T1 and T2 values
-T1Range = [10:10:400];
+T1Range = [10:10:2500];
 T2Range = [10:10:300];
 
 % Exclude T2 > T1
