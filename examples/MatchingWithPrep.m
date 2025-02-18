@@ -15,14 +15,14 @@ params = LoadBrukerData(pth);
 rawdata  = params.data;
 %[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
 [FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
-rawdata = reshape(rawdata, [params.NCol length(FA) * 8 params.NLin]);
+rawdata = reshape(rawdata, [params.NCol length(FA)*8 params.NLin]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = ifftcn(rawdata,[1 2]);
-
+figure(1); plot(FA); title("Flip Angle Pattern");
 %% Create binary mask from mean of images
 se = strel('disk', 20, 0);
 mask = mean(imgs,3);
-mask = imbinarize(mat2gray(abs(imgs(:,:,1))));
+mask = imbinarize(mat2gray(abs(mask)));
 
 
 % Normalise Dictionary
@@ -33,7 +33,8 @@ parfor c = 1:cnt
     scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
     normalisedDict(:,c) = dict(:,c) / scaleFactor;
 end
-
+T1Map = [];
+T2Map = [];
 % Iterate through each voxel
 parfor i = 1:128
     i
@@ -52,7 +53,6 @@ parfor i = 1:128
     end
 end
 
-%% Load reference maps
 
 %% Load T1 FAIR RARE
 pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\33";
@@ -63,21 +63,21 @@ data = reshape(data,[params.NCol 128 params.NInv]);
 fclose(fid);
 T1RefMap = T1Fitting(data,params.InvTimes);
 
-%% Load T2 MSMSE
+%% Load T2 MSME
 pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\34";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
 data = reshape(data,[params.NCol 128 params.NEcho]);
+T2RefMapMask = imbinarize(mat2gray(data));
+T2RefMapMask = T2RefMapMask(:,:,1);
 fclose(fid);
 T2RefMap = T2Fitting(data,params.MSMETimes);
 
-
-figure(1); 
+figure(2); 
 subplot(1,2,1); imagesc(T1Map,[0,2500]); colormap("turbo"); colorbar; title("MRF T1 Map")
 subplot(1,2,2); imagesc(T1RefMap,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map")
 
-
-figure(2); 
-subplot(1,2,1); imagesc(T2Map,[0,1000]); colormap("turbo"); colorbar; title("MRF T2 Map")
-subplot(1,2,2); imagesc(T2RefMap,[0,1000]); colormap("turbo"); colorbar; title("Ref T2 Map")
+figure(3); 
+subplot(1,2,1);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
+subplot(1,2,2);imagesc(T2RefMap,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;

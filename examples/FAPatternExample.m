@@ -6,15 +6,18 @@ NLobes = 5;
 NPoints = 100;
 
 % Ramp up max peaks
-maxFA = round(linspace(10,35,NLobes));
-maxFA(end+1:end+length(maxFA)-1) = maxFA(end-1:-1:1)./1.5;
-minFA = 5;
-lobeGap  = 5;
+%maxFA = round(linspace(10,35,NLobes));
+%maxFA(end+1:end+length(maxFA)-1) = maxFA(end-1:-1:1)./1.5;
+%minFA = 5;
+%lobeGap  = 5;
 
 faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFFAPattern.txt";
-FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
-
-
+%FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
+maxFA = 35;
+minFA = 5;
+NPoints = 50;
+NLobes = 15;
+FAPattern = GenerateSinusoidFAPattern(maxFA,minFA,NLobes,NPoints);
 %% Now generate TR Pattern
 persistence = 0.6; % Moderate persistence for smoother output
 octaves = 70;      % Number of octaves
