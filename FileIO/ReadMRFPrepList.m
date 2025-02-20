@@ -22,6 +22,8 @@ function prepList = ReadMRFPrepList(filePth)
                     prepList(counter,1) = 0;
                 elseif (strcmp(cell2mat(vals(1)),"T2Prep") == 1)
                     prepList(counter,1) = 1;
+                else
+                    prepList(counter,1) = 2i;
                 end
                 prepList(counter,2) = str2double(cell2mat(vals(2)));
                 counter = counter + 1;

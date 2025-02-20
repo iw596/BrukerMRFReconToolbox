@@ -7,8 +7,10 @@ addpath("MRF\")
 
 
 %% First we need to generate our look-up table of T1 and T2 values
-T1Range = [10:5:200, 200:100:2600];
-T2Range = [10:5:100, 100:10:500];
+%T1Range = [10:5:200, 200:500:2600];
+%T2Range = [10:5:100, 100:10:500];
+T1Range = 100
+T2Range =10;
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -29,7 +31,7 @@ end
 % Read FA train
 [FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPrep2.txt");
 % Read method file
 params = LoadBrukerData("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35");
 
