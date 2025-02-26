@@ -2,8 +2,6 @@ addpath("MRF\")
 addpath("Utils\")
 
 %% Example script to generate FA pattern
-NLobes = 5;
-NPoints = 100;
 
 % Ramp up max peaks
 %maxFA = round(linspace(10,35,NLobes));
@@ -16,7 +14,7 @@ faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MR
 maxFA = 35;
 minFA = 5;
 NPoints = 50;
-NLobes = 15;
+NLobes = 36;
 FAPattern = GenerateSinusoidFAPattern(maxFA,minFA,NLobes,NPoints);
 %% Now generate TR Pattern
 persistence = 0.6; % Moderate persistence for smoother output
