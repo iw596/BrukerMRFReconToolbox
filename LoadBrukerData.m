@@ -149,6 +149,14 @@ function params = LoadBrukerData(path)
         line = splitlines(line);
         params.BSFreqOffset = str2num(cell2mat(line(1)));
     end
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$B1OffsetFrequency'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.BSFreqOffset = str2num(cell2mat(line(1)));
+    end
    
     % Extract Bloch Siegert pulse power (watts)
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSPulsePower'));
