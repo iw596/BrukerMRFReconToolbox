@@ -2,6 +2,8 @@ function [RF] = GenerateExcitationBlock(RF,GSliSel,GSliRphs,durSliSel,durSliRphs
     
 
     
+
+    
     % Rising edge of slice selection gradient (RF = zero)
     sliceSelRisingEdge = linspace(0,GSliSel,round(riseTime/dt));
     sliceSelFlatTop = ones([round(durSliSel/dt),1]) .* GSliSel;
@@ -11,6 +13,8 @@ function [RF] = GenerateExcitationBlock(RF,GSliSel,GSliRphs,durSliSel,durSliRphs
     sliceRphsRisingEdge = linspace(0,GSliRphs,round(riseTime/dt));
     sliceRphsFlatTop = -1*ones([round(durSliRphs/dt),1]) .* GSliRphs;
     sliceRphsFallingEdge = linspace(GSliRphs,0,round(riseTime/dt));
+
+    % Calculate how much padding is required for RF at start and end
 
     
 
