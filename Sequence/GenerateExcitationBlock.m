@@ -1,21 +1,23 @@
-function [RF] = GenerateExcitationBlock(RF,GSliSel,GSliRphs,durSliSel,durSliRphs,riseTime,dt)
+function [RFFull,G] = GenerateExcitationBlock(RF,GSliSel,GSliRphs,durSliSel,durSliRphs,riseTime,dt)
     
 
-    
-
+    NPointsRF = round((riseTime + durSliSel + riseTime + riseTime + durSliRphs + riseTime) /dt);
+    RFFull = zeros([1,NPointsRF]);
     
     % Rising edge of slice selection gradient (RF = zero)
     sliceSelRisingEdge = linspace(0,GSliSel,round(riseTime/dt));
-    sliceSelFlatTop = ones([round(durSliSel/dt),1]) .* GSliSel;
+    RFFull(round(riseTime/dt)) = 0;
+    sliceSelFlatTop = ones([1,round(durSliSel/dt)]) .* GSliSel;
+    RFFull(round(riseTime/dt)+1:round(durSliSel/dt)) = RF;
     sliceSelFallingEdge = linspace(GSliSel,0,round(riseTime/dt));
 
     % Now rephasing gradient
     sliceRphsRisingEdge = linspace(0,GSliRphs,round(riseTime/dt));
-    sliceRphsFlatTop = -1*ones([round(durSliRphs/dt),1]) .* GSliRphs;
+    sliceRphsFlatTop = -1*ones([1,round(durSliRphs/dt)]) .* GSliRphs;
     sliceRphsFallingEdge = linspace(GSliRphs,0,round(riseTime/dt));
 
-    % Calculate how much padding is required for RF at start and end
-
+    
+    G = [sliceSelRisingEdge sliceSelFlatTop sliceSelFallingEdge sliceRphsRisingEdge sliceRphsFlatTop sliceRphsFallingEdge];
     
 
 end
