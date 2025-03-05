@@ -181,6 +181,7 @@ function params = LoadBrukerData(path)
     % Extract repetition time and convert to seconds if available
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RepetitionTime'));
     line = TextAsCells(mask);
+
     if (isempty(line) ~=1)
         line = TextAsCells(mask);
         line = strtrim(extractAfter(cell2mat(line),'='));
@@ -188,21 +189,61 @@ function params = LoadBrukerData(path)
         params.TR = str2num(cell2mat(line(1)))/1000;
     end
     
-    mask = ~cellfun(@isempty, strfind(TextAsCells,'$ExcPulse1Shape'));
-    line = TextAsCells(mask);
-    if (isempty(line) ~=1)
-        params.ExcRFShape = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+    k = strfind(TextAsCells,'$ExcPulse1Shape=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
         line = split(line,')');
-        params.ExcRFShape = str2double(split(line(2),' '));
+        tmp = str2double(split(line(2),' '));
+        magRF = tmp(1:2:end);
+        phs = tmp(2:2:end);
+        params.ExcRFShape = magRF .* exp(1j .*deg2rad(phs));
     end
     
+    k = strfind(TextAsCells,'$ExcPulse1=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
+    end
 
-    % Find number of read dephasing points
-   % params.NCha
+    k = strfind(TextAsCells,'$ExcSliceGradHzmm=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.SliceSelGrad = str2num(line);
+    end
 
-%    params.data
+    k = strfind(TextAsCells,'$ExcSliceRephGradHzmm=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.SliceSelRephGrad = str2num(line{1});
+    end
 
- %   params.calibData
+    k = strfind(TextAsCells,'$EncGradDur=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.EncGradDur = str2num(line{1})/1000;
+    end
+
+    k = strfind(TextAsCells,"$PVM_FatSupRampTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.RiseTime = str2num(line)/1000;
+    end 
+
 
     %% Load imaging data
     fileName = strcat(path,'\','rawdata.job0');
