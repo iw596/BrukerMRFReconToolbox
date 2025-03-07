@@ -95,6 +95,8 @@ function params = LoadBrukerData(path)
     line = splitlines(line);
     params.NRep = str2num(cell2mat(line(1)));
 
+    
+
     % Extract inversion times
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_FairTIR_Arr'));
     line = TextAsCells(mask);
@@ -181,7 +183,6 @@ function params = LoadBrukerData(path)
     % Extract repetition time and convert to seconds if available
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RepetitionTime'));
     line = TextAsCells(mask);
-
     if (isempty(line) ~=1)
         line = TextAsCells(mask);
         line = strtrim(extractAfter(cell2mat(line),'='));
@@ -189,6 +190,16 @@ function params = LoadBrukerData(path)
         params.TR = str2num(cell2mat(line(1)))/1000;
     end
     
+    k = strfind(TextAsCells,"$PVM_EchoTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.TE = str2num(line{1})/1000.0;
+    end
+
+
     k = strfind(TextAsCells,'$ExcPulse1Shape=');
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -244,6 +255,57 @@ function params = LoadBrukerData(path)
         params.RiseTime = str2num(line)/1000;
     end 
 
+    k = strfind(TextAsCells,"$NPointsPerPrep=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.NPointsPerPrep = str2num(line{1});
+    end
+    k = strfind(TextAsCells,"$MRFNPrepModules=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.MRFNPrepModules = str2num(line{1});
+    end
+    k = strfind(TextAsCells,"$MRFFAList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.MRFFA = str2double(split(line(2),' '));
+    end
+    
+    k = strfind(TextAsCells,"$InversionSliceSpoiler=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.InversionSpoilerNCycles = str2double(cell2mat(tmp(2)));
+    end
+
+    k = strfind(TextAsCells,"$T2PrepSliceSpoiler=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.T2PrepSpoilerNCycles = str2double(cell2mat(tmp(2)));
+    end
+
+    k = strfind(TextAsCells,"$MRFWaitingTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = split(line,')');
+        params.MRFWaitingTimes = str2double(split(line(2),' '));
+    end
+
 
     %% Load imaging data
     fileName = strcat(path,'\','rawdata.job0');
@@ -276,3 +338,5 @@ function params = LoadBrukerData(path)
     end
     
 end
+
+

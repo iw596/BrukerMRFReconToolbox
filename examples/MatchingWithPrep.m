@@ -6,7 +6,7 @@ addpath("Fitting\")
 
 %% Open bruker MRF dataset
 %pth = "datasets\MRF_ISMRM_Dataset\17";
-pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35";
+pth = "datasets\20250225_122413_MRF_Phantom_MRF_PhantomDev_25022028v2_1_7/6/";
 params = LoadBrukerData(pth);
 
 
@@ -22,7 +22,7 @@ figure(1); plot(FA); title("Flip Angle Pattern");
 %% Create binary mask from mean of images
 se = strel('disk', 20, 0);
 mask = mean(imgs,3);
-mask = imbinarize(mat2gray(abs(mask)));
+mask = imbinarize(mat2gray(abs(mask)),);
 
 
 % Normalise Dictionary
