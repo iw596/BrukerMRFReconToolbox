@@ -6,8 +6,8 @@ function MNew = T1PrepModuleInstantRF(M,TI,NSpoil,T1,T2)
     M = R*M;
 
     % Precess for TI
-  %  [A,B] = freeprecess(TI,T1,T2);
-   % M = A*M + B;
+    [A,B] = freeprecess(TI,T1,T2);
+     M = A*M + B;
 
     % Gradient spoiling
    % for j = 1:NSpin

@@ -21,4 +21,4 @@ M(3,:) = 1;
 
 MNew = RFExcitation(waveform,dT,M,Gz,pos);
 res = complex(MNew(1,:),MNew(2,:));
-figure; plot(abs(res))
+figure; plot(imag(res))

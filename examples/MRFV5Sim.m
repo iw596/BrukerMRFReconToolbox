@@ -1,3 +1,5 @@
+addpath(genpath("../."))
+
 params = LoadBrukerData("datasets/20250225_122413_MRF_Phantom_MRF_PhantomDev_25022028v2_1_7/6");
 
 
@@ -6,8 +8,8 @@ prepList = ReadMRFPrepList("datasets\20250225_122413_MRF_Phantom_MRF_PhantomDev_
 
 
 %% Set-up LUT
-T1Range = [10e-3:50e-3:500e-3 500e-3:100e-3:2500e-3];
-T2Range = [10e-3:10e-3:100e-3 100e-3:10e-3:500e-3];
+T1Range = [100:100:2600];
+T2Range = [10:25:450];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -30,8 +32,8 @@ end
 
 NSpin = 200;
 phi = linspace(-pi,pi,NSpin);
-TR = params.TR;
-TE = params.TE;
+TR = params.TR * 1000;
+TE = params.TE *  1000;
 % Format FA array
 FAList = repmat(params.MRFFA, ceil((params.NPointsPerPrep * size(prepList,1)) / length(params.MRFFA)), 1);
 
@@ -40,10 +42,10 @@ FAList = FAList(1:params.NPointsPerPrep * size(prepList,1));
 
 
 
-waitTimes = params.MRFWaitingTimes;
+waitTimes = params.MRFWaitingTimes*1000;
 dict = zeros(length(prepList) * params.NPointsPerPrep,size(LUT,1));
 InversionModSpoilerCycles =0* params.InversionSpoilerNCycles*2;
-T2PrepModSpoilerCycles = params.T2PrepSpoilerNCycles * 2;
+T2PrepModSpoilerCycles = 0*params.T2PrepSpoilerNCycles * 2;
 for i = 1:size(LUT,1)
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
@@ -56,9 +58,11 @@ for i = 1:size(LUT,1)
      % Run through prep modules
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
-            M = T1PrepModuleInstantRF(M,prepList(p,2)/1000,InversionModSpoilerCycles,T1Tmp,T2Tmp);
+           % M = T1PrepModuleInstantRF(M,prepList(p,2),InversionModSpoilerCycles,T1Tmp,T2Tmp);
+           M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
         elseif (prepList(p,1) == 1)
-          %  M = T2PrepModuleInstantRF(M,prepList(p,2)/1000,T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
+            %M = T2PrepModuleInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
+          M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
         end
        % Run through the correct portion of the FA train
         for f = 1:params.NPointsPerPrep

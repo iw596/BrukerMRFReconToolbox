@@ -298,13 +298,13 @@ function params = LoadBrukerData(path)
         params.T2PrepSpoilerNCycles = str2double(cell2mat(tmp(2)));
     end
 
-    k = strfind(TextAsCells,"$MRFWaitingTime=");
-    idx = find(~cellfun(@isempty,k));
-    if (isempty(idx) ~=1)
-        line = TextAsCells(idx);
-        line = split(line,')');
-        params.MRFWaitingTimes = str2double(split(line(2),' '));
-    end
+    % k = strfind(TextAsCells,"$MRFWaitingTime=");
+    % idx = find(~cellfun(@isempty,k));
+    % if (isempty(idx) ~=1)
+    %     line = TextAsCells(idx);
+    %     line = split(line,')');
+    %     params.MRFWaitingTimes = str2double(split(line(2),' '));
+    % end
 
 
     %% Load imaging data
