@@ -298,13 +298,24 @@ function params = LoadBrukerData(path)
         params.T2PrepSpoilerNCycles = str2double(cell2mat(tmp(2)));
     end
 
-    % k = strfind(TextAsCells,"$MRFWaitingTime=");
-    % idx = find(~cellfun(@isempty,k));
-    % if (isempty(idx) ~=1)
-    %     line = TextAsCells(idx);
-    %     line = split(line,')');
-    %     params.MRFWaitingTimes = str2double(split(line(2),' '));
-    % end
+    k = strfind(TextAsCells,"$MRFWaitingTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = split(line,')');
+        params.MRFWaitingTimes = str2double(split(line(2),' '));
+    end
+
+    k = strfind(TextAsCells,"InvPulse1=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFInversionPulse.duration = str2double(cell2mat(tmp(1)));
+        params.MRFInversionPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFInversionPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
 
 
     %% Load imaging data

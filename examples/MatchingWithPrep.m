@@ -2,6 +2,7 @@ addpath("Simulations\")
 addpath("recon\")
 addpath("B1Mapping\")
 addpath("Fitting\")
+addpath(genpath("qMRLab-2.4.2\"))
 
 
 %% Open bruker MRF dataset
@@ -59,25 +60,43 @@ pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\33";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
-data = reshape(data,[params.NCol 128 params.NInv]);
+data = reshape(data,[params.NCol 128 1 params.NInv]);
 fclose(fid);
-T1RefMap = T1Fitting(data,params.InvTimes);
+
+Model = inversion_recovery;
+% TI in ms
+TI = [params.InvTimes];
+Model.Prot.IRData.Mat = [TI];
+Model.Prot.TimingTable.Mat = [params.TR * 1000];
+T1RefData = struct();
+T1RefData.IRData = double(data);
+T1FitResults = FitData(T1RefData,Model,0);
+
+
+
 
 %% Load T2 MSME
 pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\34";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
-data = reshape(data,[params.NCol 128 params.NEcho]);
-T2RefMapMask = imbinarize(mat2gray(data));
-T2RefMapMask = T2RefMapMask(:,:,1);
+data = reshape(data,[params.NCol 128 1 params.NEcho]);
 fclose(fid);
-T2RefMap = T2Fitting(data,params.MSMETimes);
+
+
+Model = mono_t2;
+EchoTime  = params.MSMETimes;
+% EchoTime (ms) is a vector of [30X1]
+Model.Prot.SEdata.Mat = [EchoTime];
+T2MSMEdata = struct();
+T2MSMEdata.SEdata=double(data);
+T2FitResults = FitData(T2MSMEdata,Model,0);
+
 
 figure(2); 
 subplot(1,2,1); imagesc(T1Map,[0,2500]); colormap("turbo"); colorbar; title("MRF T1 Map")
-subplot(1,2,2); imagesc(T1RefMap,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map")
+subplot(1,2,2); imagesc(T1FitResults.T1); colormap("turbo"); colorbar; title("Ref T1 Map")
 
 figure(3); 
 subplot(1,2,1);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
-subplot(1,2,2);imagesc(T2RefMap,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;
+subplot(1,2,2);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;

@@ -9,7 +9,7 @@ function [RFFull,G] = GenerateExcitationBlock(RF,GSliSel,GSliRphs,durSliSel,durS
     RFFull(round(riseTime/dt)) = 0;
     sliceSelFlatTop = ones([1,round(durSliSel/dt)]) .* GSliSel;
     sliceSelFallingEdge = linspace(GSliSel,0,round(riseTime/dt));
-    RFFull(round(riseTime/dt)+1:round(riseTime/dt) + round((durSliSel + riseTime)/dt)) = RF;
+    RFFull(round(riseTime/dt)+1:round(riseTime/dt) + round((durSliSel)/dt)) = RF;
     % Now rephasing gradient
     sliceRphsRisingEdge = linspace(0,-1*GSliRphs,round(riseTime/dt));
     sliceRphsFlatTop = -1*ones([1,round(durSliRphs/dt)]) .* GSliRphs;
