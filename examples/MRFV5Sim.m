@@ -79,15 +79,15 @@ for i = 1:size(LUT,1)
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
             M = A*M + B; 
             % Store signal 
-            dict(curEntry,i) = mean(complex(M(1,:),M(2,:)));
+            dict(curEntry,i) =-1i * mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
             [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
             M = A*M + B;
 
             % Apply spoiling as rotation in z direction
             for j = 1:NSpin
-                %M(:,j) = zrot(phi(j)) * M(:,j);
-                M(:,j) = rotmat([0 0 phi(j)]) * M(:,j);
+                M(:,j) = zrot(phi(j)) * M(:,j);
+                %M(:,j) = rotmat([0 0 phi(j)]) * M(:,j);
             end
             faCounter = faCounter + 1;
             curEntry = curEntry + 1;

@@ -303,7 +303,14 @@ function params = LoadBrukerData(path)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = split(line,')');
+        % Check for old MRF version with single wait time
+        if (size(line,1) == 1)
+            line = strtrim(extractAfter(cell2mat(line),'='));
+            tmp = strsplit(line,',');
+            params.MRFWaitingTimes = str2double(cell2mat(tmp(1)));
+        else
         params.MRFWaitingTimes = str2double(split(line(2),' '));
+        end
     end
 
     k = strfind(TextAsCells,"InvPulse1=");

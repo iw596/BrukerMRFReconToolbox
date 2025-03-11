@@ -19,17 +19,22 @@ peakB1 = (refB1./refPeakVolage) .*  pulsePeakVoltage; % in T
 RF = peakB1.*A.*exp(1j.*deg2rad(phs)); 
 dt = (params.MRFInversionPulse.duration/1000)/length(RF);
 % Sequence generation
-fmax_sim = 2e3;
-Gz = fmax_sim / 42.57e6;
+thickness = 5e-3;
 
+G = params.MRFInversionPulse.BW/(gamma*thickness);
 
-
-pos = linspace(-1e-3,1e-3,200);
-M = zeros([3,200]);
+NSpin = 500;
+pos = linspace(-2.5e-3,2.5e-3,NSpin);
+M = zeros([3,NSpin]);
 M(3,:)= 1;
 T1 = 1.5;
 T2 = 50e-3;
-MNew = RFExcitation(RF,dt,M,4.697320099967991e-1,pos,T1,T2);
+MNew = RFExcitation(RF,dt,M,0,pos,T1,T2);
 figure(1);
 subplot(2,1,1); plot(A);
-subplot(2,1,2); plot(phs)
+subplot(2,1,2); plot(phs);
+
+figure(2);
+plot(MNew(3,:))
+
+Mxy = complex(MNew(1,:),MNew(2,:));

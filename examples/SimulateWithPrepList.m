@@ -6,11 +6,9 @@ addpath("FileIO\")
 addpath("MRF\")
 
 
-%% First we need to generate our look-up table of T1 and T2 values
-%T1Range = [10:5:200, 200:500:2600];
-%T2Range = [10:5:100, 100:10:500];
-T1Range = 100
-T2Range =10;
+T1Range = [100:300:2600 2300];
+T2Range = [10:50:450 488];
+B1Range = [1];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -31,7 +29,7 @@ end
 % Read FA train
 [FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPrep2.txt");
+prepList = ReadMRFPrepList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPrep.txt");
 % Read method file
 params = LoadBrukerData("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35");
 
@@ -40,8 +38,10 @@ NSpin = 200;
 phi = linspace(-pi,pi,NSpin);
 dict = zeros(length(prepList) * length(FA),length(LUT));
 TR = params.TR * 1000;
-TE = 1.42;
+TE = params.TE * 1000;
 dict = [];
+InversionModSpoilerCycles =params.InversionSpoilerNCycles*2;
+T2PrepModSpoilerCycles = params.T2PrepSpoilerNCycles * 2;
 for i = 1:size(LUT,1)
     i
     T1Tmp = LUT(i,1);
@@ -55,19 +55,23 @@ for i = 1:size(LUT,1)
     % Run through prep modules
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
-            M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
+           % M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
+            M = T1PrepModuleInstantRF(M,prepList(p,2),InversionModSpoilerCycles,T1Tmp,T2Tmp);
         elseif (prepList(p,1) == 1)
-            M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
+            %M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
+            M = T2PrepModuleInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
         end
         % Run through the FA train
         for f = 1:length(FA)
-            R = throt(FA(f).*B1Tmp,0);
-            M = R*M;
+           % R = throt(FA(f).*B1Tmp,0);
+            R = RotateTheta(deg2rad(FAList(f)).*B1Tmp,0);
+            %R = throt(FAList(faCounter).*B1Tmp,0);
+           M = R*M;
             % Precess to TE
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
             M = A*M + B;
             % Store signal 
-            dict(curEntry,i) = mean(complex(M(1,:),M(2,:)));
+            dict(curEntry,i) = -1i*mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
             [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
             M = A*M + B;
