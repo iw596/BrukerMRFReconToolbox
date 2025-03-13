@@ -17,7 +17,11 @@ function [RF,G,dt] = GenerateT1PrepModule(params,TI)
     RF = peakB1.*A.*exp(-1j.*deg2rad(phs)); 
     dt = (params.MRFInversionPulse.duration/1000)/length(RF);
 
+    spoilerAmplitude
+    spoilerFlatTime
+    spoilerRiseTime
 
+    %
     
 
 

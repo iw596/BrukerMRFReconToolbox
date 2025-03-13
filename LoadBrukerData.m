@@ -1,4 +1,7 @@
-function params = LoadBrukerData(path)
+function params = LoadBrukerData(path,loadDataFlag)
+    if (nargin < 2)
+        loadDataFlag = true;
+    end
     % Find directory
     methodFileName = strcat(path,'\','method'); 
     result = isfile(methodFileName);
@@ -255,6 +258,15 @@ function params = LoadBrukerData(path)
         params.RiseTime = str2num(line)/1000;
     end 
 
+    k = strfind(TextAsCells,"$PVM_GradCalConst=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.PVM_GradCalConst = str2num(line{1});
+    end
+
     k = strfind(TextAsCells,"$NPointsPerPrep=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -295,7 +307,12 @@ function params = LoadBrukerData(path)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.T2PrepSpoilerNCycles = str2double(cell2mat(tmp(2)));
+        params.T2PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
+        params.T2PrepSpoiler.duration = str2double(cell2mat(tmp(3)));
+        amp = cell2mat(tmp(4));
+        amp = amp(1:end-1);
+        params.T2PrepSpoiler.amplitude = str2double(amp);
+        amp = [];
     end
 
     k = strfind(TextAsCells,"$MRFWaitingTime=");
@@ -324,34 +341,46 @@ function params = LoadBrukerData(path)
         params.MRFInversionPulse.power = str2double(cell2mat(tmp(end-1)));
     end
 
-
-    %% Load imaging data
-    fileName = strcat(path,'\','rawdata.job0');
-    fid = fopen(fileName,'r','native');
-    if (fid == -1)
-        fileName = strcat(path,'\','fid');
-        fid = fopen(fileName,'r','native');
+    k = strfind(TextAsCells,"T2PrepPulse1=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFT2RectPulse.duration = str2double(cell2mat(tmp(1)));
+        params.MRFT2RectPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFT2RectPulse.power = str2double(cell2mat(tmp(end-1)));
     end
-    if (fid ~= -1)
-        fseek(fid,0,'bof');
-        rawdata = fread(fid,'int32');
-        fclose(fid);
-        rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-        params.data =rawdata;
-        clear("rawdata");
-    
-        %% Load calibration data if present
-        if (params.Calibration == true)
-            fileName = strcat(path,'\','rawdata.job1');
+
+    %% Load imaging data if required
+    if (loadDataFlag == true)
+        fileName = strcat(path,'\','rawdata.job0');
+        fid = fopen(fileName,'r','native');
+        if (fid == -1)
+            fileName = strcat(path,'\','fid');
             fid = fopen(fileName,'r','native');
+        end
+        if (fid ~= -1)
             fseek(fid,0,'bof');
             rawdata = fread(fid,'int32');
             fclose(fid);
             rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-            % Reshape the data using extracted parameters
-            rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
-            params.calibData =rawdata;
+            params.data =rawdata;
             clear("rawdata");
+
+            %% Load calibration data if present
+            if (params.Calibration == true)
+                fileName = strcat(path,'\','rawdata.job1');
+                fid = fopen(fileName,'r','native');
+                fseek(fid,0,'bof');
+                rawdata = fread(fid,'int32');
+                fclose(fid);
+                rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
+                % Reshape the data using extracted parameters
+                rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
+                params.calibData =rawdata;
+                clear("rawdata");
+            end
         end
     end
     

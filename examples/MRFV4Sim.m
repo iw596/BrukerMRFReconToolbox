@@ -1,6 +1,6 @@
 addpath(genpath("../."))
 
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
+params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/12");
 
 
 % Read preplist and preptimes
@@ -8,8 +8,8 @@ prepList = ReadMRFPrepList("datasets\20250311_095117_MRF_Phantom_MRF_dev_1103202
 
 
 %% Set-up LUT
-T1Range = [10:10:100 100:50:2600 2300];
-T2Range = [10:10:450 488];
+T1Range = [100:150:2600 2300];
+T2Range = [10:15:450 488];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -35,10 +35,10 @@ phi = linspace(-pi,pi,NSpin);
 TR = params.TR * 1000;
 TE = params.TE *  1000;
 % Format FA array
-FAList = repmat(params.MRFFA, ceil((params.NPointsPerPrep * size(prepList,1)) / length(params.MRFFA)), 1);
+FAList = repmat(params.MRFFA, ceil((params.NMRFFA * size(prepList,1)) / length(params.MRFFA)), 1);
 
 % Truncate FAList to correct dimensions
-FAList = FAList(1:params.NPointsPerPrep * size(prepList,1));
+FAList = FAList(1:params.NMRFFA * size(prepList,1));
 
 %%% Gradient dephasing matrix
 rg={};
@@ -49,7 +49,7 @@ Rg = blkdiag(rg{:});
 
 
 waitTimes = params.MRFWaitingTimes;
-dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
+dict = zeros(size(prepList,1) * params.NMRFFA,size(LUT,1));
 InversionModSpoilerCycles =params.InversionSpoilerNCycles*2;
 T2PrepModSpoilerCycles = params.T2PrepSpoilerNCycles * 2;
 for i = 1:size(LUT,1)
@@ -71,15 +71,15 @@ for i = 1:size(LUT,1)
             %M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
         end
        % Run through the correct portion of the FA train
-        for f = 1:params.NPointsPerPrep
-            R = RotateTheta(deg2rad(FAList(faCounter)).*B1Tmp,0);
-            %R = throt(FAList(faCounter).*B1Tmp,0);
+        for f = 1:params.NMRFFA
+            %R = RotateTheta(deg2rad(FAList(faCounter)).*B1Tmp,0);
+            R = throt(FAList(faCounter).*B1Tmp,0);
             M = R*M;
             % Precess to TE
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
             M = A*M + B; 
             % Store signal 
-            dict(curEntry,i) =-1i * mean(complex(M(1,:),M(2,:)));
+            dict(curEntry,i) =mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
             [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
             M = A*M + B;
