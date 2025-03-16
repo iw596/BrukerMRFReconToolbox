@@ -2,7 +2,7 @@
 params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
 NSpin = 200;
 T1 = 1400;
-T2 = [1:1:4 5:5:200];
+T2 = [1:1:10 10:10:400];
 signalFullSimulationTE150 = zeros(size(T2));
 signalSimpleSimulationTE150 = zeros(size(T2));
 signalFullSimulationTE80 = zeros(size(T2));

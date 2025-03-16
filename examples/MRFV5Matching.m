@@ -49,7 +49,7 @@ parfor i = 1:128
        [maxValue, max_index] = max(abs(inner_product));
        T1Map(i,j) = LUT(max_index,1);
        T2Map(i,j) = LUT(max_index,2);
-       MRFMask(i,j) = 1;
+       MRFMask(i,j) = 1;size
        dotProductMaximums(i,j) = maxValue;
 
     end
@@ -94,9 +94,7 @@ T2FitResults = FitData(T2MSMEdata,Model,0);
 
 
 figure(2); 
-subplot(1,2,1); imagesc(T1Map); colormap("turbo"); colorbar; title("MRF T1 Map")
-subplot(1,2,2); imagesc(T1FitResults.T1,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map")
-
-figure(3); 
-subplot(1,2,1);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
-subplot(1,2,2);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;
+subplot(2,2,1); imagesc(T1Map); colormap("turbo"); colorbar; title("MRF T1 Map"); axis square;
+subplot(2,2,2); imagesc(T1FitResults.T1,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map");  axis square;
+subplot(2,2,3);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
+subplot(2,2,4);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;

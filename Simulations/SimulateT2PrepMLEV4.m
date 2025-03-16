@@ -2,7 +2,7 @@ function MNew = SimulateT2PrepMLEV4(params,TE,dt,M,pos,T1,T2)
     
     FA = pi/2;
     dur = params.MRFT2RectPulse.duration;
-    gamma = 42.56e6;
+    gamma = 42.57e6;
     % Generate spoiler
     amp = ((params.PVM_GradCalConst*params.T2PrepSpoiler.amplitude/100)*1000)/gamma;
     gradDur = params.T2PrepSpoiler.duration - params.RiseTime;

@@ -29,7 +29,7 @@ M = zeros([3,NSpin]);
 M(3,:)= 1;
 T1 = 1.5;
 T2 = 50e-3;
-MNew = RFExcitation(RF,dt,M,0,pos,T1,T2);
+MNew = RFExcitation(RF,dt,M,pos,T1,T2);
 figure(1);
 subplot(2,1,1); plot(A);
 subplot(2,1,2); plot(phs);

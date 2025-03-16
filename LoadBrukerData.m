@@ -291,6 +291,18 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = split(line,')');
         params.MRFFA = str2double(split(line(2),' '));
     end
+
+
+    k = strfind(TextAsCells,"$MRFSpoiler=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFSpoiler.amplitude = str2double(cell2mat(tmp(2)));
+        params.MRFSpoiler.duration = str2double(cell2mat(tmp(1)));
+        amp = [];
+    end
     
     k = strfind(TextAsCells,"$InversionSliceSpoiler=");
     idx = find(~cellfun(@isempty,k));
@@ -298,7 +310,12 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.InversionSpoilerNCycles = str2double(cell2mat(tmp(2)));
+        params.T1PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
+        params.T1PrepSpoiler.duration = str2double(cell2mat(tmp(3)));
+        amp = cell2mat(tmp(4));
+        amp = amp(1:end-1);
+        params.T1PrepSpoiler.amplitude = str2double(amp);
+        amp = [];
     end
 
     k = strfind(TextAsCells,"$T2PrepSliceSpoiler=");
