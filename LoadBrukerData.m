@@ -311,7 +311,7 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
         params.T1PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
-        params.T1PrepSpoiler.duration = str2double(cell2mat(tmp(3)));
+        params.T1PrepSpoiler.duration = str2double(cell2mat(tmp(3)))/1000; % Convert to seconds
         amp = cell2mat(tmp(4));
         amp = amp(1:end-1);
         params.T1PrepSpoiler.amplitude = str2double(amp);
@@ -325,7 +325,7 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
         params.T2PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
-        params.T2PrepSpoiler.duration = str2double(cell2mat(tmp(3)));
+        params.T2PrepSpoiler.duration = str2double(cell2mat(tmp(3)))/1000; % Convert to seconds
         amp = cell2mat(tmp(4));
         amp = amp(1:end-1);
         params.T2PrepSpoiler.amplitude = str2double(amp);

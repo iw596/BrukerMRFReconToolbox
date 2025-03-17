@@ -5,11 +5,11 @@ addpath("Fitting\")
 
 
 %% Open bruker MRF dataset
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11");
+params = LoadBrukerData("datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15");
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/7/MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15/MRFPrepList.txt");
 
 
 
@@ -19,7 +19,7 @@ rawdata  = params.data;
 rawdata = reshape(rawdata, [params.NCol params.NPointsPerPrep * params.MRFNPrepModules params.NLin]);
 rawdata = permute(rawdata, [1 3 2]);
 imgs = ifftcn(rawdata,[1 2]);
-figure(1); plot(FA); title("Flip Angle Pattern");
+%figure(1); plot(FA); title("Flip Angle Pattern");
 %% Create binary mask from mean of images
 se = strel('disk', 20, 0);
 mask = mean(imgs,3);
@@ -34,13 +34,15 @@ parfor c = 1:cnt
     scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
     normalisedDict(:,c) = dict(:,c) / scaleFactor;
 end
-normalisedDict = normalisedDict*-1;
+%normalisedDict = normalisedDict*-1;
 T1Map = [];
 T2Map = [];
+NRead = params.NCol;
+NPE = params.NLin;
 % Iterate through each voxel
-parfor i = 1:128
+parfor i = 1:NRead
     i
-    for j = 1:64
+    for j = 1:NPE
 
        scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
        normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
@@ -49,7 +51,7 @@ parfor i = 1:128
        [maxValue, max_index] = max(abs(inner_product));
        T1Map(i,j) = LUT(max_index,1);
        T2Map(i,j) = LUT(max_index,2);
-       MRFMask(i,j) = 1;size
+       MRFMask(i,j) = 1;
        dotProductMaximums(i,j) = maxValue;
 
     end
@@ -77,7 +79,7 @@ T1FitResults = FitData(T1RefData,Model,0);
 
 
 %% Load T2 MSME
-pth = "datasets/20250225_122413_MRF_Phantom_MRF_PhantomDev_25022028v2_1_7/8";
+pth = "datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/16";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -96,5 +98,5 @@ T2FitResults = FitData(T2MSMEdata,Model,0);
 figure(2); 
 subplot(2,2,1); imagesc(T1Map); colormap("turbo"); colorbar; title("MRF T1 Map"); axis square;
 subplot(2,2,2); imagesc(T1FitResults.T1,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map");  axis square;
-subplot(2,2,3);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
-subplot(2,2,4);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;
+subplot(2,2,3);imagesc(T2Map,[0,600]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
+subplot(2,2,4);imagesc(T2FitResults.T2,[0,600]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;

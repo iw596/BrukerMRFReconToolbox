@@ -1,15 +1,15 @@
 addpath(genpath("../."))
 
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
+params = LoadBrukerData("datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15",false);
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/10/MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15/MRFPrepList.txt");
 
 
 %% Set-up LUT
-T1Range = [10:10:100 100:50:2600 2300];
-T2Range = [10:10:450 488];
+T1Range = [10:10:100 100:50:2600];
+T2Range = [10:10:550];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
