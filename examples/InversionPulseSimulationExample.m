@@ -1,4 +1,4 @@
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
+params = LoadBrukerData("datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15",false);
 T1 = [100:100:3000];
 T2_1 = 200;
 T2_2 = 50;

@@ -3,7 +3,7 @@
 
 addpath(genpath("../."))
 
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
+params = LoadBrukerData("datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15",false);
 
 
 % Read preplist and preptimes

@@ -1,8 +1,11 @@
-function MNew = SimulateAdiabaticT2Prep(params,TE,M,pos,T1,T2,instantRFFlag)
+function MNew = SimulateAdiabaticT2Prep(params,TE,M,T1,T2,pos,instantRFFlag)
     if (nargin < 7)
         instantRFFlag = true;
     end
-    
+    if (nargin < 6)
+        instantRFFlag = true;
+        pos = [];
+    end
 
     gamma = 42.57e6;
     % Generate spoiler
@@ -12,7 +15,7 @@ function MNew = SimulateAdiabaticT2Prep(params,TE,M,pos,T1,T2,instantRFFlag)
         % Generate spoiler
         amp = ((params.PVM_GradCalConst*params.T2PrepSpoiler.amplitude/100)*1000)/gamma;
         gradDur = params.T2PrepSpoiler.duration - params.RiseTime;
-        dt_spoil = 10e-6;
+        dt_spoil = 10e-8;
         G = GenSliceSpoiler(amp,gradDur,params.RiseTime,dt_spoil);
         % Inital 90 degree tip 
         R = RotateTheta(pi/2,0);

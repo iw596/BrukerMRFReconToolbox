@@ -1,10 +1,10 @@
 addpath(genpath("../."))
 
-params = LoadBrukerData("datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15",false);
+params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/60",false);
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/15/MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/60/MRFPrepList.txt");
 
 
 %% Set-up LUT
@@ -67,6 +67,7 @@ for i = 1:size(LUT,1)
             M = T1PrepModuleInstantRF(M,prepList(p,2),InversionModSpoilerCycles,T1Tmp,T2Tmp);
             %M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
         elseif (prepList(p,1) == 1)
+            %M = SimulateAdiabaticT2PrepInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
             M = T2PrepModuleInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
             %M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
         end

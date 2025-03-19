@@ -5,11 +5,11 @@ addpath("Fitting\")
 
 
 %% Open bruker MRF dataset
-params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/60");
+params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/30");
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/60/MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/7/MRFPrepList.txt");
 
 
 

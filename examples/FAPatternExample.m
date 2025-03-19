@@ -11,10 +11,10 @@ addpath("Utils\")
 
 faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFFAPattern.txt";
 %FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
-maxFA = 35;
-minFA = 5;
+maxFA = 70;
+minFA = 10;
 NPoints = 50;
-NLobes = 36;
+NLobes = 15;
 FAPattern = GenerateSinusoidFAPattern(maxFA,minFA,NLobes,NPoints);
 %% Now generate TR Pattern
 persistence = 0.6; % Moderate persistence for smoother output
