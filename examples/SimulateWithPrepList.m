@@ -6,10 +6,10 @@ addpath("FileIO\")
 addpath("MRF\")
 
 
-T1Range = [100:300:2600 2300];
-T2Range = [10:50:450 488];
+T1Range = [30e-3:2.5e-3:100e-3 100e-3:25e-3:2600e-3];
+T2Range = [10e-3:5e-3:200e-3 200e-3:10e-3:550e-3];
 B1Range = [1];
-B1Range = [1];
+
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
 % Prepare look-up table containing all valid pairs
@@ -26,22 +26,29 @@ for kk = 1:length(B1Range)
     end
 end
 
-% Read FA train
-[FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
+
+
+
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPrep.txt");
-% Read method file
-params = LoadBrukerData("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35");
+prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63/MRFPrepList.txt");
+params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63",false);
+
 
 tic
 NSpin = 200;
-phi = linspace(-pi,pi,NSpin);
-dict = zeros(length(prepList) * length(FA),length(LUT));
-TR = params.TR * 1000;
-TE = params.TE * 1000;
+% Simulate over twice slice thickness
+pos = linspace(-params.Thickness,params.Thickness,NSpin);
+% Format FA array
+FAList = repmat(params.MRFFA, ceil((params.NPointsPerPrep * size(prepList,1)) / length(params.MRFFA)), 1);
+dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
+TR = params.TR;
+TE = params.TE;
 dict = [];
-InversionModSpoilerCycles =params.InversionSpoilerNCycles*2;
-T2PrepModSpoilerCycles = params.T2PrepSpoilerNCycles * 2;
+%InversionModSpoilerCycles =params.InversionSpoilerNCycles*2;
+%T2PrepModSpoilerCycles = params.T2PrepSpoilerNCycles * 2;
+% Convert preplist to seconds
+prepList(:,2) = prepList(:,2)/1000;
+
 for i = 1:size(LUT,1)
     i
     T1Tmp = LUT(i,1);

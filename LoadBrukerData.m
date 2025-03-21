@@ -202,6 +202,14 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.TE = str2num(line{1})/1000.0;
     end
 
+    k = strfind(TextAsCells,"$PVM_SliceThick=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Thickness = str2num(line{1})/1000.0; % Convert mm to m
+    end
 
     k = strfind(TextAsCells,'$ExcPulse1Shape=');
     idx = find(~cellfun(@isempty,k));

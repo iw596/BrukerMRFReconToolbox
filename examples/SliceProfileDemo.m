@@ -13,8 +13,10 @@ waveform = waveform.*FA/(sum(waveform))/(2*pi*42.57e6*dt);
 G = (params.SliceSelGrad * 1000)/(42.57e6);
 
 
+iv = interp1( linspace(0,1,numel(waveform)), waveform, linspace(0,1,numel(waveform)*2) );
+
 figure(1);
-plot(real(waveform)); title("RF waveform")
+plot(imag(waveform)); title("RF waveform")
 
 
 % Set-up spin system

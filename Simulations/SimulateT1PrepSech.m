@@ -3,11 +3,7 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
         instantRF = true;
     end
     
-   
-
-    T1 = T1;
-    T2 = T2;
-    TI = TI;
+  
     % Load sech pulse
     [A,phs]  = ReadRFPulseFile("BrukerRFFiles\sech.inv");
     
@@ -27,7 +23,7 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
 
     % Generate spoiler
     amp = ((params.PVM_GradCalConst*params.T1PrepSpoiler.amplitude/100)*1000)/gamma;
-    gradDur = params.T1PrepSpoiler.duration/1000 - params.RiseTime/1000;
+    gradDur = params.T1PrepSpoiler.duration/1000 - params.RiseTime;
     G = GenSliceSpoiler(amp,gradDur/1000,params.RiseTime,dt);
 
 

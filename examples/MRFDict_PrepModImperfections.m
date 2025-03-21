@@ -3,16 +3,18 @@
 
 addpath(genpath("../."))
 
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
+params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63",false);
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/10/MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63/MRFPrepList.txt");
 
 
 %% Set-up LUT
-T1Range = [10e-3:10e-3:100e-3 100e-3:50e-3:2.6];
-T2Range = [10e-3:10e-3:450e-3];
+%T1Range = [10e-3:10e-3:100e-3 100e-3:50e-3:2.6];
+%T2Range = [10e-3:10e-3:450e-3];
+T1Range = 1.5;
+T2Range = 50e-3;
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -34,9 +36,9 @@ end
 
 
 NSpin = 200;
-pos = linspace(-1e-3,1e-3,NSpin);
+pos = linspace(-params.Thickness,params.Thickness,NSpin);
 grad_dt = 10e-6;
-GSpoil = GenSliceSpoiler(params.MRFSpoiler.amplitude/1000,params.MRFSpoiler.duration,params.RiseTime,grad_dt);
+GSpoil = GenSliceSpoiler(params.MRFSpoiler.amplitude/1000,params.MRFSpoiler.duration/1000,params.RiseTime,grad_dt);
 phi = linspace(-pi,pi,NSpin);
 TR = params.TR;
 TE = params.TE;
@@ -53,11 +55,11 @@ for jj=1:NSpin
 end
 Rg = blkdiag(rg{:});
 
-
+% Convert preplist times from ms to s
+prepList(:,2) = prepList(:,2)/1000;
 waitTimes = params.MRFWaitingTimes;
 dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
-%InversionModSpoilerCycles =params.InversionSpoilerNCycles*2;
-%T2PrepModSpoilerCycles = params.T2PrepSpoilerNCycles * 2;
+
 for i = 1:size(LUT,1)
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
@@ -70,7 +72,7 @@ for i = 1:size(LUT,1)
      % Run through prep modules
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
-            M = SimulateT1PrepSech(params,TI,M,pos,T1,T2,true);
+            M = SimulateT1PrepSech(params,prepList(p,2),M,pos,T1Tmp,T2Tmp,true);
             %M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
         elseif (prepList(p,1) == 1)
            % M = T2PrepModuleInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
@@ -91,12 +93,12 @@ for i = 1:size(LUT,1)
             M = A*M + B;
 
             % Apply spoiling as rotation in z direction
-             for p = 1:size(M,2)
-                for i = 1:length(G)
+             for cpos = 1:size(M,2)
+                for cGrad = 1:length(GSpoil)
                    % Calculate z-rotation due to gradient
-                   RG = zrot(2*pi*gamma*pos(p)*GSpoil(i)*grad_dt);
-                   M(:,p) = RG*M(:,p);
-                   M(:,p) = A*M(:,p) + B;
+                   RG = zrot(2*pi*42.56e6*pos(cpos)*GSpoil(cGrad)*grad_dt);
+                   M(:,cpos) = RG*M(:,cpos);
+                   M(:,cpos) = A*M(:,cpos) + B;
                 end
             end
             faCounter = faCounter + 1;
@@ -104,8 +106,7 @@ for i = 1:size(LUT,1)
         end
         
         % Wait for delay time
-        [A,B] = freeprecess(waitTimes(p),T1Tmp,T2Tmp);z
-        %[A,B] = freeprecess(500,T1Tmp,T2Tmp);
+        [A,B] = freeprecess(waitTimes(p),T1Tmp,T2Tmp);
         M = A*M + B;
 
     end
