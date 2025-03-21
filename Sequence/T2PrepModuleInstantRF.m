@@ -49,7 +49,7 @@ function MNew = T2PrepModuleInstantRF(M,TE,NSpoil,T1,T2)
    %     M(:,j) = zrot(phi(j)) * M(:,j);
    % end
     for j = 1:NSpin
-        %M(:,j) = zrot(phi(j)) * M(:,j);
+        M(:,j) = zrot(phi(j)) * M(:,j);
    %     M(:,j) = rotmat([0 0 phi(j)]) * M(:,j);
     end
     MNew = M;
