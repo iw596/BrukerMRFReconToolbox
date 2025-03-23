@@ -37,6 +37,7 @@ end
 %normalisedDict = normalisedDict*-1;
 T1Map = [];
 T2Map = [];
+B1Map = [];
 indexMap = [];
 % Iterate through each voxel
 parfor i = 1:128
@@ -50,6 +51,7 @@ parfor i = 1:128
        [maxValue, max_index] = max(abs(inner_product));
        T1Map(i,j) = LUT(max_index,1);
        T2Map(i,j) = LUT(max_index,2);
+       B1Map(i,j) = LUT(max_index,3);
        MRFMask(i,j) = 1;
        dotProductMaximums(i,j) = maxValue;
        indexMap(i,j) = max_index;
@@ -101,7 +103,7 @@ subplot(2,2,2); imagesc(T1FitResults.T1,[0,2500]); colormap("turbo"); colorbar; 
 subplot(2,2,3);imagesc(T2Map*1000,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
 subplot(2,2,4);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;
 
-
+save("Results\Matlab_InstantRF_B1Est","T1Map","T2Map","B1Map","dict","LUT","T1FitResults","T2FitResults");
 
 
 
