@@ -23,15 +23,15 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
 
     % Generate spoiler
     amp = ((params.PVM_GradCalConst*params.T1PrepSpoiler.amplitude/100)*1000)/gamma;
-    gradDur = params.T1PrepSpoiler.duration/1000 - params.RiseTime;
-    G = GenSliceSpoiler(amp,gradDur/1000,params.RiseTime,dt);
+    gradDur = params.T1PrepSpoiler.duration - params.RiseTime;
+    G = GenSliceSpoiler(amp,gradDur,params.RiseTime,dt);
 
 
     % Calculate delay required to achieve TI 
     if (instantRF == true)
-        delay = TI - (params.MRFInversionPulse.duration/1000/2 - params.T1PrepSpoiler.duration/1000 - params.RiseTime);
+        delay = TI - (params.MRFInversionPulse.duration/1000/2 - params.T1PrepSpoiler.duration - params.RiseTime);
     else
-        delay = TI - (params.MRFInversionPulse.duration/1000/2 - params.T1PrepSpoiler.duration/1000 - params.RiseTime  - params.RiseTime - params.ExcRFDur/1000/2);
+        delay = TI - (params.MRFInversionPulse.duration/1000/2 - params.T1PrepSpoiler.duration- params.RiseTime  - params.RiseTime - params.ExcRFDur/2);
     end
     
     % Simulate inversion RF

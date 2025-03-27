@@ -5,7 +5,7 @@ addpath("recon\")
 
 
 
-pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\40";
+pth = "datasets\20250324_111056_MRF_Phantom_MRF_Dev_24052025_1_14\13";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
 data = permute(data,[1 3 4 2]);

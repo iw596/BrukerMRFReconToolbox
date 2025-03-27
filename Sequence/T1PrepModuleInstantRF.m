@@ -2,7 +2,7 @@ function MNew = T1PrepModuleInstantRF(M,TI,NSpoil,T1,T2)
     NSpin = size(M,2);
     phi = linspace(-NSpoil/2*pi,NSpoil/2*pi,NSpin);
     % 180 degre (+x)
-    R = RotateTheta(pi,pi);
+    R = RotateTheta(pi,0);
     M = R*M;
 
     % Precess for TI

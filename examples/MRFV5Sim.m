@@ -9,12 +9,15 @@ prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev
 
 %% Set-up LUT
 
-T1Range = [30e-3:10e-3:100e-3 100e-3:50e-3:2.4];
-T2Range = [10e-3:10e-3:200e-3 200e-3:20e-3:500e-3];
-B1Range = [0.85:0.05:1.15];
+%T1Range = [40e-3:10e-3:90e-3, 100e-3:20e-3:1 , 1:40e-3:2, 2050e-3:100e-3:2.4];
+%T2Range = [10e-3:5e-3:100e-3,110e-3:10e-3:300e-3, 350e-3:50e-3:550e-3];
+%B1Range = [0.9:0.02:1.1];
 %T1Range = 50e-3:100e-3:2.5;
 %T2Range =5e-3:10e-3:550e-3;
 
+T1Range = [20e-3:10e-3:100e-3 100e-3:25e-3:2.4];
+T2Range = (10e-3:10e-3:550e-3);
+B1Range = (1);
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
 % Prepare look-up table containing all valid pairs
@@ -32,7 +35,7 @@ for kk = 1:length(B1Range)
 end
 
 
-
+gg= GenSliceSpoiler(params.MRFSpoiler.amplitude/1000,params.MRFSpoiler.duration/1000,params.RiseTime,10e-5);
 
 NSpin = 200;
 phi = linspace(-pi,pi,NSpin);
@@ -56,8 +59,11 @@ waitTimes = params.MRFWaitingTimes;
 dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 T2PrepModSpoilerCycles = params.T2PrepSpoiler.NCycles*2;
+NPointsPerPrep = params.NPointsPerPrep;
+NPrep = size(prepList,1);
 tic
 for i = 1:size(LUT,1)
+    i
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
     B1Tmp = LUT(i,3);
@@ -67,7 +73,7 @@ for i = 1:size(LUT,1)
     curEntry = 1;
     faCounter = 1;
      % Run through prep modules
-    for p = 1:size(prepList,1)
+    for p = 1:NPrep
         if (prepList(p,1) == 0)
             M = T1PrepModuleInstantRF(M,prepList(p,2)/1000,InversionModSpoilerCycles,T1Tmp,T2Tmp);
             %M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
@@ -76,7 +82,7 @@ for i = 1:size(LUT,1)
             %M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
         end
        % Run through the correct portion of the FA train
-        for f = 1:params.NPointsPerPrep
+        for f = 1:NPointsPerPrep
             R = RotateTheta(deg2rad(FAList(faCounter)).*B1Tmp,0);
             %R = throt(FAList(faCounter).*B1Tmp,0);
             M = R*M;
@@ -107,5 +113,5 @@ for i = 1:size(LUT,1)
 
 end
 toc
-save("datasets/20250225_122413_MRF_Phantom_MRF_PhantomDev_25022028v2_1_7\dict","dict","LUT")
+save("datasets/20250324_111056_MRF_Phantom_MRF_Dev_24052025_1_14\dictWB1","dict","LUT")
 figure; plot(abs(dict(:,end)))

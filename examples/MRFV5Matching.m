@@ -32,7 +32,7 @@ normalisedDict = zeros(size(dict));
 cnt=size(dict,2);
 parfor c = 1:cnt  
     scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
-    normalisedDict(:,c) = dict(:,c) / scaleFactor;
+    normalisedDict(:,c) = -1*dict(:,c) / scaleFactor;
 end
 %normalisedDict = normalisedDict*-1;
 T1Map = [];
@@ -52,6 +52,7 @@ parfor i = 1:128
        T1Map(i,j) = LUT(max_index,1);
        T2Map(i,j) = LUT(max_index,2);
        B1Map(i,j) = LUT(max_index,3);
+       %B1Map(i,j) = LUT(max_index,3);
        MRFMask(i,j) = 1;
        dotProductMaximums(i,j) = maxValue;
        indexMap(i,j) = max_index;
@@ -59,8 +60,8 @@ parfor i = 1:128
     end
 end
 
-figure(13);plot(squeeze(angle(imgs(48,53,:)))); hold on; plot(angle((normalisedDict(:,555))));
-legend("Measured","Dict");
+figure(13);plot(squeeze(abs(imgs(29,40,:)))); hold on; plot(abs((normalisedDict(:,7296)))); hold on; plot(abs((normalisedDict(:,7291))));
+legend("Measured","Dict matched","Dict Actual");
 
 %% Load T1 FAIR RARE
 pth = "datasets/20250317_095411_MRF_Phantom_MRF_Dev_17032025_1_11/17";
@@ -97,10 +98,10 @@ T2MSMEdata.SEdata=double(data);
 T2FitResults = FitData(T2MSMEdata,Model,0);
 
 
-figure(3); 
-subplot(2,2,1); imagesc(T1Map*1000,[0,2500]); colormap("turbo"); colorbar; title("MRF T1 Map"); axis square;
+figure(12); 
+subplot(2,2,1); imagesc(T1Map*1000); colormap("turbo"); colorbar; title("MRF T1 Map"); axis square;
 subplot(2,2,2); imagesc(T1FitResults.T1,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map");  axis square;
-subplot(2,2,3);imagesc(T2Map*1000,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
+subplot(2,2,3);imagesc(T2Map*1000); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
 subplot(2,2,4);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;
 
 save("Results\Matlab_InstantRF_B1Est","T1Map","T2Map","B1Map","dict","LUT","T1FitResults","T2FitResults");

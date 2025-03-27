@@ -9,15 +9,14 @@ addpath("lib\")
 pulse = ReadRFPulseFile("datasets\IWFermiPuilse.exc");
 % Normalise pulse amplitude
 B1Envelope = pulse./max(pulse);
-pth = "datasets\BlochSiegertData\20";
+pth = "datasets\20250324_111056_MRF_Phantom_MRF_Dev_24052025_1_14\18";
 %pth = "datasets\21";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin]);
 data = permute(data,[1 3 2]);
 imgs = ifftcn(data,[1 2]);
 
-gamma = 4258* 2*pi; %Gauss/radians
-
+gamma = 42.58e6;
 
 
 
@@ -30,7 +29,7 @@ subplot(1,2,1); imshow(abs(imgPos),[]); title("Magntiude of positive Bloch-siege
 subplot(1,2,2); imshow(abs(imgNeg),[]); title("Magntiude of negative Bloch-siegert image")
 
 
-dwrf = 7500;
+dwrf = params.BSFreqOffset;
 PhaseDiff=angle(imgPos.*conj(imgNeg));
 % Perform ROMEO phase unwrapping
 parameters.output_dir = fullfile(tempdir, 'romeo_tmp'); % temporary ROMEO output folder

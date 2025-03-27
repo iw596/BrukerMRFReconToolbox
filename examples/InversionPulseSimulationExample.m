@@ -34,3 +34,12 @@ hold on;
 plot(T1,signalFullSimulationT2_2,'Color','red')
 hold on;
 plot(T1,signalFullSimulationT2_3,'Color','green')
+
+tic
+M = SimulateT1PrepSech(params,TI,M,pos,T1(i),T2_1);
+toc
+
+tic 
+R = RotateTheta(pi,0);
+R*M;
+toc
