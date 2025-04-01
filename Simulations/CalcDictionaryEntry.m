@@ -6,12 +6,12 @@ function entry = CalcDictionaryEntry(T1,T2,B1,prepList,FAList,waitTimes,M,phi,pa
      TR = params.TR;
      TE = params.TE;
      NSpin = size(M,2);
-     InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
+     InversionModSpoilerCycles = params.T1PrepSpoiler.NCycles*2;
      T2PrepModSpoilerCycles = params.T2PrepSpoiler.NCycles*2;
      % Run through prep modules
     for p = 1:NPrep
         if (prepList(p,1) == 0)
-            M = T1PrepModuleInstantRF(M,prepList(p,2)/1000,InversionModSpoilerCycles,T1,T2);
+             M = T1PrepModuleInstantRF(M,prepList(p,2)/1000,InversionModSpoilerCycles,T1,T2);
             %M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
         elseif (prepList(p,1) == 1)
             M = T2PrepModuleInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1,T2);
@@ -46,3 +46,4 @@ function entry = CalcDictionaryEntry(T1,T2,B1,prepList,FAList,waitTimes,M,phi,pa
 
     end
 end
+

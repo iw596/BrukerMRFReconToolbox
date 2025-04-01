@@ -42,7 +42,7 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
     for p = 1:size(M,2)
         for i = 1:length(G)
            % Calculate z-rotation due to gradient
-           RG = zrot(2*pi*gamma*pos(p)*G(i)*dt);
+           RG = zrot(-2*pi*gamma*pos(p)*G(i)*dt);
            M(:,p) = RG*M(:,p);
            M(:,p) = A*M(:,p) + B;
         end

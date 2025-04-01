@@ -9,15 +9,13 @@ prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev
 
 %% Set-up LUT
 
-%T1Range = [40e-3:10e-3:90e-3, 100e-3:20e-3:1 , 1:40e-3:2, 2050e-3:100e-3:2.4];
-%T2Range = [10e-3:5e-3:100e-3,110e-3:10e-3:300e-3, 350e-3:50e-3:550e-3];
-%B1Range = [0.9:0.02:1.1];
-%T1Range = 50e-3:100e-3:2.5;
-%T2Range =5e-3:10e-3:550e-3;
+T1Range = [10e-3:10e-3:90e-3, 100e-3:20e-3:1 , 1:40e-3:2, 2050e-3:100e-3:2.4];
+T2Range = [10e-3:5e-3:100e-3,110e-3:10e-3:300e-3, 350e-3:50e-3:550e-3];
+B1Range = [0.9:0.01:1.15];
 
-T1Range = [20e-3:10e-3:100e-3 100e-3:25e-3:2.4];
-T2Range = (10e-3:10e-3:550e-3);
-B1Range = (1);
+%T1Range = [20e-3:10e-3:100e-3 100e-3:25e-3:2.4];
+%T2Range = (10e-3:10e-3:550e-3);
+%B1Range = (1);
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
 % Prepare look-up table containing all valid pairs

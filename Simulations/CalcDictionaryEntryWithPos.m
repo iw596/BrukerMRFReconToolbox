@@ -31,14 +31,14 @@ function entry = CalcDictionaryEntryWithPos(T1,T2,B1,prepList,FAList,waitTimes,M
             % Store signal 
             entry(curEntry) =-1i * mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
-            [A,B] = freeprecess(TR - TE,T1,T2);
+            [A,B] = freeprecess(TR - TE - params.MRFSpoiler.duration/1000 - 2*params.RiseTime,T1,T2);
             M = A*M + B;
 
             % Apply spoiling as rotation in z direction
             [A,B] = freeprecess(dt,T1,T2);
             for curPos = 1:size(M,2)
                 for curG = 1:length(G)
-                    RG = zrot(2*pi*gamma*pos(p)*G(curG)*dt);
+                    RG = zrot(-2*pi*gamma*pos(curPos)*G(curG)*dt);
                     M(:,curPos) = RG*M(:,curPos);
                     M(:,curPos) = A*M(:,curPos) + B;
                 end
