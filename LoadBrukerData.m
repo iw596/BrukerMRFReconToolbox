@@ -361,7 +361,7 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.MRFInversionPulse.duration = str2double(cell2mat(tmp(1)));
+        params.MRFInversionPulse.duration = str2double(cell2mat(tmp(1)))/1000;
         params.MRFInversionPulse.BW = str2double(cell2mat(tmp(2)));
         params.MRFInversionPulse.power = str2double(cell2mat(tmp(end-1)));
     end

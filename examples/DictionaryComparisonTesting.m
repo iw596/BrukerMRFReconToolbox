@@ -4,8 +4,8 @@ addpath(genpath("../."))
 prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63/MRFPrepList.txt");
 params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63",false);
 
-T1Range = 1.5;
-T2Range = 50e-3;
+T1Range = [20e-3:10e-3:500e-3,500e-3:100e-3:2.5];
+T2Range = [10e-3:10e-3:550e-3];
 B1Range = 1.0;
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -23,7 +23,7 @@ for kk = 1:length(B1Range)
     end
 end
 
-NSpin = 500;
+NSpin = 150;
 thickness = 1e-3;
 pos = linspace(-thickness/2,thickness/2,NSpin);
 dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
@@ -38,8 +38,9 @@ FAList = FAList(1:params.NPointsPerPrep * size(prepList,1));
 waitTimes = params.MRFWaitingTimes;
 phi = linspace(-pi,pi,NSpin);
 
+
 tic
-for i = 1:size(dict,2)
+parfor i = 1:size(dict,2)
     i
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
@@ -49,10 +50,13 @@ for i = 1:size(dict,2)
     M(3,:) = 1;
     curEntry = 1;
     dict(:,i) = CalcDictionaryEntry(T1Tmp,T2Tmp,B1Tmp,prepList,FAList,waitTimes,M,phi,params);
-    dict2(:,i) = CalcDictionaryEntryWithPos(T1Tmp,T2Tmp,B1Tmp,prepList,FAList,waitTimes,M,pos,params);
+    dictPrepMod(:,i) = CalcDictionaryEntryWithPos(T1Tmp,T2Tmp,B1Tmp,prepList,FAList,waitTimes,M,pos,params);
+    
 end
 toc
 %figure(1);
-%plot(abs(dict)); hold on; plot(abs(dict2));
+%plot(angle(dict(:,2))); hold on; plot(angle(dict2(:,2)));
 %legend("Instant","Realistic")
-save("C:\Users\kpqv532\CODERepository\scripttest","dict2")
+save("Dictionaries\SmallDictInstant","dict","LUT");
+save("Dictionaries\SmallDictPrepMods","dictPrepMod","LUT");
+
