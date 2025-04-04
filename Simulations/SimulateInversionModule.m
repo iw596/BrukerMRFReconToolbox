@@ -17,7 +17,6 @@ GSpoil = GradientSpoiler(G,dt);
 
 
 % Calculate the TI delay based off flags
-delay = 0;
 if (instantExcRFFlag == false && instantInversionRFFlag == false)
     % Full simulation
     delay = TI - params.MRFInversionPulse.duration/2-gradDur - 3*params.RiseTime -params.EncGradDur/2;
