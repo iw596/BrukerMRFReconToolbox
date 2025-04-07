@@ -20,11 +20,11 @@ classdef GradientSpoiler
               end
               NSpin = size(pos,2);
               NG = length(obj.waveform);
-              gamma = 42.57e6;
+              gamma = 42.56e6;
               [A,B] = freeprecess(obj.dt,T1,T2,df);
               for p = 1:NSpin
                   for g = 1:NG
-                    RG = zrot(2*pi*gamma*pos(p)*obj.waveform(g));
+                    RG = zrot(-2*pi*gamma*pos(p)*obj.waveform(g));
                     M(:,p) = RG*M(:,p);
                     M(:,p) = A*M(:,p) + B;
                   end

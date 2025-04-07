@@ -2,6 +2,7 @@ function MNew = SimulateInversionModule(TI,Magnetization,pos,params,dt,instantEx
 M = Magnetization.M;
 T1 = Magnetization.T1;
 T2 = Magnetization.T2;
+gamma = 42.56e6;
 if (nargin < 8)
     instantInversionRFFlag = true;
     inversionRF = [];
@@ -23,6 +24,9 @@ if (instantExcRFFlag == false && instantInversionRFFlag == false)
 
 elseif (instantExcRFFlag == false && instantInversionRFFlag == true )
     delay = TI -gradDur - 3*params.RiseTime -params.EncGradDur/2;
+
+elseif (instantExcRFFlag == true && instantInversionRFFlag == false )
+    delay = TI - params.MRFInversionPulse.duration/2 -gradDur - 2*params.RiseTime ;
 
 else
     % Instant excitation and inversion

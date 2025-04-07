@@ -18,9 +18,10 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
     pulsePeakVoltage = sqrt(params.MRFInversionPulse.power * 50);
     % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
     peakB1 = (refB1./refPeakVolage) .*  pulsePeakVoltage; % in T
-    RF = peakB1.*A.*exp(1j.*deg2rad(phs)); 
-    dt = (params.MRFInversionPulse.duration/1000)/length(RF);
-
+    
+    dt = 10e-6;
+    RF = InterpolateRFWaveform(A.*exp(1j.*deg2rad(phs)),params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(A),dt);
+    RF = peakB1.*RF; 
     % Generate spoiler
     amp = ((params.PVM_GradCalConst*params.T1PrepSpoiler.amplitude/100)*1000)/gamma;
     gradDur = params.T1PrepSpoiler.duration - params.RiseTime;
@@ -29,9 +30,9 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
 
     % Calculate delay required to achieve TI 
     if (instantRF == true)
-        delay = TI - (params.MRFInversionPulse.duration/1000/2 - params.T1PrepSpoiler.duration - params.RiseTime);
+        delay = TI - (params.MRFInversionPulse.duration/2 - params.T1PrepSpoiler.duration - params.RiseTime);
     else
-        delay = TI - (params.MRFInversionPulse.duration/1000/2 - params.T1PrepSpoiler.duration- params.RiseTime  - params.RiseTime - params.ExcRFDur/2);
+        delay = TI - (params.MRFInversionPulse.duration/2 - params.T1PrepSpoiler.duration- params.RiseTime  - params.RiseTime - params.ExcRFDur/2);
     end
     
     % Simulate inversion RF
