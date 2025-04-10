@@ -8,7 +8,7 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
     [A,phs]  = ReadRFPulseFile("BrukerRFFiles\sech.inv");
     
     % Calculate peak B1 based off reference power
-    gamma = 42.57*10^6; % Gyromagnetic constant of 1H is MHz/T
+    gamma = 42.56*10^6; % Gyromagnetic constant of 1H is MHz/T
     % Calculate pulse B1 required to achieve pi/2 flip
     % for 1 ms block pulse
     refB1 = (pi/2)./(2*pi*42.57*10^6*1e-3); % Peak B1 in T
@@ -19,9 +19,8 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
     % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
     peakB1 = (refB1./refPeakVolage) .*  pulsePeakVoltage; % in T
     
-    dt = 10e-6;
-    RF = InterpolateRFWaveform(A.*exp(1j.*deg2rad(phs)),params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(A),dt);
-    RF = peakB1.*RF; 
+    dt = params.MRFInversionPulse.duration/length(A);
+    RF = peakB1.*(A./max(A)).*exp(1j.*deg2rad(phs)); 
     % Generate spoiler
     amp = ((params.PVM_GradCalConst*params.T1PrepSpoiler.amplitude/100)*1000)/gamma;
     gradDur = params.T1PrepSpoiler.duration - params.RiseTime;
@@ -30,7 +29,7 @@ function MNew = SimulateT1PrepSech(params,TI,M,pos,T1,T2,instantRF)
 
     % Calculate delay required to achieve TI 
     if (instantRF == true)
-        delay = TI - (params.MRFInversionPulse.duration/2 - params.T1PrepSpoiler.duration - params.RiseTime);
+        delay = TI - params.MRFInversionPulse.duration/2 - params.T1PrepSpoiler.duration - params.RiseTime;
     else
         delay = TI - (params.MRFInversionPulse.duration/2 - params.T1PrepSpoiler.duration- params.RiseTime  - params.RiseTime - params.ExcRFDur/2);
     end

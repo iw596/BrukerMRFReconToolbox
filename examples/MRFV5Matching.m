@@ -2,7 +2,7 @@ addpath("Simulations\")
 addpath("recon\")
 addpath("B1Mapping\")
 addpath("Fitting\")
-
+addpath("qMRLab-2.4.2\")
 
 %% Open bruker MRF dataset
 params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63");
@@ -51,7 +51,7 @@ parfor i = 1:128
        [maxValue, max_index] = max(abs(inner_product));
        T1Map(i,j) = LUT(max_index,1);
        T2Map(i,j) = LUT(max_index,2);
-       B1Map(i,j) = LUT(max_index,3);
+      % B1Map(i,j) = LUT(max_index,3);
        %B1Map(i,j) = LUT(max_index,3);
        MRFMask(i,j) = 1;
        dotProductMaximums(i,j) = maxValue;

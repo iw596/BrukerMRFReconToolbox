@@ -3,13 +3,13 @@ addpath("FileIO\")
 addpath("B1Mapping\")
 addpath("recon\")
 
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\31PT1Data\20250207_150306_Phantom_PhosphoricAcid_Phantom_31P_B1Testin_1_1\";
+pth = "datasets\20250404_103339_Phantom_PhosphoricAcid_Phantom_PhosphoricA_1_11\";
 %files = ["27","28","29","30","31","32","33","34","35"];
-files = ["27","28"];
+files = ["36"];
 
 
 NFiles = size(files,2);
-imgs = zeros([96,96,96,2,4]);
+imgs = [];
 for i = 1:NFiles
     fullPth = strcat(pth,files(i));
     params = LoadBrukerData(fullPth);

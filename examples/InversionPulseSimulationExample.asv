@@ -16,8 +16,8 @@ pulsePeakVoltage = sqrt(params.MRFInversionPulse.power * 50);
 peakB1 = (refB1./refVol) .*  pulsePeakVoltage; % in T
 [mag,phs] = ReadRFPulseFile("BrukerRFFiles\sech.inv");
 InversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
-dt = 10e-6;
-% dt = params.MRFInversionPulse.duration/length(mag);
+%dt = 10e-6;
+dt = params.MRFInversionPulse.duration/length(mag);
 InversionRF = InterpolateRFWaveform(InversionRF,params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(mag),dt);
 t = dt*(0.5 + [0:length(InversionRF)-1]);
 NSpin = 200;
@@ -48,7 +48,7 @@ for i = 1:size(T1,2)
     % signalFullSimulationT2_3(i) = mean(M(3,:));
 end
 
-figure(6); 
+figure(5); 
 plot(T1,signalFullSimulationT2_1,'Color','blue')
 hold on;
 plot(T1,signalFullSimulationT2_2,'Color','red')
