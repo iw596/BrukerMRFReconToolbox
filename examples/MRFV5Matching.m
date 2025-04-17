@@ -98,7 +98,7 @@ T2MSMEdata.SEdata=double(data);
 T2FitResults = FitData(T2MSMEdata,Model,0);
 
 
-figure(13); 
+figure(14); 
 subplot(2,2,1); imagesc(T1Map*1000); colormap("turbo"); colorbar; title("MRF T1 Map"); axis square;
 subplot(2,2,2); imagesc(T1FitResults.T1,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map");  axis square;
 subplot(2,2,3);imagesc(T2Map*1000); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;

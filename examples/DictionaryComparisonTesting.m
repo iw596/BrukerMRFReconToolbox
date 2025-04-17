@@ -1,8 +1,8 @@
 addpath(genpath("../."))
 
 % Load data 
-prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63/MRFPrepList.txt");
-params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63",false);
+params = LoadBrukerData("datasets/20250411_152139_MRF_Phantom_MRF_3D_Experiment_11042025_1_17/14",false);
+prepList = ReadMRFPrepList("datasets\20250411_152139_MRF_Phantom_MRF_3D_Experiment_11042025_1_17/14/MRFPrepList.txt");
 
 T1Range = [20e-3:10e-3:500e-3,500e-3:100e-3:2.5];
 T2Range = [10e-3:10e-3:550e-3];
@@ -27,7 +27,7 @@ NSpin = 150;
 thickness = 1e-3;
 pos = linspace(-thickness/2,thickness/2,NSpin);
 dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
-dict2 = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
+dictPrepMod = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
 
 NExc = params.NPointsPerPrep * size(prepList,1);
 NPrep = size(prepList,1);
@@ -40,6 +40,7 @@ phi = linspace(-pi,pi,NSpin);
 
 
 tic
+
 parfor i = 1:size(dict,2)
     i
     T1Tmp = LUT(i,1);
