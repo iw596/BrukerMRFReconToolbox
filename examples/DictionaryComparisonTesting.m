@@ -4,8 +4,8 @@ addpath(genpath("../."))
 params = LoadBrukerData("datasets/20250411_152139_MRF_Phantom_MRF_3D_Experiment_11042025_1_17/14",false);
 prepList = ReadMRFPrepList("datasets\20250411_152139_MRF_Phantom_MRF_3D_Experiment_11042025_1_17/14/MRFPrepList.txt");
 
-T1Range = [20e-3:10e-3:500e-3,500e-3:100e-3:2.5];
-T2Range = [10e-3:10e-3:550e-3];
+T1Range = [20e-3:5e-3:1500e-3,1.5:100e-3:2.5];
+T2Range = [10e-3:0.5e-3:100e-3 100e-3:10e-3:500e-3];
 B1Range = 1.0;
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -24,7 +24,7 @@ for kk = 1:length(B1Range)
 end
 
 NSpin = 150;
-thickness = 1e-3;
+thickness = 2e-3;
 pos = linspace(-thickness/2,thickness/2,NSpin);
 dict = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
 dictPrepMod = zeros(size(prepList,1) * params.NPointsPerPrep,size(LUT,1));
@@ -58,6 +58,6 @@ toc
 %figure(1);
 %plot(angle(dict(:,2))); hold on; plot(angle(dict2(:,2)));
 %legend("Instant","Realistic")
-save("Dictionaries\SmallDictInstant","dict","LUT");
-save("Dictionaries\SmallDictPrepMods","dictPrepMod","LUT");
+save("Dictionaries\LargeDictInstant","dict","LUT");
+save("Dictionaries\LargeDictPrepMods","dictPrepMod","LUT");
 

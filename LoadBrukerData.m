@@ -18,17 +18,17 @@ function params = LoadBrukerData(path,loadDataFlag)
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$RadialTraj'));
     line = TextAsCells(mask);
     if (isempty(line))
-        params.Traj = "Cartesian";
+        params.Traj.type = "Cartesian";
     else
         line = strtrim(extractAfter(cell2mat(line),'='));
         if (strcmp(line, 'Yes') == 1)
-            params.Traj = "Radial";
+            params.Traj.type = "Radial";
         else
-            params.Traj = "Cartesian";
+            params.Traj.type = "Cartesian";
         end
     end
     
-    if (params.Traj == "Radial")
+    if (params.Traj.type == "Radial")
         % Extract radial mode if we need it
         mask = ~cellfun(@isempty, strfind(TextAsCells,'$Trajectory'));
           line = TextAsCells(mask);
@@ -82,8 +82,17 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.NPar = str2num(cell2mat(line(3))); % NLin is Siemens language for Phase encoding in 3d dimension
     end
 
+    k = strfind(TextAsCells,"$MRFFAList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.MRFFA = str2double(split(line(2),' '));
+    end
+
     % Extract the FOV
-    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov'));
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov='));
     line = TextAsCells(mask);
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
@@ -317,7 +326,7 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
-        tmp = strsplit(line,',');
+        tmp = strsplit(line,{',','\n'});
         params.T1PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
         params.T1PrepSpoiler.duration = str2double(cell2mat(tmp(3)))/1000; % Convert to seconds
         amp = cell2mat(tmp(4));
@@ -372,10 +381,69 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
+
+
         params.MRFT2RectPulse.duration = str2double(cell2mat(tmp(1)));
         params.MRFT2RectPulse.BW = str2double(cell2mat(tmp(2)));
         params.MRFT2RectPulse.power = str2double(cell2mat(tmp(end-1)));
     end
+
+    k = strfind(TextAsCells,"PVM_TrajKx=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.kx =  tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_TrajKy=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.ky = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_SpiralSize=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.Traj.PVM_SpiralSize = str2double(line);
+    end
+    k = strfind(TextAsCells,"PVM_SpiralPostSize=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.Traj.PVM_SpiralPostSize = str2double(line);
+    end
+
+     k = strfind(TextAsCells,"PVM_SpiralNbOfInterleaves=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.Traj.PVM_SpiralNbOfInterleaves = str2double(line);
+    end
+
+    k = strfind(TextAsCells,"PVM_TrajKScale=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_TrajKScale = tmp(2:end);
+    end
+
 
     %% Load imaging data if required
     if (loadDataFlag == true)

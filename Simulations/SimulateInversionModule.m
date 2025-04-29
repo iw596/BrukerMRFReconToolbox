@@ -1,7 +1,5 @@
-function MNew = SimulateInversionModule(TI,Magnetization,pos,params,dt,instantExcRFFlag,instantInversionRFFlag,inversionRF)
-M = Magnetization.M;
-T1 = Magnetization.T1;
-T2 = Magnetization.T2;
+function MNew = SimulateInversionModule(TI,M,T1,T2,pos,params,dt,instantExcRFFlag,instantInversionRFFlag,inversionRF)
+
 gamma = 42.56e6;
 if (nargin < 8)
     instantInversionRFFlag = true;

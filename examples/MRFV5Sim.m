@@ -1,17 +1,17 @@
 addpath(genpath("../."))
 
-params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63",false);
+params = LoadBrukerData("datasets/20250411_152139_MRF_Phantom_MRF_3D_Experiment_11042025_1_17/14",false);
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("datasets\20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18032025_1_12/63/MRFPrepList.txt");
+prepList = ReadMRFPrepList("datasets\20250411_152139_MRF_Phantom_MRF_3D_Experiment_11042025_1_17/14/MRFPrepList.txt");
 
 
 %% Set-up LUT
 
-T1Range = [10e-3:10e-3:90e-3, 100e-3:20e-3:1 , 1:40e-3:2, 2050e-3:100e-3:2.4];
-T2Range = [10e-3:5e-3:100e-3,110e-3:10e-3:300e-3, 350e-3:50e-3:550e-3];
-B1Range = [0.9:0.01:1.15];
+T1Range = [10e-3:10e-3:1.5 , 1.5:100e-3:2.5];
+T2Range = [10e-3:2.5e-3:100e-3,110e-3:10e-3:300e-3];
+B1Range = [1];
 
 %T1Range = [20e-3:10e-3:100e-3 100e-3:25e-3:2.4];
 %T2Range = (10e-3:10e-3:550e-3);
@@ -36,7 +36,7 @@ end
 gg= GenSliceSpoiler(params.MRFSpoiler.amplitude/1000,params.MRFSpoiler.duration/1000,params.RiseTime,10e-5);
 
 NSpin = 200;
-phi = linspace(-pi,pi,NSpin);
+phi = linspace(-2*pi,2*pi,NSpin);
 TR = params.TR;
 TE = params.TE;
 % Format FA array
@@ -111,5 +111,5 @@ for i = 1:size(LUT,1)
 
 end
 toc
-save("datasets/20250324_111056_MRF_Phantom_MRF_Dev_24052025_1_14\dictWB1","dict","LUT")
+save("Dictionaries\Dict3DInstantRF","dict","LUT")
 figure; plot(abs(dict(:,end)))
