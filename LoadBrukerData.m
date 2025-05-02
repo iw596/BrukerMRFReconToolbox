@@ -415,7 +415,8 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'='));
-        params.Traj.PVM_SpiralSize = str2double(line);
+        line = split(line,{' ', ')', '\n','$$'});
+        params.Traj.PVM_SpiralSize = str2double(line{1});
     end
     k = strfind(TextAsCells,"PVM_SpiralPostSize=");
     idx = find(~cellfun(@isempty,k));
