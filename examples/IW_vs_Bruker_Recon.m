@@ -32,7 +32,7 @@ nufft_st = nufft_init(k, Nd, J, Nd*2, Nd/2);  % using MIRT
 % Initalise DCF estimation parameters
 Npts = size(k,1);
 w = ones(Npts, 1);  % initial guess
-n_iter = 30;
+n_iter = 20;
 
 for it = 1:n_iter
     % Create gridded image from current DCF
@@ -47,12 +47,6 @@ end
 
 iwReconImg = nufft_adj(w.*data, nufft_st);  % adjoint (gridding);
 figure; imshow(abs(iwReconImg),[]);
-
-FT = NUFFT(k,1,[0,0],[64 64]);
-
-d
-
-iwReconImg = FT'*(reshape(dcf,size(dataSub)).*dataSub);
 
 
 %% Load bruker spiral imgs 
