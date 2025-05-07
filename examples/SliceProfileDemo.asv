@@ -42,6 +42,4 @@ M = RFExcitation(M,T1,T2,dt,RFFull,'gradient_waveform',options.gradient_waveform
 Mxy = complex(M(1,:), M(2,:));
 
 figure(3);
-subplot(2,2,1); plot(real(Mxy)); xlabel("Position [mm]"); title("real (Mxy)");
-subplot(2,2,2); plot(imag(Mxy)); xlabel("Position [mm]"); title("imag (Mxy)");
-subplot(2,2,3); plot(M(3,:)); xlabel("Position [mm]"); title("Mz");
+subplot(1,3plot(imag(Mxy)); xlabel("Position [mm]")

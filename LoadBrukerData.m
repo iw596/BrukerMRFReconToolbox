@@ -2,8 +2,11 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (nargin < 2)
         loadDataFlag = true;
     end
+    
+
+
     % Find directory
-    methodFileName = strcat(path,'\','method'); 
+    methodFileName = strcat(path,'/','method'); 
     result = isfile(methodFileName);
     if (result ==0)
         error("Method file is not present");

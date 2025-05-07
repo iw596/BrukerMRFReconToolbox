@@ -1,7 +1,12 @@
-function [outputArg1,outputArg2] = InstantRFExcitation(alpha,theta)
-%INSTANTRFEXCITATION Summary of this function goes here
-%   Detailed explanation goes here
-outputArg1 = inputArg1;
-outputArg2 = inputArg2;
+function MNew = InstantRFExcitation(M,alpha,theta)
+    ca = cos(alpha);	% cosine of tip alpha
+    sa = sin(alpha);	% sine of tip
+    cp = cos(theta  ); % cosine of phi
+    sp = sin(theta  ); % sine of phi
+    R = [cp*cp+sp*sp*ca cp*sp*(1-ca) -sp*sa;
+         cp*sp-sp*cp*ca sp*sp+cp*cp*ca cp*sa;
+         sa*sp -sa*cp ca];
+
+    MNew = R * M;
 end
 

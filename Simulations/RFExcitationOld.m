@@ -1,4 +1,4 @@
-function MNew = RFExcitation(RF,dt,M,pos,T1,T2,G)
+function MNew = RFExcitationOld(RF,dt,M,pos,T1,T2,G)
     
     gamma = 42.57e6;
     % Convert waveform into flip angle and theta array
