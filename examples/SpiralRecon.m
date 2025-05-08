@@ -45,11 +45,10 @@ for it = 1:n_iter
 end
 
 img = nufft_adj(w.*data, nufft_st);  % adjoint (gridding);
-figure; imshow(abs(img(:,:,10)),[]);
+figure; imshow(abs(img(:,:,1205)),[]);
 
 FT = NUFFT(k,1,[0,0],[64 64]);
 
-d
 
 img = FT'*(reshape(dcf,size(dataSub)).*dataSub);
 

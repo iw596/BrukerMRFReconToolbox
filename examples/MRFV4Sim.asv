@@ -9,7 +9,7 @@ prepList = ReadMRFPrepList("C:\Users\kpqv532\CODERepository\BrukerData\20250507_
 
 %% Set-up LUT
 T1Range = [100e-3:100e-3:2600e-3];
-T2Range = [10e-3:10e-3:600e-3];
+T2Range = [10e-3:10e-3:300e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;

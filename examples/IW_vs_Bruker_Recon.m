@@ -50,13 +50,13 @@ figure; imshow(abs(iwReconImg),[]);
 
 
 %% Load bruker spiral imgs 
-spiralImgs = read_2dseq();
+spiralImgs = read_2dseq('datasets/20250501_163652_MRF_Phantom_MRF_Dev_01052025_1_21/23/pdata/1');
 
 
 figure(1);
-subplot(1,2,1); imshow(abs(iwReconImg),[]); axis on; title("Custom Recon");
+subplot(1,2,1); imshow(mat2gray(abs(iwReconImg)),[]); axis on; title("Custom Recon");
 
-subplot(1,2,2); imshow(abs(spiralImgs),[]); axis on; title("Bruker Recon");
+subplot(1,2,2); imshow(mat2gray(abs(spiralImgs)),[]); axis on; title("Bruker Recon");
 
 
 
