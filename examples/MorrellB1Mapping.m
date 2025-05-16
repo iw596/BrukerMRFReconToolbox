@@ -4,7 +4,7 @@ addpath("recon\")
 
 
 
-pth = "datasets\Yasaman_MRF10122024\15";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250514_160857_MnCl2_100um_50ml_MnCl2_100um_50ml_14052025_1_1\12";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
 data = permute(data,[1 3 4 2]);
@@ -38,11 +38,11 @@ for i = 1:size(phaseDiffImg,1)
     end
 end
 faMapFiltered = medfilt3(faMap,[5, 5, 1]);
-figure; imagesc(abs(squeeze(rad2deg(faMapFiltered(:,:,24))./90).*mask(:,:,24)),[0.8 1.2]); axis square;
+figure; imagesc(abs(squeeze(rad2deg(faMapFiltered(:,:,24))./90).*mask(:,:,24)),[0.5 1.2]); axis square;
 colormap("turbo")
 
 
 figure(1);
 subplot(2,2,1); imshow(abs(imgs(:,:,8,1)),[]);
 subplot(2,2,2); imshow(abs(imgs(:,:,8,2)),[]);
-subplot(2,2,3); imagesc(rad2deg(faMapFiltered(:,:,8))./90,[0.9,1.1]); axis square;
+subplot(2,2,3); imagesc(rad2deg(faMapFiltered(:,:,8))./90,[0.5,1.2]); axis square;

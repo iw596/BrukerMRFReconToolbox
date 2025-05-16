@@ -19,7 +19,7 @@ k = k(1:params.Traj.PVM_SpiralSize,:);
 
 % Calculate dcf using pipe - menon method
 
-% Assume k-space coordinates (e.g. radial)
+% Assume k-space coordinates 
 k = [real(k(:))*2*pi , imag(k(:)*2*pi)];  % [N x 2]
 N = 64;             % Grid size
 Nd = [N N];          % Image dimensions

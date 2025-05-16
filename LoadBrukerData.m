@@ -94,14 +94,29 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.MRFFA = str2double(split(line(2),' '));
     end
 
+    % Extract number of channels used to record data
+    k = strfind(TextAsCells,"$PVM_EncNReceivers=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NCha = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line);
+        line = split(line(1),'=');
+        params.NCha = str2double(line(2));
+    end
+
+
     % Extract the FOV
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov='));
     line = TextAsCells(mask);
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     line = split(line(2),' ');
-    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
-
+    if (size(line,1) == 2)
+        params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
+    else
+        params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2))) str2num(cell2mat(line(3)))];
+    end
 
     % Extract number of repetitions
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
@@ -111,6 +126,15 @@ function params = LoadBrukerData(path,loadDataFlag)
     params.NRep = str2num(cell2mat(line(1)));
 
     
+    k = strfind(TextAsCells,"$EPIC_RFPulseNoExp=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.EPIC_RFPulseNoExp = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line);
+        line = split(line(1),'=');
+        params.EPIC_RFPulseNoExp = str2double(line(2));
+    end
 
     % Extract inversion times
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_FairTIR_Arr'));

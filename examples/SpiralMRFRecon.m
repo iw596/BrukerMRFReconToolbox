@@ -6,8 +6,8 @@ params = LoadBrukerData(pth,true);
 
 
 %% Trim raw data 
-nextMultiple = 128 * ceil(params.Traj.PVM_SpiralSize / 128);
-padding = nextMultiple - params.Traj.PVM_SpiralSize; % PVM_SpiralSize includes padding and rewinder
+nextMultiple = 128 * ceil((params.Traj.PVM_SpiralSize + params.Traj.PVM_SpiralPostSize) / 128);
+padding = nextMultiple - params.Traj.PVM_SpiralSize;
 data = params.data;
 data = reshape(data,[nextMultiple,params.NPointsPerPrep*params.MRFNPrepModules,params.Traj.PVM_SpiralNbOfInterleaves]);
 data = data(1:params.Traj.PVM_SpiralSize,:,:);
@@ -31,7 +31,7 @@ nufft_st = nufft_init(k, Nd, J, Nd*2, Nd/2);  % using MIRT
 % Initalise DCF estimation parameters
 Npts = size(k,1);
 w = ones(Npts, 1);  % initial guess
-n_iter = 30;
+n_iter = 10;
 for it = 1:n_iter
     % Create gridded image from current DCF
     % Forward NUFFT (from image to k-space)
@@ -41,8 +41,8 @@ for it = 1:n_iter
 end
 
 img = nufft_adj(w.*conj(data), nufft_st);  % adjoint (gridding);
-figure; imshow(abs(img(:,:,25)),[]);
-figure; plot(squeeze(abs(img(36,28,:))))
+figure; imshow(abs(img(:,:,1)),[]);
+figure; plot(squeeze(abs(img(34,21,:))))
 
 % Normalise Dictionary
 normalisedDict = zeros(size(dict));
@@ -73,3 +73,5 @@ parfor i = 1:64
 
     end
 end
+
+figure; plot()
