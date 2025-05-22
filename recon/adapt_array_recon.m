@@ -54,10 +54,5 @@ function recon = adapt_array_recon(imgs,psi)
         end
     end
     recon=zeros(nx,ny,nz);
-    % Interpolation of weights upto the full resolution
-    %for i=1:nc
-     %       wfull(i,:,:)=conj(imresize3(squeeze(abs(wsmall(i,:,:,:))),[nx ny nz],'bilinear').*exp(j.*imresize3(angle(squeeze(wsmall(i,:,:,:))),[nx ny nz],'nearest')));
-      %      cmap(i,:,:)=imresize3(squeeze(abs(cmapsmall(i,:,:,:))),[nx ny nz],'bilinear').*exp(j.*imresize3(squeeze(angle(cmapsmall(i,:,:,:))),[nx ny nz],'nearest'));
-    %end
     recon=squeeze(sum(wsmall.*imgs));   %Combine coil signals. 
 end

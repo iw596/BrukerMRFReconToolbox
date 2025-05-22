@@ -472,6 +472,21 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.PVM_TrajKScale = tmp(2:end);
     end
 
+    k = strfind(TextAsCells,"EPIC_RFPulseStart=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.EPICB1Map.RFPulseStart = str2double(line);
+    end
+
+    k = strfind(TextAsCells,"EPIC_RFPulseEnd=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.EPICB1Map.RFPulseEnd = str2double(line);
+    end
 
     %% Load imaging data if required
     if (loadDataFlag == true)
