@@ -40,7 +40,6 @@ function MNew = RFExcitation(M,T1,T2,dt,RF,options)
                 % RF excitation
                 M(:,j) = InstantRFExcitation(M(:,j),alpha(i),theta(i));
                 
-
                 % Second precession section
                 M(:,j) = Rz*M(:,j);
                 M(:,j) = A*M(:,j) + B;
@@ -48,7 +47,7 @@ function MNew = RFExcitation(M,T1,T2,dt,RF,options)
         end
     else
         % Same as above but no need for calculating gradient
-        for i = length(RF)
+        for i = 1:length(RF)
             % First precession section
             M= A*M + B;
 

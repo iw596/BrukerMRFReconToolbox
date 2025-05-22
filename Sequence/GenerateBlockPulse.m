@@ -5,7 +5,7 @@ function RF = GenerateBlockPulse(FA,dur,dt,phs)
     if(nargin < 4)
         phs = 0;
     end
-    gamma = 42.57e6;
+    gamma = 42.577e6;
     N = round(dur/dt);
     RF = ones([1,N]);
     RF = FA*(RF/sum(RF))/(2*pi*gamma*dt);

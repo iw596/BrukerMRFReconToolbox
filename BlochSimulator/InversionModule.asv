@@ -50,9 +50,10 @@ function InversionModule(M,TI,T1,T2,options)
     % Run RF waveform
     if (~isempty(options.InversionRF))
             M = RFExcitation(M,T1,T2,options.dt,options.InversionRF,'ignore_decay',options.ignore_decay);  
+        end
     else
         R = RotateTheta(pi,0);
         M = R*M;
     end
-    MNew = M;
+    
 end
