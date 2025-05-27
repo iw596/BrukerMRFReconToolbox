@@ -5,12 +5,15 @@ RF  = A./max(A) .* exp(1j.*deg2rad(phs));
 T = 14e-3;
 
 % Scale to 20uT amplitude
-RF = 30e-6.*RF;
-dt = 1e-6;
+RF = 10e-6.*RF;
+dt = 10e-6;
 
 
 % Interpolate pulse to 10us resolution
 RF = InterpolateRFWaveform(RF,T,T/length(RF),dt);
+
+% Generate spoiler
+GenSliceSpoiler(amp,dur,riseTime,dt)
 
 
 % Set-up spin system
@@ -22,7 +25,7 @@ T2 = 50000e-3;
 
 MNew = RFExcitation(M,T1,T2,dt,RF,"ignore_decay",true);
 
-% Generate spoiler
+
 
 
 
