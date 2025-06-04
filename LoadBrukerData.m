@@ -460,6 +460,15 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = strtrim(extractAfter(cell2mat(line),'='));
         params.Traj.PVM_SpiralNbOfInterleaves = str2double(line);
     end
+    
+    k = strfind(TextAsCells,"MRFNoInterleaves");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Traj.MRFNoInterleaves = str2double(line{1});
+    end
 
     k = strfind(TextAsCells,"PVM_TrajKScale=");
     idx = find(~cellfun(@isempty,k));

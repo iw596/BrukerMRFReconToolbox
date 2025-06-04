@@ -1,6 +1,6 @@
 addpath(genpath("./."))
 %% Load 31P data
-pth = uigetdir();
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250523_141105_Phantom_PhosphoricAcid_B1_Mapping_23052025_1_15\11";
 params = LoadBrukerData(pth);
 
 
@@ -28,7 +28,7 @@ RFDurs = linspace(params.EPICB1Map.RFPulseStart,params.EPICB1Map.RFPulseEnd,para
 FA = (pi/2).*RFDurs./(RFDurs(1));
 
 %% Load noise scan
-pth_noise = uigetdir();
+pth_noise = "C:\Users\kpqv532\OneDrive - University of Leeds\20250523_141105_Phantom_PhosphoricAcid_B1_Mapping_23052025_1_15\8";
 params_noise = LoadBrukerData(pth_noise);
 noisedata = params_noise.data;
 % First sort data in channels, in this case we have 4
@@ -71,13 +71,13 @@ montage(mat2gray(abs(squeeze(ttt(:,:,24,:))))); title("RSSQ Recon");
 
 figure(15); 
 subplot(3,1,1); plot(abs(squeeze(imgs_rssq(45,24,24,:)))); title("Magnitude");
-subplot(3,1,2); plot(abs(real(squeeze(imgs_rssq(45,24,24,:))))); title("Real");
+subplot(3,1,2); plot(abs(real(squeeze(imgs_rssq(45,24,24,:))))./max(abs(real(squeeze(imgs_rssq(45,24,24,:)))))); title("Real");hold on; plot(sin(FA))
 subplot(3,1,3); plot(abs(imag(squeeze(imgs_rssq(45,24,24,:))))); title("Imag");
 
 figure(16); 
-subplot(3,1,1); plot(abs(squeeze(recon(45,24,24,:)))); title("Magnitude");
-subplot(3,1,2); plot((real(squeeze(recon(45,24,24,:))))); title("Real");
-subplot(3,1,3); plot((imag(squeeze(recon(45,24,24,:))))); title("Imag");
+subplot(3,1,1); plot(rad2deg(FA),abs(squeeze(ttt(45,24,24,:)))); title("Magnitude");
+subplot(3,1,2); plot(rad2deg(FA),(real(squeeze(ttt(45,24,24,:))))); title("Real");
+subplot(3,1,3); plot(rad2deg(FA),(imag(squeeze(ttt(45,24,24,:))))); title("Imag");
 
 
 save("Results\Walsh_31P","recon","psi","imgs_rssq");

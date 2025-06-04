@@ -1,15 +1,13 @@
-addpath(genpath("../."))
-
-params = LoadBrukerData("C:\Users\kpqv532\CODERepository\BrukerData\20250507_093855_MRF_Phantom_MRF_SpiralDev_07052025_1_22\8");
-
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\CODERepository\BrukerData\20250507_093855_MRF_Phantom_MRF_SpiralDev_07052025_1_22\8\MRFPrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+
 
 
 %% Set-up LUT
-T1Range = [100e-3:100e-3:2600e-3];
-T2Range = [5e-3:5e-3:300e-3];
+T1Range = [100e-3:10e-3:2600e-3];
+T2Range = [5e-3:2.5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -27,25 +25,34 @@ for kk = 1:length(B1Range)
     end
 end
 
-
-
-
 NSpin = 200;
-phi = linspace(-4*pi,4*pi,NSpin);
+gyro = 42.577e6;
+thickness = params.Thickness;
+pos = linspace(-thickness,thickness,NSpin);
+
+%% Extract useful timing parameters
 TR = params.TR;
 TE = params.TE ;
+RiseT = params.RiseTime;
+dt = 10e-6;
+
+%% Generate spoiler for inversion module
+flatTime = params.T1PrepSpoiler.duration - RiseT;
+amplitude = (params.PVM_GradCalConst *  (params.T1PrepSpoiler.amplitude/100))*1000/gyro;
+spoiler_inv = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+
+%% Generate spoiler for acquisition
+
+
+
+
+
+
 % Format FA array
 FAList = repmat(params.MRFFA, ceil((params.NMRFFA * size(prepList,1)) / length(params.MRFFA)), 1);
-
 % Truncate FAList to correct dimensions
 FAList = FAList(1:params.NMRFFA * size(prepList,1));
 
-%%% Gradient dephasing matrix
-rg={};
-for jj=1:NSpin
-    rg{jj} = rotmat([0 0 phi(jj)]);
-end
-Rg = blkdiag(rg{:});
 
 
 waitTimes = params.MRFWaitingTimes;
@@ -53,8 +60,9 @@ waitTimes = params.MRFWaitingTimes;
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
-for i = 1:size(LUT,1)
+parfor i = 1:size(LUT,1)
     i
+    dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
     B1Tmp = LUT(i,3);
@@ -66,22 +74,20 @@ for i = 1:size(LUT,1)
      % Run through prep modules
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
-            M = T1PrepModuleInstantRF(M,prepList(p,2)/1000,InversionModSpoilerCycles,T1Tmp,T2Tmp);
-            %M = SimulateInversion(M,T1Tmp,T2Tmp,prepList(p,2));
+            % Instant inversion
+            % Apply spoiler
+            % Delay for time TI
         elseif (prepList(p,1) == 1)
-           % M = T2PrepModuleInstantRF(M,prepList(p,2),T2PrepModSpoilerCycles,T1Tmp,T2Tmp);
-            %M = SimulateT2Prep(M,prepList(p,2),NSpin,2,T1Tmp,T2Tmp);
         end
        % Run through the correct portion of the FA train
          for f = 1:NPointsPerPrep
-            %R = RotateTheta(deg2rad(FAList(faCounter)).*B1Tmp,0);
-            R = throt(FAList(faCounter).*B1Tmp,0);
+            R = RotateTheta(deg2rad(FAList(faCounter)).*B1Tmp,0);
             M = R*M;
             % Precess to TE
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
             M = A*M + B; 
             % Store signal 
-            dict(curEntry,i) =mean(complex(M(1,:),M(2,:)));
+            dictEntry(curEntry) =mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
             [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
             M = A*M + B;
@@ -89,7 +95,6 @@ for i = 1:size(LUT,1)
             % Apply spoiling as rotation in z direction
             for j = 1:NSpin
                 M(:,j) = zrot(phi(j)) * M(:,j);
-                %M(:,j) = rotmat([0 0 phi(j)]) * M(:,j);
             end
             faCounter = faCounter + 1;
             curEntry = curEntry + 1;
@@ -97,11 +102,10 @@ for i = 1:size(LUT,1)
         
         % Wait for delay time
         [A,B] = freeprecess(waitTimes(p),T1Tmp,T2Tmp);
-        %[A,B] = freeprecess(500,T1Tmp,T2Tmp);
         M = A*M + B;
 
     end
-
+    dict(:,i) = dictEntry;
 end
-save("datasets/20250225_122413_MRF_Phantom_MRF_PhantomDev_25022028v2_1_7\dict","dict","LUT")
-figure; plot(real(dict(:,end)))
+
+save("Dictionaries\SpiralDict_Positions","dict","LUT");

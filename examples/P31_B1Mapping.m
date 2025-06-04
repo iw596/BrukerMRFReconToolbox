@@ -3,9 +3,9 @@ addpath("FileIO\")
 addpath("B1Mapping\")
 addpath("recon\")
 
-pth = "C:\Users\kpqv532\CODERepository\BrukerData\20250502_083210_Phantom_PhosphoricAcid_Phantom_PhosphoricA_1_14\";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250530_140004_PhosphoricAcid_PhosphoricAcid_31PB1Map_1_1\";
 %files = ["27","28","29","30","31","32","33","34","35"];
-files = ["18"];
+files = ["13"];
 
 fullPth = strcat(pth,files(1));
 params = LoadBrukerData(fullPth);
@@ -37,8 +37,8 @@ mask = imbinarize(mat2gray(abs(squeeze(imgs(:,:,:,1)))));
 mask = imfill(mask, 'holes');
 
 
-AFIB1Map = FitAFIB1(imgs_rssq,60,20,20*5);
-AFIB1MapFiltered = medfilt3(AFIB1Map,[3, 3, 3]);
+AFIB1Map = FitAFIB1(imgs_rssq,60,30,30*5);
+AFIB1MapFiltered = medfilt3(AFIB1Map,[3, 3, 1]);
 
 
 figure; imagesc(squeeze(AFIB1MapFiltered(:,24,:)));

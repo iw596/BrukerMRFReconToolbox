@@ -1,15 +1,15 @@
-addpath(genpath("../."))
+%% Script to simulate spiral MRF data7
 
-params = LoadBrukerData("C:\Users\kpqv532\CODERepository\BrukerData\20250507_093855_MRF_Phantom_MRF_SpiralDev_07052025_1_22\8");
-
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\CODERepository\BrukerData\20250507_093855_MRF_Phantom_MRF_SpiralDev_07052025_1_22\8\MRFPrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+
 
 
 %% Set-up LUT
-T1Range = [100e-3:100e-3:2600e-3];
-T2Range = [5e-3:5e-3:300e-3];
+T1Range = [100e-3:10e-3:2600e-3];
+T2Range = [5e-3:2.5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -27,11 +27,8 @@ for kk = 1:length(B1Range)
     end
 end
 
-
-
-
 NSpin = 200;
-phi = linspace(-4*pi,4*pi,NSpin);
+phi = linspace(-2*pi,2*pi,NSpin);
 TR = params.TR;
 TE = params.TE ;
 % Format FA array
@@ -53,8 +50,9 @@ waitTimes = params.MRFWaitingTimes;
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
-for i = 1:size(LUT,1)
+parfor i = 1:size(LUT,1)
     i
+    dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
     T1Tmp = LUT(i,1);
     T2Tmp = LUT(i,2);
     B1Tmp = LUT(i,3);
@@ -81,7 +79,7 @@ for i = 1:size(LUT,1)
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
             M = A*M + B; 
             % Store signal 
-            dict(curEntry,i) =mean(complex(M(1,:),M(2,:)));
+            dictEntry(curEntry) =mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
             [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
             M = A*M + B;
@@ -101,7 +99,7 @@ for i = 1:size(LUT,1)
         M = A*M + B;
 
     end
-
+    dict(:,i) = dictEntry;
 end
-save("datasets/20250225_122413_MRF_Phantom_MRF_PhantomDev_25022028v2_1_7\dict","dict","LUT")
-figure; plot(real(dict(:,end)))
+
+save("Dictionaries\SpiralDict_Large","dict","LUT");

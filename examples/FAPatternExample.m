@@ -11,8 +11,8 @@ addpath("Utils\")
 
 faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFFAPattern.txt";
 %FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
-maxFA = 70;
-minFA = 10;
+maxFA = 30;
+minFA = 4;
 NPoints = 50;
 NLobes = 15;
 FAPattern = GenerateSinusoidFAPattern(maxFA,minFA,NLobes,NPoints);
