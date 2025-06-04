@@ -169,8 +169,11 @@ function params = LoadBrukerData(path,loadDataFlag)
         tmp = cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once'));
         tmp = strsplit(tmp,',');
         % Split comma separated values
-        sliceSpoiler.duration = str2num(tmp{3}); % Spoiler duration in ms
+        sliceSpoiler.duration = str2num(tmp{3})/1000; % Spoiler duration in s
         sliceSpoiler.NCycles = str2num(tmp{2});
+        amp = cell2mat(tmp(4));
+        amp = amp(1:end-1);
+        sliceSpoiler.amplitude = str2double(amp);
         params.sliceSpoiler = sliceSpoiler;
     end
     

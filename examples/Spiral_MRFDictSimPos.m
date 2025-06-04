@@ -1,13 +1,15 @@
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
+
+addpath(genpath(".\."))
+params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\isaac\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
 
 
 
 %% Set-up LUT
-T1Range = [100e-3:10e-3:2600e-3];
-T2Range = [5e-3:2.5e-3:350e-3];
+T1Range = [100e-3:50e-3:2600e-3];
+T2Range = [5e-3:5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -26,24 +28,39 @@ for kk = 1:length(B1Range)
 end
 
 NSpin = 200;
-gyro = 42.577e6;
+gyro = 42.577e6; %Hz/T
 thickness = params.Thickness;
-pos = linspace(-thickness,thickness,NSpin);
-
+pos = linspace(-thickness/2,thickness/2,NSpin);
+NPos = NSpin;
 %% Extract useful timing parameters
 TR = params.TR;
 TE = params.TE ;
 RiseT = params.RiseTime;
 dt = 10e-6;
 
+
 %% Generate spoiler for inversion module
 flatTime = params.T1PrepSpoiler.duration - RiseT;
-amplitude = (params.PVM_GradCalConst *  (params.T1PrepSpoiler.amplitude/100))*1000/gyro;
+amplitude = (params.PVM_GradCalConst *  (params.T1PrepSpoiler.amplitude/100)); % Hz/mm
+amplitude =  amplitude * 1000; % Hz/m
+amplitude = amplitude./gyro; % Hz/m -> T/m
 spoiler_inv = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
 
 %% Generate spoiler for acquisition
+flatTime =  params.sliceSpoiler.duration - RiseT;
+%flatTime = params.sliceSpoiler.duration - RiseT;
+amplitude = (params.PVM_GradCalConst *  (params.sliceSpoiler.amplitude/100));
+amplitude = amplitude * 1000; % Hz/m
+amplitude = amplitude./gyro;
+spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
 
 
+nr     = round(RiseT/dt);   % ramp time resolution
+nf     = round(flatTime/dt);   % flat top time resolution
+ru = (round(1:1:nr)-0.5) / nr;
+ft = ones(1, nf);
+rd = (round(nr:-1:1)-0.5) / nr;
+G  = amplitude * [ru, ft, rd];
 
 
 
@@ -75,8 +92,17 @@ parfor i = 1:size(LUT,1)
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
             % Instant inversion
+            M = InstantRFExcitation(M,pi,0);
             % Apply spoiler
+            for ii = 1:NPos
+                for jj = 1:length(spoiler_inv)
+                    Rz = zrot(2*pi*gyro*spoiler_inv(jj)*pos(ii)*dt);
+                    M(:,ii) = Rz *M(:,ii);
+                end
+            end
             % Delay for time TI
+            [A,B] = freeprecess(prepList(p,2)/1000,T1Tmp,T2Tmp);
+            M = A*M + B; 
         elseif (prepList(p,1) == 1)
         end
        % Run through the correct portion of the FA train
@@ -93,8 +119,11 @@ parfor i = 1:size(LUT,1)
             M = A*M + B;
 
             % Apply spoiling as rotation in z direction
-            for j = 1:NSpin
-                M(:,j) = zrot(phi(j)) * M(:,j);
+            for ii = 1:NPos
+                for jj = 1:length(spoiler_acq)
+                    Rz = zrot(2*pi*gyro*G(jj)*pos(ii)*dt);
+                    M(:,ii) = Rz *M(:,ii);
+                end
             end
             faCounter = faCounter + 1;
             curEntry = curEntry + 1;

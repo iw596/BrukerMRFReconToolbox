@@ -74,7 +74,7 @@ subplot(1,2,1); imagesc(T1Map)
 subplot(1,2,2); imagesc(T2Map)
 
 %% Load T1 FAIR
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250529_085103_MRF_Phantom_MRFDev_29052025_1_29\69";
+pth = "C:\Users\isaac\OneDrive - University of Leeds\20250529_085103_MRF_Phantom_MRFDev_29052025_1_29\69";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -97,7 +97,7 @@ T1FitResults = FitData(T1RefData,Model,0);
 
 
 %% Load T2 MSME
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250529_085103_MRF_Phantom_MRFDev_29052025_1_29\67";
+pth = "C:\Users\isaac\OneDrive - University of Leeds\20250529_085103_MRF_Phantom_MRFDev_29052025_1_29\67";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -121,7 +121,7 @@ T2FitResults = FitData(T2MSMEdata,Model,0);
 
 T2Map_MRF = T2Map * 1000;
 T1Map_MRF = T1Map.* 1000;
-figure(58);
+figure(62);
 subplot(2,2,1); imagesc(T1Map_MRF ,[0 2000]); axis image;  colormap("turbo"); colorbar;
 subplot(2,2,2); imagesc(T2Map_MRF,[0 400]); axis image;  colormap("turbo"); colorbar;
 subplot(2,2,3); imagesc(T1FitResults.T1,[0 2000]); axis image;  colormap("turbo"); colorbar;
@@ -185,7 +185,7 @@ f = polyval(p,RefT2_meanValues(1:end));
 eqn = poly_equation(p); % polynomial equation (string)
 Rsquared = my_Rsquared_coeff(MRFT2_meanValues(1:end),f); % correlation coefficient
 
-figure(59);
+figure(60);
 plot(RefT2_meanValues(1:end),MRFT2_meanValues(1:end),'x',RefT2_meanValues(1:end),f,'--',LineWidth=2)
 legend('data',eqn)
 xlabel("T2 ground truth [ms]","Fontsize",20);

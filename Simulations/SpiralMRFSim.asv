@@ -37,6 +37,12 @@ FAList = repmat(params.MRFFA, ceil((params.NMRFFA * size(prepList,1)) / length(p
 % Truncate FAList to correct dimensions
 FAList = FAList(1:params.NMRFFA * size(prepList,1));
 
+%%% Gradient dephasing matrix
+rg={};
+for jj=1:NSpin
+    rg{jj} = rotmat([0 0 phi(jj)]);
+end
+Rg = blkdiag(rg{:});
 
 
 waitTimes = params.MRFWaitingTimes;
