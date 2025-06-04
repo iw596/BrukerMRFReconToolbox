@@ -1,10 +1,18 @@
 addpath(genpath("../."))
 
-params = LoadBrukerData("C:\Users\kpqv532\CODERepository\BrukerData\20250507_093855_MRF_Phantom_MRF_SpiralDev_07052025_1_22\8");
+params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250515_171014_MRF_Phantom_MRF_Phantom_b1mapping_1_25\12");
 
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\CODERepository\BrukerData\20250507_093855_MRF_Phantom_MRF_SpiralDev_07052025_1_22\8\MRFPrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\isaac\OneDrive - University of Leeds\20250515_171014_MRF_Phantom_MRF_Phantom_b1mapping_1_25\PrepList.txt");
+
+nextMultiple = 128 * ceil((params.NCol) / 128);
+padding = nextMultiple - params.NCol;
+data = params.data;
+data = reshape(data,[nextMultiple,params.NPointsPerPrep*params.MRFNPrepModules*params.NLin*params.NPar]);
+data = data(1:params.NCol,:);
+data = reshape(data,[params.NCol,params.NPointsPerPrep*params.MRFNPrepModules,params.NLin,params.NPar]);
+data = permute(data,[1 3 4 2]);
 
 
 %% Set-up LUT
@@ -31,7 +39,7 @@ end
 
 
 NSpin = 200;
-phi = linspace(-4*pi,4*pi,NSpin);
+phi = linspace(-pi,pi,NSpin);
 TR = params.TR;
 TE = params.TE ;
 % Format FA array

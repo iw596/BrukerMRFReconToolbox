@@ -15,10 +15,15 @@ prepList = ReadMRFPrepList("datasets\20250411_152139_MRF_Phantom_MRF_3D_Experime
 
 
 
-rawdata  = params.data;
-rawdata = reshape(rawdata, [params.NCol params.NPointsPerPrep * params.MRFNPrepModules params.NLin params.NPar]);
-rawdata = permute(rawdata, [1 3 4 2 ]);
-imgs = ifftcn(rawdata,[1 2 3]);
+nextMultiple = 128 * ceil((params.NCol) / 128);
+padding = nextMultiple - params.NCol;
+data = params.data;
+data = reshape(data,[nextMultiple,params.NPointsPerPrep*params.MRFNPrepModules*params.NLin*params.NPar]);
+data = data(1:params.NCol,:);
+data = reshape(data,[params.NCol,params.NPointsPerPrep*params.MRFNPrepModules,params.NLin,params.NPar]);
+data = permute(data,[1 3 4 2]);
+
+imgs = ifftcn(data,[1 2 3]);
 
 NPar = params.NPar;
 NLin = params.NLin;
@@ -43,37 +48,37 @@ indexMap = [];
 parfor i = 1:NCol
     i
     for j = 1:NLin
-        for k = 1:NPar
+        for k = 32:32
            
-            % Find closest B1 value in LUT and restrict dictionary search to this area
-            measuredB1Val = squeeze(AFIB1Map(i,j,k));
-            [val,idx] = min(abs(1-squeeze(LUT(:,3))));
-            closestB1 = LUT(idx,3);
-            idx=find(LUT(:,3) == closestB1);
-            subDict = normalisedDict(:,idx);
-            subLUT = LUT(idx,:);
-            scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
-            normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
-            inner_product=abs(squeeze(normalized_mrfsignal)'* (subDict));
-            % Find best matching pattern
-            [maxValue, max_index] = max(abs(inner_product));
-            matched_indices(i, j,k) = max_index;
-            T1Map(i,j,k) = subLUT(max_index,1);
-            T2Map(i,j,k) = subLUT(max_index,2);
-            B1Map(i,j,k) = subLUT(max_index,3);
-            MRFMask(i,j,k) = 1;
-            indexMap(i,j,k) = max_index; 
+            % % Find closest B1 value in LUT and restrict dictionary search to this area
+            % measuredB1Val = squeeze(AFIB1Map(i,j,k));
+            % [val,idx] = min(abs(1-squeeze(LUT(:,3))));
+            % closestB1 = LUT(idx,3);
+            % idx=find(LUT(:,3) == closestB1);
+            % subDict = normalisedDict(:,idx);
+            % subLUT = LUT(idx,:);
+            % scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
+            % normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
+            % inner_product=abs(squeeze(normalized_mrfsignal)'* (subDict));
+            % % Find best matching pattern
+            % [maxValue, max_index] = max(abs(inner_product));
+            % matched_indices(i, j,k) = max_index;
+            % T1Map(i,j,k) = subLUT(max_index,1);
+            % T2Map(i,j,k) = subLUT(max_index,2);
+            % B1Map(i,j,k) = subLUT(max_index,3);
+            % MRFMask(i,j,k) = 1;
+            % indexMap(i,j,k) = max_index; 
             
-           % scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
-           % normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
-           % inner_product=abs(squeeze(normalized_mrfsignal)'* (normalisedDict));
-           % % Find best matching pattern
-           % [maxValue, max_index] = max(abs(inner_product));
-           % T1Map(i,j,k) = LUT(max_index,1);
-           % T2Map(i,j,k) = LUT           (max_index,2);
-           % MRFMask(i,j) = 1;
-           % dotProductMaximums(i,j,k) = maxValue;
-           % indexMap(i,j,k) = max_index;
+           scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
+           normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
+           inner_product=abs(squeeze(normalized_mrfsignal)'* (normalisedDict));
+           % Find best matching pattern
+           [maxValue, max_index] = max(abs(inner_product));
+           T1Map(i,j,k) = LUT(max_index,1);
+           T2Map(i,j,k) = LUT           (max_index,2);
+           MRFMask(i,j) = 1;
+           dotProductMaximums(i,j,k) = maxValue;
+           indexMap(i,j,k) = max_index;
        end
     end
 end
