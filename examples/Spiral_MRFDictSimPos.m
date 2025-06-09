@@ -1,9 +1,9 @@
 
 addpath(genpath(".\."))
-params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\isaac\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
 
 
 
@@ -38,6 +38,9 @@ TE = params.TE ;
 RiseT = params.RiseTime;
 dt = 10e-6;
 
+%% Simulation Flags
+instantInversionFlag = false;
+
 
 %% Generate spoiler for inversion module
 flatTime = params.T1PrepSpoiler.duration - RiseT;
@@ -54,6 +57,24 @@ amplitude = amplitude * 1000; % Hz/m
 amplitude = amplitude./gyro;
 spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
 
+%% If required set-up inversion pulse
+if (instantInversionFlag == false)
+    refPower = params.RefPow;
+    refVol = sqrt(refPower*50);
+    % Calculate pulse B1 required to achieve pi/2 flip
+    % for 1 ms block pulse
+    refB1 = (pi/2)./(2*pi*42.57*10^6*1e-3); % Peak B1 in T
+    % Calculate pulse peak voltage assuming 50 ohm load
+    pulsePeakVoltage = sqrt(params.MRFInversionPulse.power * 50);
+    % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
+    peakB1 = (refB1./refVol) .*  pulsePeakVoltage; % in T
+    [mag,phs] = ReadRFPulseFile("BrukerRFFiles\sech.inv");
+    InversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
+    InversionRF = InterpolateRFWaveform(InversionRF,params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(mag),dt);
+end
+
+
+
 
 nr     = round(RiseT/dt);   % ramp time resolution
 nf     = round(flatTime/dt);   % flat top time resolution
@@ -64,11 +85,24 @@ G  = amplitude * [ru, ft, rd];
 
 
 
+%% Adjust preparation timings based on flags
+if (instantInversionFlag == false)
+    % Adjust all inversion times to account for inversion pulse length
+    for p = 1:size(prepList,1)
+        if (prepList(p,1) == 0)
+             prepList(p,2) = prepList(p,2) - (params.MRFInversionPulse.duration/2 * 1000);
+        end
+    end
+
+end
+
+
+
 
 % Format FA array
 FAList = repmat(params.MRFFA, ceil((params.NMRFFA * size(prepList,1)) / length(params.MRFFA)), 1);
 % Truncate FAList to correct dimensions
-FAList = FAList(1:params.NMRFFA * size(prepList,1));
+FAList = deg2rad(FAList(1:params.NMRFFA * size(prepList,1)));
 
 
 
@@ -77,6 +111,7 @@ waitTimes = params.MRFWaitingTimes;
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
+pool = parpool('Threads');
 parfor i = 1:size(LUT,1)
     i
     dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
@@ -91,8 +126,12 @@ parfor i = 1:size(LUT,1)
      % Run through prep modules
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
-            % Instant inversion
-            M = InstantRFExcitation(M,pi,0);
+            if (instantInversionFlag == true)
+                % Instant inversion
+                M = InstantRFExcitation(M,pi,0);
+            else
+                M = RFExcitation(M,T1Tmp,T2Tmp,dt,InversionRF);
+            end
             % Apply spoiler
             for ii = 1:NPos
                 for jj = 1:length(spoiler_inv)
@@ -107,7 +146,7 @@ parfor i = 1:size(LUT,1)
         end
        % Run through the correct portion of the FA train
          for f = 1:NPointsPerPrep
-            R = RotateTheta(deg2rad(FAList(faCounter)).*B1Tmp,0);
+            R = RotateTheta(FAList(faCounter).*B1Tmp,0);
             M = R*M;
             % Precess to TE
             [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
@@ -137,4 +176,4 @@ parfor i = 1:size(LUT,1)
     dict(:,i) = dictEntry;
 end
 
-save("Dictionaries\SpiralDict_Positions","dict","LUT");
+save("Dictionaries\SpiralDict_Positions_inversionRF","dict","LUT");

@@ -20,7 +20,7 @@ data = reshape(data,[params.NCol,2,params.NCha,params.NLin,params.NPar]);
 % Permute into Read-Lines-Par-Cha-Rep
 data = permute(data,[1 4 5 2 3]);
 % FFT into imgs for each channel
-imgs = abs(fftcn(data,[1 2 3]));
+imgs = abs(ifftcn(data,[1 2 3]));
 AFIB1Map_ref = FitAFIB1(imgs,60,30e-3,150e-3);
 
 
@@ -43,7 +43,7 @@ data = reshape(data,[params.NCol,2,params.NCha,params.NLin,params.NPar]);
 % Permute into Read-Lines-Par-Cha-Rep
 data = permute(data,[1 4 5 2 3]);
 % FFT into imgs for each channel
-imgs = abs(fftcn(data,[1 2 3]));
+imgs = abs(ifftcn(data,[1 2 3]));
 AFIB1Map_epic = FitAFIB1(imgs,60,params.TR,params.TR*params.AFIRatio);
 
 
@@ -66,7 +66,7 @@ data = data(1:NLineSize,:); % Trim padding
 % Reshape into Read-Cha-Lines-Par-Rep
 data = reshape(data,[params.NCol,params.NLin params.NPar]);
 % FFT into imgs for each channel
-imgs_45 = abs(fftcn(data,[1 2 3]));
+imgs_45 = abs(ifftcn(data,[1 2 3]));
 
 params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\18");
 data = params.data;
@@ -82,9 +82,9 @@ data = data(1:NLineSize,:); % Trim padding
 data = reshape(data,[params.NCol,params.NLin params.NPar]);
 % Permute into Read-Lines-Par-Cha-Rep
 % FFT into imgs for each channel
-imgs_90 = abs(fftcn(data,[1 2 3]));
+imgs_90 = abs(ifftcn(data,[1 2 3]));
 
 DAMB1 = acosd(imgs_90./(2.*imgs_45))./45;
 
-figure; imagesc(abs(DAMB1(:,:,32)),[0.5 1.2]); colormap("turbo")
-figure; imagesc(abs(AFIB1Map_epic(:,:,32)),[0.5 1.2]); colormap("turbo")
+figure; imagesc(abs(DAMB1(:,:,24)),[0.5 1.2]); colormap("turbo")
+figure; imagesc(abs(AFIB1Map_epic(:,:,24)),[0.5 1.2]); colormap("turbo")

@@ -103,13 +103,13 @@ colormap("turbo")
 DAMB1MapFiltered_masked  = DAMB1MapFiltered.*mask;
 AFIB1MapFiltered_masked = AFIB1MapFiltered.*mask;
 figure(70); 
-subplot(1,2,1);imagesc(abs(squeeze(DAMB1MapFiltered_masked(24,:,:))),[0.5 1.2]); colormap("turbo"); colorbar;title("Double Angle Method");axis image;
-subplot(1,2,2); imagesc(abs(squeeze(AFIB1MapFiltered_masked(24,:,:))),[0.5 1.2]); colormap("turbo");colorbar;title("AFI"); axis image;
+subplot(1,2,1);imagesc(abs(squeeze(DAMB1MapFiltered_masked(24,:,:))),[0.5 1.2]); colormap("turbo"); title("Double Angle Method");
+subplot(1,2,2); imagesc(abs(squeeze(AFIB1MapFiltered_masked(24,:,:))),[0.5 1.2]); colormap("turbo");title("AFI")
 
 idx = 24;  % Row index you want to analyze
 % Do a profile plot
 AFI_tmpImg = abs(squeeze(AFIB1MapFiltered_masked(24,:,:)));
-AFI_profile = squeeze(AFI_tmpImg(idx,:));
+DAM_profile = squeeze(DAM_tmpImg(idx,:));
 DAM_tmpImg = abs(squeeze(DAMB1MapFiltered_masked(24,:,:)));
 DAM_profile = squeeze(DAM_tmpImg(idx,:));
 
@@ -118,24 +118,11 @@ figure(10);
 subplot(1,2,1);
 imagesc(DAM_tmpImg, [0.5 1.2]); colormap("turbo");
 hold on;
+line([1 size(DAM_tmpImg,2)], [idx idx], 'Color', 'r', 'LineWidth', 1);  % Draw horizontal red line
 subplot(2,2,3);
 
 figure(11);
 subplot(1,2,1); 
 imagesc(DAM_tmpImg, [0.5 1.2]); colormap("turbo");
-line([1 size(DAM_tmpImg,2)], [idx idx], 'Color', 'r', 'LineWidth', 1);  % Draw horizontal red line
 subplot(1,2,2);
-plot(DAM_profile,'LineWidth',1.5); hold on; plot(AFI_profile,'LineWidth',1.5);
-xlabel("Position","FontSize",12);
-ylabel("B1 value","FontSize",12);
-legend("DAM Profile","AFI Profile");
-
-% Difference image
-
-diffImg = DAM_tmpImg - AFI_tmpImg;
-figure(12);
-imagesc(diffImg); colormap("gray"); title("DAM-AFI");colorbar;
-
-figure(13)
-subplot(1,2,1);imagesc(abs(squeeze(DAMB1(24,:,:))),[0.5 1.2]); colormap("turbo"); colorbar;title("Double Angle Method");
-subplot(1,2,2); imagesc(abs(squeeze(AFIB1Map(24,:,:))),[0.5 1.2]); colormap("turbo");colorbar;title("AFI")
+plot(DAM_profile); legend("DAM Profile");
