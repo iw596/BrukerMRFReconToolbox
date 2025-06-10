@@ -1,7 +1,7 @@
 %% Script to perform spiral MRF recon  
 addpath(genpath('./.'));
 %% Load data
-pth = uigetdir;
+pth = "C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10";
 params = LoadBrukerData(pth,true);
 
 
@@ -75,7 +75,7 @@ subplot(1,2,1); imagesc(T1Map.*1000)
 subplot(1,2,2); imagesc(T2Map.*1000)
 
 %% Load T1 FAIR
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\21";
+pth = "C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\21";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -98,7 +98,7 @@ T1FitResults = FitData(T1RefData,Model,0);
 
 
 %% Load T2 MSME
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\3";
+pth = "C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\22";
 params = LoadBrukerData(pth);
 fid = fopen(pth + '\pdata\1\2dseq');
 data = fread(fid,"int16");
@@ -112,7 +112,7 @@ EchoTime  = params.MSMETimes;
 Model.Prot.SEdata.Mat = [EchoTime];
 T2MSMEdata = struct();
 T2MSMEdata.SEdata=double(data);
-Model.options.DropFirstEcho = false;
+Model.options.DropFirstEcho = true;
 Model.options.OffsetTerm = true;
 
 T2FitResults = FitData(T2MSMEdata,Model,0);
@@ -120,7 +120,7 @@ T2FitResults = FitData(T2MSMEdata,Model,0);
 
 T2Map_MRF = T2Map * 1000;
 T1Map_MRF = T1Map.* 1000;
-figure(62);
+figure(65);
 subplot(2,2,1); imagesc(T1Map_MRF ,[0 2000]); axis image;  colormap("turbo"); colorbar;
 subplot(2,2,2); imagesc(T2Map_MRF,[0 400]); axis image;  colormap("turbo"); colorbar;
 subplot(2,2,3); imagesc(T1FitResults.T1,[0 2000]); axis image;  colormap("turbo"); colorbar;

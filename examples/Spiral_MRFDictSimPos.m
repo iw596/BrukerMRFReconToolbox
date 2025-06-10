@@ -1,15 +1,15 @@
 
 addpath(genpath(".\."))
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\10",true);
+params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\isaac\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
 
 
 
 %% Set-up LUT
-T1Range = [100e-3:50e-3:2600e-3];
-T2Range = [5e-3:5e-3:350e-3];
+T1Range = [100e-3:25e-3:2600e-3];
+T2Range = [5e-3:2.5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -111,7 +111,6 @@ waitTimes = params.MRFWaitingTimes;
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
-pool = parpool('Threads');
 parfor i = 1:size(LUT,1)
     i
     dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
