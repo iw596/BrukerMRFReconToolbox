@@ -1,10 +1,10 @@
-params = LoadBrukerData("datasets/20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5/35");
 
-
+addpath(genpath("./."));
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10");
 FA = pi/2;
 RFwaveform = params.ExcRFShape;
 RFDur = params.ExcRFDur;
-dt = RFDur/length(waveform);
+dt = RFDur/length(RFwaveform);
 gamma = 42.577e6;
 
 % Scale waveform
@@ -14,7 +14,7 @@ GSliSel = (params.SliceSelGrad * 1000)/(gamma);
 GSliRphs = (params.SliceSelRephGrad * 1000)/(gamma);
 durSliSel = params.ExcRFDur;
 riseTime = params.RiseTime; 
-durSliRphs = params.EncGradDur - riseTIme;
+durSliRphs = params.RephGradDur - riseTime;
 
 [RFFull,G] = GenerateExcitationBlock(RFwaveform,GSliSel,GSliRphs,durSliSel,durSliRphs,riseTime,dt);
     
@@ -22,12 +22,12 @@ durSliRphs = params.EncGradDur - riseTIme;
 
 
 figure(1);
-plot(imag(RFwaveform)); title("RF waveform")
+plot(real(RFwaveform)); title("RF waveform")
 
 
 % Set-up spin system
-T1 = 1.5;
-T2 = 50e-3;
+T1 = 200e-3;
+T2 = 10e-3;
 NSpin = 200;
 pos = zeros(3,NSpin);
 pos(3,:) = linspace(-1e-3,1e-3,NSpin);
@@ -37,7 +37,7 @@ options.gradient_waveform = zeros([3,length(G)]);
 options.gradient_waveform(3,:) = G;
 options.pos = pos;
 % Run simulation
-M = RFExcitation(M,T1,T2,dt,RFFull,'gradient_waveform',options.gradient_waveform,'pos',options.pos,'ignore_decay',true);
+M = RFExcitation(M,T1,T2,dt,RFFull,'gradient_waveform',options.gradient_waveform,'pos',options.pos,'ignore_decay',false);
 %M = RFExcitation(RFwaveform,dt,M,G,pos,T1,T2);
 Mxy = complex(M(1,:), M(2,:));
 

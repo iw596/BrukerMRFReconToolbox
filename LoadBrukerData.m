@@ -271,6 +271,28 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
     end
 
+    k = strfind(TextAsCells,'$ExcPul=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
+    end
+    
+    k = strfind(TextAsCells,'$ExcPulShape=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = split(line,')');
+        tmp = str2double(split(line(2),' '));
+        magRF = tmp(1:2:end);
+        phs = tmp(2:2:end);
+        params.ExcRFShape = magRF .* exp(1j .*deg2rad(phs));
+    end
+
+
     k = strfind(TextAsCells,'$ExcSliceGradHzmm=');
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -286,6 +308,16 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = strtrim(extractAfter(cell2mat(line),'='));
         line = splitlines(line);
         params.SliceSelRephGrad = str2num(line{1});
+    end
+
+
+    k = strfind(TextAsCells,'$RephGradDur=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.RephGradDur = str2num(line{1})/1000;
     end
 
     k = strfind(TextAsCells,'$EncGradDur=');

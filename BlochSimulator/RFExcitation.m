@@ -30,7 +30,8 @@ function MNew = RFExcitation(M,T1,T2,dt,RF,options)
         for i = 1:length(RF)
             for j = 1:size(options.pos,2)
                 % First precession section
-                gradient_freq = CalculateGradientFreq(squeeze(options.gradient_waveform(:,i)),squeeze(options.pos(:,j)));                                gradient_freq = gradient_freq + options.df; % Incorporate off-res
+                % gradient_freq = CalculateGradientFreq(squeeze(options.gradient_waveform(:,i)),squeeze(options.pos(:,j)));                                gradient_freq = gradient_freq + options.df; % Incorporate off-res
+                gradient_freq = gamma * (options.pos(3,j) .* options.gradient_waveform(i));
                 gradient_freq = gradient_freq + options.df; % Incorporate off-res
                 phi = 2*pi*gradient_freq*timeStep;
                 Rz = zrot(phi);

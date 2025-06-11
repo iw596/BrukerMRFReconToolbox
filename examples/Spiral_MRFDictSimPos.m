@@ -1,9 +1,9 @@
 
 addpath(genpath(".\."))
-params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",true);
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\isaac\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
 
 
 
@@ -30,7 +30,8 @@ end
 NSpin = 200;
 gyro = 42.577e6; %Hz/T
 thickness = params.Thickness;
-pos = linspace(-thickness/2,thickness/2,NSpin);
+pos = zeros(3,NSpin);
+pos(3,:) = linspace(-thickness/2,thickness/2,NSpin);
 NPos = NSpin;
 %% Extract useful timing parameters
 TR = params.TR;
@@ -40,7 +41,7 @@ dt = 10e-6;
 
 %% Simulation Flags
 instantInversionFlag = false;
-
+instantExcitationFlag = false;
 
 %% Generate spoiler for inversion module
 flatTime = params.T1PrepSpoiler.duration - RiseT;
@@ -56,6 +57,13 @@ amplitude = (params.PVM_GradCalConst *  (params.sliceSpoiler.amplitude/100));
 amplitude = amplitude * 1000; % Hz/m
 amplitude = amplitude./gyro;
 spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+nr     = round(RiseT/dt);   % ramp time resolution
+nf     = round(flatTime/dt);   % flat top time resolution
+ru = (round(1:1:nr)-0.5) / nr;
+ft = ones(1, nf);
+rd = (round(nr:-1:1)-0.5) / nr;
+G  = amplitude * [ru, ft, rd];
+
 
 %% If required set-up inversion pulse
 if (instantInversionFlag == false)
@@ -74,19 +82,39 @@ if (instantInversionFlag == false)
 end
 
 
+%% If required set-up RF excitation waveform
+if (instantExcitationFlag == false)
+    % As excitation pulse is non-adiabatic we can set-up reference pulse
+    % and scale by ratio of reference to actual flip angle
+    refFA = pi/2;
+    ExcRF = InterpolateRFWaveform(params.ExcRFShape,params.ExcRFDur,params.ExcRFDur/length(params.ExcRFShape),dt);
+    ExcRFDur = params.ExcRFDur;
+    % Scale waveform
+    ExcRF = ExcRF.*refFA/(sum(ExcRF))/(2*pi*gamma*dt);
+    % Extract gradient parameters
+    % Convert gradient in Hz/mm to T/m
+    GSliSel = (params.SliceSelGrad * 1000)/(gamma);
+    GSliRphs = (params.SliceSelRephGrad * 1000)/(gamma);
+    durSliSel = params.ExcRFDur;
+    riseTime = params.RiseTime; 
+    durSliRphs = params.RephGradDur - riseTime;
+    
+    % Generate excitation module (gradient + paddedwage
+    [RF,G_slisel] = GenerateExcitationBlock(ExcRF,GSliSel,GSliRphs,durSliSel,durSliRphs,riseTime,dt);
+    % Adjust TR and TE values to account for non-instant RF and spoilers
+    d1 = TE - ExcRFDur/2 - RiseT - RiseT- params.RephGradDur;
+    d2 = TR - TE - RiseT - ExcRFDur/2;
+
+end
 
 
-nr     = round(RiseT/dt);   % ramp time resolution
-nf     = round(flatTime/dt);   % flat top time resolution
-ru = (round(1:1:nr)-0.5) / nr;
-ft = ones(1, nf);
-rd = (round(nr:-1:1)-0.5) / nr;
-G  = amplitude * [ru, ft, rd];
+
+
 
 
 
 %% Adjust preparation timings based on flags
-if (instantInversionFlag == false)
+if (instantInversionFlag == false && instantExcitationFlag==true)
     % Adjust all inversion times to account for inversion pulse length
     for p = 1:size(prepList,1)
         if (prepList(p,1) == 0)
@@ -94,6 +122,14 @@ if (instantInversionFlag == false)
         end
     end
 
+elseif (instantInversionFlag == true && instantExcitationFlag==true)
+    % Adjust all inversion times to account for inversion pulse length and
+    % excitation pulse length
+    for p = 1:size(prepList,1)
+        if (prepList(p,1) == 0)
+             prepList(p,2) = prepList(p,2) - (params.MRFInversionPulse.duration/2 * 1000) - RiseT*1000 - params.ExcRFDur*1000/2 ;
+        end
+    end
 end
 
 
@@ -145,21 +181,33 @@ parfor i = 1:size(LUT,1)
         end
        % Run through the correct portion of the FA train
          for f = 1:NPointsPerPrep
-            R = RotateTheta(FAList(faCounter).*B1Tmp,0);
-            M = R*M;
-            % Precess to TE
-            [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
-            M = A*M + B; 
+            if (instantExcitationFlag == true)
+                R = RotateTheta(FAList(faCounter).*B1Tmp,0);
+                M = R*M;
+                % Precess to TE
+                [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
+                M = A*M + B; 
+            else
+                M = RFExcitation(M,T1Tmp,T2Tmp,dt,RF.*FAList(faCounter)/refFA,"gradient_waveform",G_slisel,"pos",pos);
+                % Precess to TE
+                [A,B] = freeprecess(d1,T1Tmp,T2Tmp);
+                M = A*M + B; 
+            end
             % Store signal 
             dictEntry(curEntry) =mean(complex(M(1,:),M(2,:)));
             % Precess until next TR
-            [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
-            M = A*M + B;
+            if (instantExcitationFlag == true)
+                [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
+                M = A*M + B;
+            else
+                [A,B] = freeprecess(d2,T1Tmp,T2Tmp);
+                M = A*M + B;
+            end
 
             % Apply spoiling as rotation in z direction
             for ii = 1:NPos
                 for jj = 1:length(spoiler_acq)
-                    Rz = zrot(2*pi*gyro*G(jj)*pos(ii)*dt);
+                    Rz = zrot(2*pi*gyro*G(jj)*pos(3,ii)*dt);
                     M(:,ii) = Rz *M(:,ii);
                 end
             end

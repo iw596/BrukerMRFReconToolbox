@@ -25,7 +25,7 @@ AFIB1Map_ref = FitAFIB1(imgs,60,30e-3,150e-3);
 
 
 %% Load EPIC AFI
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\20");
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\40");
 data = params.data;
 
 % Calculate how much padding per line of k-space
