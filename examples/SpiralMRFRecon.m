@@ -35,7 +35,7 @@ img = nufft_adj(area.*(data), nufft_st);  % adjoint (gridding);
 img = flipdim(img,1);
 img = flipdim(img,1);
 
-figure; imshow(abs(img(:,:,10)),[]);
+figure; imshow(abs(img(:,:,1490)),[]);
 %figure; plot(squeeze(abs(img(37,97,:))))
 
 % Normalise Dictionary
@@ -51,7 +51,7 @@ T2Map = [];
 indexMap = [];
 NCol = params.NCol;
 % Iterate through each voxel
-parfor i = 1:NCol
+for i = 1:NCol
     i
     for j = 1:NCol
 
@@ -202,12 +202,12 @@ degree = 1;
 p = polyfit(Ref1_meanValues(1:end),MRFT1_meanValues(1:end),degree);
 
 % Evaluate the fitted polynomial p and plot:
-f = polyval(p,Ref1_meanValues(1:end));
+f = polyval(p,Ref1_meanValues(1:4));
 eqn = poly_equation(p); % polynomial equation (string)
-Rsquared = my_Rsquared_coeff(MRFT1_meanValues(1:end),f); % correlation coefficient
+Rsquared = my_Rsquared_coeff(MRFT1_meanValues(1:4),f); % correlation coefficient
 
 figure(60);
-plot(Ref1_meanValues(1:end),MRFT1_meanValues(1:end),'x',Ref1_meanValues(1:end),f,'--',LineWidth=2)
+plot(Ref1_meanValues(1:4),MRFT1_meanValues(1:4),'x',Ref1_meanValues(1:4),f,'--',LineWidth=2)
 legend('data',eqn)
 xlabel("T1 ground truth [ms]","Fontsize",20);
 ylabel("T1 MRF [ms]","Fontsize",20)

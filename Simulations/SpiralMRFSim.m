@@ -1,15 +1,15 @@
 %% Script to simulate spiral MRF data7
 addpath(genpath("./."))
-params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",false);
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",false);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\PrepList1.txt");
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\PrepList1.txt");
 
 
 
 %% Set-up LUT
-T1Range = [10e-3:5e-3:200e-3 200e-3:10e-3:2600e-3];
-T2Range = [1e-3:1e-3:20e-3 10e-3:5e-3:350e-3];
+T1Range = [10e-3:5e-3:1000e-3 1040e-3:20e-3:2000e-3 2000e-3:100e-3:3000e-3];
+T2Range = [1e-3:1e-3:20e-3 10e-3:5e-3:100e-3 110e-3:10e-3:300e-3 350e-3:50e-3:800e-3] ;
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;

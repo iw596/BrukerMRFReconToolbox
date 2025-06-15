@@ -8,8 +8,8 @@ prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\2025
 
 
 %% Set-up LUT
-T1Range = [100e-3:25e-3:2600e-3];
-T2Range = [5e-3:2.5e-3:350e-3];
+T1Range = [100e-3]; %300e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
+T2Range = [13e-3]; %13e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -90,11 +90,11 @@ if (instantExcitationFlag == false)
     ExcRF = InterpolateRFWaveform(params.ExcRFShape,params.ExcRFDur,params.ExcRFDur/length(params.ExcRFShape),dt);
     ExcRFDur = params.ExcRFDur;
     % Scale waveform
-    ExcRF = ExcRF.*refFA/(sum(ExcRF))/(2*pi*gamma*dt);
+    ExcRF = ExcRF.*refFA/(sum(ExcRF))/(2*pi*gyro*dt);
     % Extract gradient parameters
     % Convert gradient in Hz/mm to T/m
-    GSliSel = (params.SliceSelGrad * 1000)/(gamma);
-    GSliRphs = (params.SliceSelRephGrad * 1000)/(gamma);
+    GSliSel = (params.SliceSelGrad * 1000)/(gyro);
+    GSliRphs = (params.SliceSelRephGrad * 1000)/(gyro);
     durSliSel = params.ExcRFDur;
     riseTime = params.RiseTime; 
     durSliRphs = params.RephGradDur - riseTime;
@@ -147,7 +147,8 @@ waitTimes = params.MRFWaitingTimes;
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
-parfor i = 1:size(LUT,1)
+for i = 1:size(LUT,1)
+   tic
     i
     dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
     T1Tmp = LUT(i,1);
@@ -221,6 +222,7 @@ parfor i = 1:size(LUT,1)
 
     end
     dict(:,i) = dictEntry;
+    toc
 end
 
 save("Dictionaries\SpiralDict_Positions_inversionRF","dict","LUT");

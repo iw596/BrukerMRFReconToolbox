@@ -202,15 +202,6 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.BSFreqOffset = str2num(cell2mat(line(1)));
     end
    
-    % Extract Bloch Siegert pulse power (watts)
-    mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSPulsePower'));
-    line = TextAsCells(mask);
-    if (isempty(line) ~=1)
-        line = TextAsCells(mask);
-        line = strtrim(extractAfter(cell2mat(line),'='));
-        line = splitlines(line);
-        params.BSPulsePower = str2num(cell2mat(line(1)));
-    end
 
     % Extract AFI ratio if available
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$AFITRRatio'));
@@ -290,6 +281,17 @@ function params = LoadBrukerData(path,loadDataFlag)
         magRF = tmp(1:2:end);
         phs = tmp(2:2:end);
         params.ExcRFShape = magRF .* exp(1j .*deg2rad(phs));
+    end
+
+    % Extract Bloch Siegert pulse power (watts)
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$B1Pulse1='));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.BSPulse.dur = str2double(cell2mat(tmp(1)))/1000;
+        params.BSPulse.power = str2double(cell2mat(tmp(end-1)));
     end
 
 
@@ -515,6 +517,21 @@ function params = LoadBrukerData(path,loadDataFlag)
         tmp = str2double(tmp);
         params.Traj.PVM_TrajKScale = tmp(2:end);
     end
+
+    k = strfind(TextAsCells,"EnableMRFSpiralRotation=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        if (strcmp(tmp{1}, 'Yes') == 1)
+            params.Traj.InterShotRot = true;
+        else
+            params.Traj.InterShotRot = false;
+        end
+
+    end
+    
 
     k = strfind(TextAsCells,"EPIC_RFPulseStart=");
     idx = find(~cellfun(@isempty,k));

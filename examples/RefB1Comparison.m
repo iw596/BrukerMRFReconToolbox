@@ -86,5 +86,8 @@ imgs_90 = abs(fftcn(data,[1 2 3]));
 
 DAMB1 = acosd(imgs_90./(2.*imgs_45))./45;
 
-figure; imagesc(abs(DAMB1(:,:,32)),[0.5 1.2]); colormap("turbo")
-figure; imagesc(abs(AFIB1Map_epic(:,:,32)),[0.5 1.2]); colormap("turbo")
+figure; 
+subplot(1,2,1); imagesc(abs(DAMB1(:,:,32)),[0.5 1.2]); colormap("turbo"); title("DAM"); colorbar;
+subplot(1,2,2);imagesc(abs(AFIB1Map_epic(:,:,32)),[0.5 1.2]); colormap("turbo"); title("AFI"); colorbar;
+
+figure; imagesc(abs(DAMB1(:,:,32)) -abs(AFIB1Map_epic(:,:,32)))
