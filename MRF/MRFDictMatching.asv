@@ -1,9 +1,0 @@
-function res = MRFDictMatching(data,dict,LUT)
-    arguments
-        data = []
-        dic
-    end
-    %% First normalise the dictioanry
-    
-
-end
