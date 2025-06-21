@@ -29,50 +29,62 @@ J = [6 6];            % interpolation neighborhood
 K = 2*length(k);              % oversampling
 nufft_st = nufft_init(k, Nd, J, Nd*2, Nd/2);  % using MIRT
 
+%% Load dictionary
+dictStruct = load("Dictionaries\AireDictCalc.mat");
+dict = dictStruct.dict;
+LUT = dictStruct.LUT;
+clear("dictStruct");
+
 
 
 img = nufft_adj(area.*(data), nufft_st);  % adjoint (gridding);
 img = flipdim(img,1);
 img = flipdim(img,1);
 
+% Reshape data to add third spatial dimension
+
 figure; imshow(abs(img(:,:,1490)),[]);
+img = reshape(img,[params.NCol params.NCol 1 params.NPointsPerPrep*params.MRFNPrepModules]);
+res = MRFDictMatching(img,dict,LUT,"parallelFlag",false);
+
+
 %figure; plot(squeeze(abs(img(37,97,:))))
 
-% Normalise Dictionary
-normalisedDict = zeros(size(dict));
-
-cnt=size(dict,2);
-parfor c = 1:cnt  
-    scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
-    normalisedDict(:,c) = dict(:,c) / scaleFactor;
-end
-T1Map = [];
-T2Map = [];
-indexMap = [];
-NCol = params.NCol;
-% Iterate through each voxel
-for i = 1:NCol
-    i
-    for j = 1:NCol
-
-       scaleFactor = sqrt(sum(img(i,j,:).*conj(img(i,j,:))));
-       normalized_mrfsignal = conj(img(i,j,:))/scaleFactor;
-       inner_product=abs(squeeze(normalized_mrfsignal)'* (normalisedDict));
-       % Find best matching pattern
-       [maxValue, max_index] = max(abs(inner_product));
-       T1Map(i,j) = LUT(max_index,1);
-       T2Map(i,j) = LUT(max_index,2);
-       B1Map(i,j) = LUT(max_index,3);
-       MRFMask(i,j) = 1;
-       dotProductMaximums(i,j) = maxValue;
-       indexMap(i,j) = max_index;
-
-    end
-end
+% % Normalise Dictionary
+% normalisedDict = zeros(size(dict));
+% 
+% cnt=size(dict,2);
+% parfor c = 1:cnt  
+%     scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
+%     normalisedDict(:,c) = dict(:,c) / scaleFactor;
+% end
+% T1Map = [];
+% T2Map = [];
+% indexMap = [];
+% NCol = params.NCol;
+% % Iterate through each voxel
+% for i = 1:NCol
+%     i
+%     for j = 1:NCol
+% 
+%        scaleFactor = sqrt(sum(img(i,j,:).*conj(img(i,j,:))));
+%        normalized_mrfsignal = conj(img(i,j,:))/scaleFactor;
+%        inner_product=abs(squeeze(normalized_mrfsignal)'* (normalisedDict));
+%        % Find best matching pattern
+%        [maxValue, max_index] = max(abs(inner_product));
+%        T1Map(i,j) = LUT(max_index,1);
+%        T2Map(i,j) = LUT(max_index,2);
+%        B1Map(i,j) = LUT(max_index,3);
+%        MRFMask(i,j) = 1;
+%        dotProductMaximums(i,j) = maxValue;
+%        indexMap(i,j) = max_index;
+% 
+%     end
+% end
 
 figure; 
-subplot(1,2,1); imagesc(T1Map.*1000)
-subplot(1,2,2); imagesc(T2Map.*1000)
+subplot(1,2,1); imagesc(res.MRFT1Map.*1000); colormap("turbo")
+subplot(1,2,2); imagesc(res.MRFT2Map.*1000); colormap("turbo")
 
 %% Load T1 FAIR
 pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\21";
@@ -112,8 +124,8 @@ EchoTime  = params.MSMETimes;
 Model.Prot.SEdata.Mat = [EchoTime];
 T2MSMEdata = struct();
 T2MSMEdata.SEdata=double(data);
-Model.options.DropFirstEcho = true;
-Model.options.OffsetTerm = true;
+Model.options.DropFirstEcho = false;
+Model.options.OffsetTerm = false;
 
 T2FitResults = FitData(T2MSMEdata,Model,0);
 

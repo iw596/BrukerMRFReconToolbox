@@ -46,7 +46,7 @@ imgs_90 = ifftcn(data,[1 2 3]);
 imgs_90_rssq = rssq(imgs_90,4);
 
 DAMB1 = acosd(imgs_90_rssq./(2.*imgs_45_rssq))./45;
-DAMB1MapFiltered = medfilt3(abs(DAMB1),[3, 3, 1]);
+DAMB1MapFiltered = medfilt3(abs(DAMB1),[5,5, 5]);
 
 
 for i = 1:4
@@ -101,7 +101,7 @@ imgs_rssq = squeeze(rssq(imgs_cha,4));
 
 
 AFIB1Map = FitAFIB1(imgs_rssq,60,params.TR,params.TR*params.AFIRatio);
-AFIB1MapFiltered = medfilt3(AFIB1Map,[3, 3, 1]);
+AFIB1MapFiltered = medfilt3(AFIB1Map,[5, 5, 5]);
 
 se = strel('disk', 20, 0);
 mask = mean(imgs_rssq,4);
@@ -109,6 +109,21 @@ mask = imbinarize(mat2gray(abs(mask)));
 mask = imclose(mask, se);
 mask = imfill(mask, 'holes');
 
+
+Model = b1_dam;% Create class from model
+Mdata.SFalpha = imgs_45_rssq; %load data
+Mdata.SF2alpha  = imgs_90_rssq;
+Mdata.Mask  = mask;
+
+%Model.Smoothingfilter_Dimension = 'gaussian'; %apply gaussian smoothing in 3D with fwhm=3
+%Model.Smoothingfilter_Type = '3D';
+%Model.Smoothingfilter_sizex = 3;
+%Model.Smoothingfilter_sizey = 3;
+%Model.Smoothingfilter_sizez = 3;
+Model.Prot.Alpha.Mat = [45];
+
+
+FitResults       = FitData(Mdata,Model); % fit data
 
 figure; imagesc(squeeze(AFIB1MapFiltered(45,:,:)));
 
@@ -162,5 +177,12 @@ subplot(1,2,2); imagesc(abs(squeeze(AFIB1Map(45,:,:))),[0.5 1.2]); colormap("tur
 
 
 %% Save Double-angle B1 map
+fileID = fopen('Results/DAMB1Map.bin','w');
+fwrite(fileID,DAMB1,"double");
+fclose(fileID);
 
-sa
+
+fileID = fopen('Results/AFIB1Map.bin','w');
+fwrite(fileID,AFIB1Map,"double");
+fclose(fileID);
+

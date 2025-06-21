@@ -28,7 +28,7 @@ function MNew = RFExcitation(M,T1,T2,dt,RF,options)
     for i = 1:length(RF)
         if (~isempty(options.gradient_waveform))
             z_pos = options.pos(3,:);
-            grad_i = options.gradient_waveform(i);
+            grad_i = options.gradient_waveform(3,i);
             gradient_freq = gamma * (z_pos * grad_i) + options.df; % 1 x N
             phi = 2*pi*gradient_freq*timeStep;
             for j = 1:size(M,2)

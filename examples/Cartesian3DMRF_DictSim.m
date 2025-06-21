@@ -1,15 +1,14 @@
-
 addpath(genpath(".\."))
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\RestfulMRFData\12",false);
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\RestfulMRFData\12",true);
 
 % Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\RestfulMRFData\PrepList.txt");
 
 
 
 %% Set-up LUT
-T1Range = [100e-3]; %300e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
-T2Range = [13e-3]; %13e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
+T1Range = [100e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
+T2Range = [1e-3:1e-3:20e-3 20e-3:5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -27,7 +26,7 @@ for kk = 1:length(B1Range)
     end
 end
 
-NSpin = 200;
+NSpin = 120;
 gyro = 42.577e6; %Hz/T
 thickness = params.Thickness;
 pos = zeros(3,NSpin);
@@ -40,8 +39,8 @@ RiseT = params.RiseTime;
 dt = 10e-6;
 
 %% Simulation Flags
-instantInversionFlag = false;
-instantExcitationFlag = false;
+instantInversionFlag = true;
+instantExcitationFlag = true;
 
 %% Generate spoiler for inversion module
 flatTime = params.T1PrepSpoiler.duration - RiseT;
@@ -57,6 +56,13 @@ amplitude = (params.PVM_GradCalConst *  (params.sliceSpoiler.amplitude/100));
 amplitude = amplitude * 1000; % Hz/m
 amplitude = amplitude./gyro;
 spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+nr     = round(RiseT/dt);   % ramp time resolution
+nf     = round(flatTime/dt);   % flat top time resolution
+ru = (round(1:1:nr)-0.5) / nr;
+ft = ones(1, nf);
+rd = (round(nr:-1:1)-0.5) / nr;
+G  = amplitude * [ru, ft, rd];
+
 
 %% If required set-up inversion pulse
 if (instantInversionFlag == false)
@@ -140,8 +146,7 @@ waitTimes = params.MRFWaitingTimes;
 InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
-for i = 1:size(LUT,1)
-   tic
+parfor i = 1:size(LUT,1)
     i
     dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
     T1Tmp = LUT(i,1);
@@ -215,7 +220,7 @@ for i = 1:size(LUT,1)
 
     end
     dict(:,i) = dictEntry;
-    toc
+    
 end
 
 save("Dictionaries\SpiralDict_Positions_inversionRF","dict","LUT");

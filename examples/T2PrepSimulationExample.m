@@ -1,5 +1,5 @@
 %% Script to test T2 preparation module
-params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
+%params = LoadBrukerData("datasets/20250311_095117_MRF_Phantom_MRF_dev_11032025_1_8/11",false);
 NSpin = 200;
 T1 = 1.3;
 T2 = 88e-3;
@@ -22,10 +22,10 @@ end
 figure(1);
 plot(TE,signal)
 
-fT2 = @(a)(a(1) .* exp(-TE/a(2)) - (signal));
+%fT2 = @(a)(a(1) .* exp(-TE/a(2)) - (signal));
 
-pdInit = 1;
-t2Init = 10e-3;
-[C] = lsqnonlin(fT2,[pdInit t2Init 0],[],[],options);
+%pdInit = 1;
+%t2Init = 10e-3;
+%[C] = lsqnonlin(fT2,[pdInit t2Init 0],[],[],options);
 
 

@@ -115,5 +115,5 @@ parfor i = 1:size(dict,2)
      dict(:, i) = signal;  % Assign entire column
 end
 
-
+save("Dictionaries/Dict1","dict","LUT");
 

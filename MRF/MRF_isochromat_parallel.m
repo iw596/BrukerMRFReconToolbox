@@ -1,47 +1,16 @@
-
-addpath(genpath(".\."))
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\RestfulMRFData\12",false);
-
-% Read preplist and preptimes
-prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
-
-
-
-%% Set-up LUT
-T1Range = [100e-3]; %300e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
-T2Range = [13e-3]; %13e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
-B1Range = [1];
-% Exclude T2 > T1
-NDictionaryEntries = 0 ;
-% Prepare look-up table containing all valid pairs
-LUT = [];
-for kk = 1:length(B1Range)
-    for ii = 1:length(T1Range)
-        for jj = 1:length(T2Range)
-            % Only keep physically feasible pairs (i.e. T1 > T2)
-            if (T1Range(ii)>=T2Range(jj))
-                LUT(NDictionaryEntries+1,[1:3]) = [T1Range(ii),T2Range(jj),B1Range(kk)];
-                NDictionaryEntries = NDictionaryEntries + 1;
-            end
-        end
-    end
-end
-
-NSpin = 200;
+function signal = MRF_isochromat_parallel(T1,T2,pos,NSpin,params,simFlags)
+    
 gyro = 42.577e6; %Hz/T
-thickness = params.Thickness;
-pos = zeros(3,NSpin);
-pos(3,:) = linspace(-thickness/2,thickness/2,NSpin);
-NPos = NSpin;
+
 %% Extract useful timing parameters
 TR = params.TR;
 TE = params.TE ;
 RiseT = params.RiseTime;
-dt = 10e-6;
+dt = params.dt;
 
 %% Simulation Flags
-instantInversionFlag = false;
-instantExcitationFlag = false;
+instantInversionFlag = simFlags.instantInversionFlag;
+instantExcitationFlag = simFlags.instantExcitationFlag;
 
 %% Generate spoiler for inversion module
 flatTime = params.T1PrepSpoiler.duration - RiseT;
@@ -57,6 +26,13 @@ amplitude = (params.PVM_GradCalConst *  (params.sliceSpoiler.amplitude/100));
 amplitude = amplitude * 1000; % Hz/m
 amplitude = amplitude./gyro;
 spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+nr     = round(RiseT/dt);   % ramp time resolution
+nf     = round(flatTime/dt);   % flat top time resolution
+ru = (round(1:1:nr)-0.5) / nr;
+ft = ones(1, nf);
+rd = (round(nr:-1:1)-0.5) / nr;
+G  = amplitude * [ru, ft, rd];
+
 
 %% If required set-up inversion pulse
 if (instantInversionFlag == false)
@@ -218,4 +194,5 @@ for i = 1:size(LUT,1)
     toc
 end
 
-save("Dictionaries\SpiralDict_Positions_inversionRF","dict","LUT");
+
+end

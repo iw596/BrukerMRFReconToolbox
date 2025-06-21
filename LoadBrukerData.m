@@ -83,6 +83,8 @@ function params = LoadBrukerData(path,loadDataFlag)
     params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
     if (length(line) > 2)
         params.NPar = str2num(cell2mat(line(3))); % NLin is Siemens language for Phase encoding in 3d dimension
+    else
+        params.NPar = 1;
     end
 
     k = strfind(TextAsCells,"$MRFFAList=");

@@ -1,7 +1,7 @@
 addpath("FileIO\")
 addpath("B1Mapping\")
 addpath("recon\")
-
+addpath(genpath("qMRLab-2.4.2\"))
 
 params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250603_154005_PhosphoricAcid_b1mapping_1_2\5");
 data = params.data;
@@ -92,6 +92,9 @@ mask = imclose(mask, se);
 mask = imfill(mask, 'holes');
 
 
+
+
+
 figure; imagesc(squeeze(AFIB1MapFiltered(:,24,:)));
 
 %figure; imagesc(abs(rot90(squeeze(AFIB1MapFiltered(:,:,48)).*mask(:,:,49),-1)),[0.8 1]); axis square; 
@@ -103,8 +106,9 @@ colormap("turbo")
 DAMB1MapFiltered_masked  = DAMB1MapFiltered.*mask;
 AFIB1MapFiltered_masked = AFIB1MapFiltered.*mask;
 figure(70); 
-subplot(1,2,1);imagesc(abs(squeeze(DAMB1MapFiltered_masked(24,:,:))),[0.5 1.2]); colormap("turbo"); colorbar;title("Double Angle Method");axis image;
-subplot(1,2,2); imagesc(abs(squeeze(AFIB1MapFiltered_masked(24,:,:))),[0.5 1.2]); colormap("turbo");colorbar;title("AFI"); axis image;
+imagesc(abs(squeeze(DAMB1(24,:,:))),[0.5 1.2]); colormap("turbo"); colorbar;title("Double Angle Method");axis image;
+figure(71)
+imagesc(abs(squeeze(AFIB1Map(24,:,:))),[0.5 1.2]); colormap("turbo");colorbar;title("AFI"); axis image;
 
 idx = 24;  % Row index you want to analyze
 % Do a profile plot
