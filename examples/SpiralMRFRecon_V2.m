@@ -1,4 +1,4 @@
-%% Script to perform spiral MRF recon  
+%% Script to perform spiral MRF recon with data undersamplinh  
 addpath(genpath('./.'));
 %% Load data
 pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\67";
@@ -16,6 +16,8 @@ data = permute(data,[1 3 2]);
 k = params.Traj.PVM_TrajKScale(1) .* params.Traj.kx + 1j*params.Traj.PVM_TrajKScale(2) .*params.Traj.ky;
 k = reshape(k,[params.Traj.PVM_SpiralSize + params.Traj.PVM_SpiralPostSize ,params.Traj.PVM_SpiralNbOfInterleaves]);
 
+%% Set undersampling factor
+NAcel = 2;
 
 
 

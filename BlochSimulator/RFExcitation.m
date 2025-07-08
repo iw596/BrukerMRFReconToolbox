@@ -40,9 +40,9 @@ function MNew = RFExcitation(M,T1,T2,dt,RF,options)
                 M(:,j) = apply_relax(M(:,j));
             end
         else
-            M = apply_relax(M);
+            M = A*M + B;
             M = InstantRFExcitation(M,alpha(i),theta(i));
-            M = apply_relax(M);
+            M = A*M + B;
         end
     end
 

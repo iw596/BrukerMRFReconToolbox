@@ -42,13 +42,5 @@ toc
 
 
 %% C bloch sim
-B1 = InversionRF.*gyro; % Convert from T to Hz
-G = zeros([length(B1),3]);
-df = 0;
-dp = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
-dv = 0;
-
-tic
-    [mx,my,mz] = bloch_Hz(B1,G,dt,T1,T2,df,dp,dv);
-toc
+padding = round(d1/dt);
 
