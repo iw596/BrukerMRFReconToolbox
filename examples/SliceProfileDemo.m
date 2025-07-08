@@ -1,6 +1,6 @@
 
 addpath(genpath("./."));
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10");
+params = LoadBrukerData("C:\Users\isaac\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10");
 FA = pi/2;
 RFwaveform = params.ExcRFShape;
 RFDur = params.ExcRFDur;
@@ -48,7 +48,7 @@ B1_Hz        = RFFull     * T.gam;
 GSliSel_Hzcm  = options.gradient_waveform * T.gam/100;
 pos_cm = (options.pos.*100).';
 tic
-[mx,my,mz] = bloch_Hz(B1scale*B1_Hz, GSliSel_Hzcm.', dt, T1, T2, 0, (options.pos.*100).', 0, 0); % Label
+[mx,my,mz] = bloch_Hz(B1_Hz, GSliSel_Hzcm.', dt, T1, T2, 0, (options.pos.*100).', 0, 0); % Label
 mexTime = toc
 
 %M = RFExcitation(RFwaveform,dt,M,G,pos,T1,T2);

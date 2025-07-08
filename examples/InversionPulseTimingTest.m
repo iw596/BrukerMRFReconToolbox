@@ -34,18 +34,35 @@ d1 = TI - (flatTime + 2*riseTime) - params.MRFInversionPulse.duration/2;
 
 M = zeros(3,NSpin);
 M(3,:) = 1;
+pos = zeros([NSpin,3]); 
+pos(:,3) = linspace(-1e-3,1e-3,NSpin);
 %% Matlab implementation
 tic
     M = RFExcitation(M,T1,T2,dt,InversionRF);
+    % Apply spoiling as rotation in z direction
+     for ii = 1:NSpin
+         for jj = 1:length(spoiler_inv)
+              Rz = zrot(2*pi*gyro*spoiler_inv(jj)*pos(ii,3)*dt);
+              M(:,ii) = Rz *M(:,ii);
+    
+         end
+     end
     
 toc
 
 
 %% C bloch sim
-B1 = InversionRF.*gyro; % Convert from T to Hz
-G = zeros([length(B1),3]);
+B1_RF = InversionRF.*gyro; % Convert from T to Hz
+B1_spoil = zeros([length(spoiler_inv),1]);
+B1 = [B1_RF.'; B1_spoil];
+G_RF = zeros([length(B1_RF),3]);
+G_Spoil = zeros([length(spoiler_inv),3]);
+G_Spoil(:,3) = spoiler_inv;
+G = [G_RF;G_Spoil];
+G = (G.*gyro)/100;
 df = 0;
-dp = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
+dp = zeros([NSpin,3]); 
+dp(:,3) = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
 dv = 0;
 
 tic
