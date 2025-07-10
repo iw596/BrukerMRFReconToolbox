@@ -8,10 +8,8 @@ prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\2025
 
 
 %% Set-up LUT
-%T1Range = [300e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
-%T2Range = [1e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
-T1Range = [2800e-3];
-T2Range = [350e-3];
+T1Range = [300e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
+T2Range = [1e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -204,7 +202,7 @@ for i = 1:size(LUT,1)
             % Apply spoiling as rotation in z direction
             for ii = 1:NPos
                 for jj = 1:length(spoiler_acq)
-                    Rz = zrot(2*pi*gyro*spoiler_acq(jj)*pos(3,ii)*dt);
+                    Rz = zrot(2*pi*gyro*G(jj)*pos(3,ii)*dt);
                     M(:,ii) = Rz *M(:,ii);
                 end
             end

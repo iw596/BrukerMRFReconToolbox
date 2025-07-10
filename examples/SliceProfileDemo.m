@@ -17,7 +17,7 @@ riseTime = params.RiseTime;
 durSliRphs = params.RephGradDur - riseTime;
 
 [RFFull,G] = GenerateExcitationBlock(RFwaveform,GSliSel,GSliRphs,durSliSel,durSliRphs,riseTime,dt);
-    
+RFFull = RFFull.*exp(-1j*pi/2);   
 
 
 
@@ -26,8 +26,8 @@ durSliRphs = params.RephGradDur - riseTime;
 
 
 % Set-up spin system
-T1 = 2000e-3;
-T2 = 50e-3;
+T1 = 1000e-3;
+T2 = 15e-3;
 NSpin = 200;
 pos = zeros(3,NSpin);
 pos(3,:) = linspace(-1e-3,1e-3,NSpin);
@@ -48,7 +48,7 @@ B1_Hz        = RFFull     * T.gam;
 GSliSel_Hzcm  = options.gradient_waveform * T.gam/100;
 pos_cm = (options.pos.*100).';
 tic
-[mx,my,mz] = bloch_Hz(B1scale*B1_Hz, GSliSel_Hzcm.', dt, T1, T2, 0, (options.pos.*100).', 0, 0); % Label
+[mx,my,mz] = bloch_Hz(B1_Hz, GSliSel_Hzcm.', dt, T1, T2, 0, (options.pos.*100).', 0, 0); % Label
 mexTime = toc
 
 %M = RFExcitation(RFwaveform,dt,M,G,pos,T1,T2);

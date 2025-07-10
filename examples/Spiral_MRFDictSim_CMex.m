@@ -1,6 +1,5 @@
-
 addpath(genpath(".\."))
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\RestfulMRFData\12",false);
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",false);
 
 % Read preplist and preptimes
 prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");
@@ -8,8 +7,8 @@ prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\2025
 
 
 %% Set-up LUT
-%T1Range = [300e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
-%T2Range = [1e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
+%T1Range = [10e-3:10e-3:500e-3 500e-3:25e-3:2800e-3];
+%T2Range = [1e-3:0.25e-3:10e-3 20e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
 T1Range = [2800e-3];
 T2Range = [350e-3];
 B1Range = [1];
@@ -32,8 +31,11 @@ end
 NSpin = 200;
 gyro = 42.577e6; %Hz/T
 thickness = params.Thickness;
-pos = zeros(3,NSpin);
-pos(3,:) = linspace(-thickness/2,thickness/2,NSpin);
+df = 0;
+dp = zeros([NSpin,3]); 
+dp(:,3) = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
+dv = 0;
+
 NPos = NSpin;
 %% Extract useful timing parameters
 TR = params.TR;
@@ -42,7 +44,7 @@ RiseT = params.RiseTime;
 dt = 10e-6;
 
 %% Simulation Flags
-instantInversionFlag = true;
+instantInversionFlag = false;
 instantExcitationFlag = true;
 
 %% Generate spoiler for inversion module
@@ -51,7 +53,9 @@ amplitude = (params.PVM_GradCalConst *  (params.T1PrepSpoiler.amplitude/100)); %
 amplitude =  amplitude * 1000; % Hz/m
 amplitude = amplitude./gyro; % Hz/m -> T/m
 spoiler_inv = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
-
+spoiler_inv = spoiler_inv * gyro/100; % Convert to Hz/cm
+G_invspoiler = zeros(length(spoiler_inv),3);
+G_invspoiler(:,3) = spoiler_inv;
 %% Generate spoiler for acquisition
 flatTime =  params.sliceSpoiler.duration - RiseT;
 %flatTime = params.sliceSpoiler.duration - RiseT;
@@ -59,7 +63,9 @@ amplitude = (params.PVM_GradCalConst *  (params.sliceSpoiler.amplitude/100));
 amplitude = amplitude * 1000; % Hz/m
 amplitude = amplitude./gyro;
 spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
-
+spoiler_acq = spoiler_acq * gyro/100; % Convert to Hz/cm
+G_slispoiler = zeros(length(spoiler_acq),3);
+G_slispoiler(:,3) = spoiler_acq;
 %% If required set-up inversion pulse
 if (instantInversionFlag == false)
     refPower = params.RefPow;
@@ -74,6 +80,7 @@ if (instantInversionFlag == false)
     [mag,phs] = ReadRFPulseFile("BrukerRFFiles\sech.inv");
     InversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
     InversionRF = InterpolateRFWaveform(InversionRF,params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(mag),dt);
+    InversionB1 = InversionRF * gyro;
 end
 
 
@@ -143,7 +150,7 @@ InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
 NPointsPerPrep = params.NPointsPerPrep;
 dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
 tic
-for i = 1:size(LUT,1)
+parfor i = 1:size(LUT,1)
    
     i
     dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
@@ -162,15 +169,15 @@ for i = 1:size(LUT,1)
                 % Instant inversion
                 M = InstantRFExcitation(M,pi,0);
             else
-                M = RFExcitation(M,T1Tmp,T2Tmp,dt,InversionRF);
+                %M = RFExcitation(M,T1Tmp,T2Tmp,dt,InversionRF);
+                [mx,my,mz] = bloch_Hz(InversionB1,zeros(length(InversionB1),1),dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+                M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
             end
             % Apply spoiler
-            for ii = 1:NPos
-                for jj = 1:length(spoiler_inv)
-                    Rz = zrot(2*pi*gyro*spoiler_inv(jj)*pos(ii)*dt);
-                    M(:,ii) = Rz *M(:,ii);
-                end
-            end
+            [mx,my,mz] = bloch_Hz(0,G_invspoiler,dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+
+
             % Delay for time TI
             [A,B] = freeprecess(prepList(p,2)/1000,T1Tmp,T2Tmp);
             M = A*M + B; 
@@ -200,14 +207,18 @@ for i = 1:size(LUT,1)
                 [A,B] = freeprecess(d2,T1Tmp,T2Tmp);
                 M = A*M + B;
             end
+            % Slice spoiler
+            [mx,my,mz] = bloch_Hz(zeros(length(G_slispoiler),1),G_slispoiler,dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+
 
             % Apply spoiling as rotation in z direction
-            for ii = 1:NPos
-                for jj = 1:length(spoiler_acq)
-                    Rz = zrot(2*pi*gyro*spoiler_acq(jj)*pos(3,ii)*dt);
-                    M(:,ii) = Rz *M(:,ii);
-                end
-            end
+            % for ii = 1:NPos
+            %     for jj = 1:length(spoiler_acq)
+            %         Rz = zrot(2*pi*gyro*G(jj)*pos(3,ii)*dt);
+            %         M(:,ii) = Rz *M(:,ii);
+            %     end
+            % end
             faCounter = faCounter + 1;
             curEntry = curEntry + 1;
         end

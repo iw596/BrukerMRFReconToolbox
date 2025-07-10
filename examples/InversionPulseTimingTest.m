@@ -6,7 +6,7 @@ params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18
 dt = 10^(-6);
 T1 = 2.5;
 T2 = 50e-3;
-TI = 21e-3;
+TI = 1e-3;
 gyro = 42.57e6;
 NSpin = 200;
 %% Generate inverstion pulse
@@ -34,21 +34,50 @@ d1 = TI - (flatTime + 2*riseTime) - params.MRFInversionPulse.duration/2;
 
 M = zeros(3,NSpin);
 M(3,:) = 1;
+pos = zeros([NSpin,3]); 
+pos(:,3) = linspace(-1e-3,1e-3,NSpin);
 %% Matlab implementation
 tic
     M = RFExcitation(M,T1,T2,dt,InversionRF);
-    
+    % Apply spoiling as rotation in z direction
+     for ii = 1:NSpin
+         for jj = 1:length(spoiler_inv)
+              Rz = zrot(2*pi*gyro*spoiler_inv(jj)*pos(ii,3)*dt);
+              M(:,ii) = Rz *M(:,ii);
+         end
+     end
+    M = ApplyFreePrecession(M,T1,T2,d1);
 toc
 
 
 %% C bloch sim
-B1 = InversionRF.*gyro; % Convert from T to Hz
-G = zeros([length(B1),3]);
+NPointsDelay = round(d1/dt);
+B1_RF = InversionRF.*gyro; % Convert from T to Hz
+B1_spoil = zeros([length(spoiler_inv),1]);
+B1_delay = zeros(NPointsDelay,1);
+B1 = [B1_RF.'; B1_spoil];
+G_RF = zeros([length(B1_RF),3]);
+G_Spoil = zeros([length(spoiler_inv),3]);
+G_Spoil(:,3) = spoiler_inv;
+
+G = [G_RF;G_Spoil];
+G = (G.*gyro)/100;
 df = 0;
-dp = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
+dp = zeros([NSpin,3]); 
+dp(:,3) = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
 dv = 0;
 
-tic
-    [mx,my,mz] = bloch_Hz(B1,G,dt,T1,T2,df,dp,dv);
-toc
 
+mx = zeros(NSpin,1);
+my = zeros(NSpin,1);
+mz = ones(NSpin,1) * 0.5;
+
+tic
+    [mx,my,mz] = bloch_Hz(B1,G,dt,T1,T2,df,dp,dv,0,mx,my,mz);
+    MTmp = ApplyFreePrecession([mx my mz].',T1,T2,d1);
+toc
+mz = MTmp(3,:);
+
+
+figure(10);
+plot(M(3,:)); hold on; plot(mz);
