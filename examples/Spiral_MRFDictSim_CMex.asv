@@ -7,10 +7,10 @@ prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\2025
 
 
 %% Set-up LUT
-T1Range = [10e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
-T2Range = [1e-3:1e-3:10e-3 20e-3:2.5e-3:100e-3 100e-3:10e-3:350e-3];
-%T1Range = [2800e-3];
-%T2Range = [350e-3];
+%T1Range = [10e-3:10e-3:500e-3 500e-3:25e-3:2800e-3];
+%T2Range = [1e-3:0.25e-3:10e-3 20e-3:1e-3:100e-3 100e-3:5e-3:350e-3];
+T1Range = [2800e-3];
+T2Range = [350e-3];
 B1Range = [1];
 % Exclude T2 > T1
 NDictionaryEntries = 0 ;
@@ -45,7 +45,7 @@ dt = 10e-6;
 
 %% Simulation Flags
 instantInversionFlag = false;
-instantExcitationFlag = true;
+instantExcitationFlag = false;
 
 %% Generate spoiler for inversion module
 flatTime = params.T1PrepSpoiler.duration - RiseT;
@@ -199,7 +199,7 @@ for i = 1:size(LUT,1)
                 M = A*M + B; 
             else
                 %M = RFExcitation(M,T1Tmp,T2Tmp,dt,RF.*FAList(faCounter)/refFA,"gradient_waveform",G_slisel,"pos",pos);
-                [mx,my,mz] = bloch_Hz(ExcB1.*FAList(faCounter)/refFA,G_exc(1:end-1,:),dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+                [mx,my,mz] = bloch_Hz(ExcB1,G_exc(),dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
                 M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
                 % Precess to TE
                 [A,B] = freeprecess(d1,T1Tmp,T2Tmp);

@@ -1,7 +1,7 @@
 %% Script to perform spiral MRF recon  
 addpath(genpath('./.'));
 %% Load data
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250714_092334_MRF_Phantom_SpiralMRFDev_1_34\72";
 params = LoadBrukerData(pth,true);
 
 
@@ -43,7 +43,7 @@ img = flipdim(img,1);
 
 % Reshape data to add third spatial dimension
 
-figure; imshow(abs(img(:,:,1490)),[]);
+figure; imshow(abs(img(:,:,1)),[]);
 img = reshape(img,[params.NCol params.NCol 1 params.NPointsPerPrep*params.MRFNPrepModules]);
 res = MRFDictMatching(img,dict,LUT,"parallelFlag",true);
 

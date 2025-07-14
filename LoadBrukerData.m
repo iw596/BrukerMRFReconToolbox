@@ -164,6 +164,14 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.EPICFA = str2double(split(line(2),' '));
     end
 
+     mask = ~cellfun(@isempty, strfind(TextAsCells,'$FAList'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NEPICFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.EPICFA = str2double(split(line(2),' '));
+    end
+
     % Extract information about slice spoiler
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$SliceSpoiler'));
     line = TextAsCells(mask);
