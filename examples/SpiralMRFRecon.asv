@@ -1,7 +1,7 @@
 %% Script to perform spiral MRF recon  
 addpath(genpath('./.'));
 %% Load data
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250801_085320_MRF_Phantom_MRFDev_01082025_1_38\40";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250718_133850_MRF_Phantom_3dMRFDev_v2_18072025_1_36\13";
 params = LoadBrukerData(pth,true);
 
 
@@ -36,29 +36,17 @@ nufft_st = nufft_init(k, Nd, J, Nd*2, Nd/2);  % using MIRT
 %clear("dictStruct");
 
 %% Load and generate B1 map
-% pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250718_133850_MRF_Phantom_3dMRFDev_v2_18072025_1_36\14";
-% params_B1Map = LoadBrukerData(pth);
-% nextMultiple = 128 * ceil((params_B1Map.NCol) / 128);
-% padding = nextMultiple - params_B1Map.NCol;
-% data = params_B1Map.data;
-% data = reshape(data,[nextMultiple,2,params_B1Map.NLin,params_B1Map.NPar]);
-% data = data(1:params_B1Map.NCol,:,:);
-% data = reshape(data,[params_B1Map.NCol,2,params_B1Map.NLin,params_B1Map.NPar]);
-% data = permute(data,[1 3 4 2]);
-% imgs = ifftcn(data,[1 2 3]);
-% AFIB1Map = FitAFIB1(imgs,60,20,20*5);
-% AFIB1MapResized = imresize3(AFIB1Map,[params.NCol params.NLin params.NPar]);
+
 
 
 
 img = nufft_adj(area.*(data), nufft_st);  % adjoint (gridding);
-figure; plot(squeeze(abs(img(params.NCol/2,params.NCol/2,:))))
 img = flipdim(img,1);
 img = flipdim(img,1);
 
 % Reshape data to add third spatial dimension
 
-figure; imshow(abs(img(:,:,700)),[]);
+figure; imshow(abs(img(:,:,1)),[]);
 img = reshape(img,[params.NCol params.NCol 1 params.NPointsPerPrep*params.MRFNPrepModules]);
 res = MRFDictMatching(img,dict,LUT,"parallelFlag",true);
 
@@ -172,15 +160,15 @@ end
 
 % Fit a polynomial p of degree 1 to the data:
 degree = 1;
-p = polyfit(RefT2_meanValues(1:4),MRFT2_meanValues(1:4),degree);
+p = polyfit(RefT2_meanValues(1:end),MRFT2_meanValues(1:end),degree);
 
 % Evaluate the fitted polynomial p and plot:
-f = polyval(p,RefT2_meanValues(1:4));
+f = polyval(p,RefT2_meanValues(1:end));
 eqn = poly_equation(p); % polynomial equation (string)
-Rsquared = my_Rsquared_coeff(MRFT2_meanValues(1:4),f); % correlation coefficient
+Rsquared = my_Rsquared_coeff(MRFT2_meanValues(1:end),f); % correlation coefficient
 
 figure(65);
-plot(RefT2_meanValues(1:4),MRFT2_meanValues(1:4),'x',RefT2_meanValues(1:4),f,'--',LineWidth=2)
+plot(RefT2_meanValues(1:end),MRFT2_meanValues(1:end),'x',RefT2_meanValues(1:end),f,'--',LineWidth=2)
 legend('data',eqn)
 xlabel("T2 ground truth [ms]","Fontsize",20);
 ylabel("T2 MRF [ms]","Fontsize",20)
@@ -195,12 +183,12 @@ degree = 1;
 p = polyfit(Ref1_meanValues(1:end),MRFT1_meanValues(1:end),degree);
 
 % Evaluate the fitted polynomial p and plot:
-f = polyval(p,Ref1_meanValues(1:end));
+f = polyval(p,Ref1_meanValues(1:4));
 eqn = poly_equation(p); % polynomial equation (string)
-Rsquared = my_Rsquared_coeff(MRFT1_meanValues(1:end),f); % correlation coefficient
+Rsquared = my_Rsquared_coeff(MRFT1_meanValues(1:4),f); % correlation coefficient
 
 figure(60);
-plot(Ref1_meanValues(1:end),MRFT1_meanValues(1:end),'x',Ref1_meanValues(1:end),f,'--',LineWidth=2)
+plot(Ref1_meanValues(1:4),MRFT1_meanValues(1:4),'x',Ref1_meanValues(1:4),f,'--',LineWidth=2)
 legend('data',eqn)
 xlabel("T1 ground truth [ms]","Fontsize",20);
 ylabel("T1 MRF [ms]","Fontsize",20)

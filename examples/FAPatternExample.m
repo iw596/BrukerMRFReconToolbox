@@ -12,9 +12,9 @@ addpath("Utils\")
 faFilePath = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFFAPattern.txt";
 %FAPattern = GenerateFAPattern(length(maxFA),NPoints,minFA,maxFA,lobeGap,0,0);
 maxFA = 30;
-minFA = 4;
-NPoints = 50;
-NLobes = 15;
+minFA = 10;
+NPoints = 150;
+NLobes = 6;
 FAPattern = GenerateSinusoidFAPattern(maxFA,minFA,NLobes,NPoints);
 %% Now generate TR Pattern
 persistence = 0.6; % Moderate persistence for smoother output
@@ -27,7 +27,7 @@ subplot(2,1,1); plot(FAPattern); ylabel("Flip angle"); xlabel("Time point");
 subplot(2,1,2); plot(TRPattern); ylabel("TR (s)"); xlabel("Time point");
 
 
-fileName = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\MRFPattern.txt";
+fileName = "C:\Users\kpqv532\OneDrive - University of Leeds\MRF_FA_Patterns\FAList5.txt";
 
 Y = round(FAPattern,1);
 Z = round(TRPattern*1000,1);

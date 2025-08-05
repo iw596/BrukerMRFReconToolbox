@@ -4,7 +4,7 @@ addpath("B1Mapping\")
 addpath("recon\")
 
 % Load 45 degree dataset
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\9";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250724_164854_MRF_Phantom_MRF_24072025_1_37\9";
 params = LoadBrukerData(pth);
 data = reshape(params.data,[params.NCol,params.NLin,params.NPar params.NRep]);
 DAMImgs = ifftcn(data,[1 2 3]);

@@ -5,8 +5,8 @@ params = LoadBrukerData("datasets/20250318_102411_MRF_Phantom_MRF_Phantom_Dev_18
 %% Set-up simulation parameters
 dt = 10^(-6);
 T1 = 2.5;
-T2 = 50e-3;
-TI = 1e-3;
+T2 = 15e-3;
+TI = 1500e-3;
 gyro = 42.57e6;
 NSpin = 200;
 %% Generate inverstion pulse
@@ -46,7 +46,7 @@ tic
               M(:,ii) = Rz *M(:,ii);
          end
      end
-    M = ApplyFreePrecession(M,T1,T2,d1);
+   % M = ApplyFreePrecession(M,T1,T2,d1);
 toc
 
 
@@ -70,11 +70,11 @@ dv = 0;
 
 mx = zeros(NSpin,1);
 my = zeros(NSpin,1);
-mz = ones(NSpin,1) * 0.5;
+mz = ones(NSpin,1);
 
 tic
     [mx,my,mz] = bloch_Hz(B1,G,dt,T1,T2,df,dp,dv,0,mx,my,mz);
-    MTmp = ApplyFreePrecession([mx my mz].',T1,T2,d1);
+    %MTmp = ApplyFreePrecession([mx my mz].',T1,T2,d1);
 toc
 mz = MTmp(3,:);
 

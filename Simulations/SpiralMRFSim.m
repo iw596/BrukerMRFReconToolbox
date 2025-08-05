@@ -1,6 +1,6 @@
 %% Script to simulate spiral MRF data7
 addpath(genpath("./."))
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10",false);
+params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250724_164854_MRF_Phantom_MRF_24072025_1_37\34",false);
 
 % Read preplist and preptimes
 prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250602_110808_MRF_Phantom_MRF_Dev_02062025_1_30\PrepList.txt");

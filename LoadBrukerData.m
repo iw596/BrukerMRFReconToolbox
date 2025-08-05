@@ -87,6 +87,22 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.NPar = 1;
     end
 
+    k = strfind(TextAsCells,"$PVM_NMovieFrames=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.PVM_NMovieFrames = str2num(line{1});
+    end
+
+   k = strfind(TextAsCells,"$PVM_ObjOrderList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NSli = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+    end
+
     k = strfind(TextAsCells,"$MRFFAList=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -427,15 +443,11 @@ function params = LoadBrukerData(path,loadDataFlag)
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
-        line = split(line,')');
-        % Check for old MRF version with single wait time
-        if (size(line,1) == 1)
-            line = strtrim(extractAfter(cell2mat(line),'='));
-            tmp = strsplit(line,',');
-            params.MRFWaitingTimes = str2double(cell2mat(tmp(1)));
-        else
-        params.MRFWaitingTimes = str2double(split(line(2),' '));
-        end
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.MRFWaitingTimes =  tmp(2:end);
     end
 
     k = strfind(TextAsCells,"InvPulse1=");
@@ -455,11 +467,20 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-
-
-        params.MRFT2RectPulse.duration = str2double(cell2mat(tmp(1)));
+        params.MRFT2RectPulse.duration = str2double(cell2mat(tmp(1)))/1000;
         params.MRFT2RectPulse.BW = str2double(cell2mat(tmp(2)));
         params.MRFT2RectPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+    k = strfind(TextAsCells,"T2PrepPulse2=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFT2InversionPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.MRFT2InversionPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFT2InversionPulse.power = str2double(cell2mat(tmp(end-1)));
     end
 
     k = strfind(TextAsCells,"PVM_TrajKx=");
@@ -558,6 +579,35 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = strtrim(extractAfter(cell2mat(line),'='));
         params.EPICB1Map.RFPulseEnd = str2double(line);
     end
+
+    k = strfind(TextAsCells,"ShotWait=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.ShotWait = str2double(line);
+    end
+
+    k = strfind(TextAsCells,"T2PrepTimes=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.T2PrepTimes = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"$MrfFlipAngle=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.MRFFA = str2double(split(line(2),' '));
+    end
+    
 
     %% Load imaging data if required
     if (loadDataFlag == true)

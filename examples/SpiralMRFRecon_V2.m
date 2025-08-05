@@ -1,7 +1,7 @@
 %% Script to perform spiral MRF recon with data undersamplinh  
 addpath(genpath('./.'));
 %% Load data
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\67";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250724_164854_MRF_Phantom_MRF_24072025_1_371\34";
 params = LoadBrukerData(pth,true);
 
 %% Trim raw data 
