@@ -1,5 +1,5 @@
 addpath(genpath(".\."))
-pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250724_164854_MRF_Phantom_MRF_24072025_1_37\107";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250811_102419_MRF_Phantom_T2PrepDev_11082025_1_39\33";
 params = LoadBrukerData(pth,true);
 nextMultiple = 128 * ceil((params.NCol) / 128);
 padding = nextMultiple - params.NCol;
@@ -23,3 +23,24 @@ Model.options.OffsetTerm = true;
 T2FitResults = FitData(T2MSMEdata,Model,0);
 
 figure; imagesc(abs(T2FitResults.T2),[0,500]); colormap("turbo");
+
+
+figure(51);
+imagesc(abs(T2FitResults.T2) ,[0 500]); axis image;  colormap("turbo"); colorbar;
+title('Draw 8 ROIs on the Image');
+% Initialize arrays to store mean values
+RefT2_meanValues = zeros(1, 8);
+
+% Initialize ROI handles
+roiHandles = gobjects(1, 8);
+% Draw 8 ROIs and calculate mean values
+for i = 1:8
+    roiHandles(i) = drawrectangle('Label', sprintf('ROI %d', i), 'Color', 'r');
+    wait(roiHandles(i));  % Wait for the user to draw the ROI
+    
+    % Create mask for the ROI
+    mask = createMask(roiHandles(i));
+    RefT2_meanValues(i) = mean(T2FitResults.T2(mask));
+
+    fprintf('Mean value for ROI %d: %.2f\n', i, RefT2_meanValues(i));
+end
