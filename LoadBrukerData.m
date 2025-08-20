@@ -14,7 +14,7 @@ function params = LoadBrukerData(path,loadDataFlag)
     end
 
     % Open the method file and get some useful values 
-    filetext = fileread(methodFileName);
+    filetext = fileread(fullfile(methodFileName));
     TextAsCells = regexp(filetext,'##','split');
     params.System = "Bruker";
     % Check trajectory
@@ -106,10 +106,15 @@ function params = LoadBrukerData(path,loadDataFlag)
     k = strfind(TextAsCells,"$MRFFAList=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
+        
         line = TextAsCells(idx);
         params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
-        line = split(line,')');
-        params.MRFFA = str2double(split(line(2),' '));
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        tmp =  rmmissing(tmp); % Removes Nans
+        params.MRFFA = tmp(2:end);
     end
 
     % Extract number of channels used to record data
@@ -390,14 +395,15 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = splitlines(line);
         params.MRFNPrepModules = str2num(line{1});
     end
-    k = strfind(TextAsCells,"$MRFFAList=");
-    idx = find(~cellfun(@isempty,k));
-    if (isempty(idx) ~=1)
-        line = TextAsCells(idx);
-        params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
-        line = split(line,')');
-        params.MRFFA = str2double(split(line(2),' '));
-    end
+    % k = strfind(TextAsCells,"$MRFFAList=");
+    % idx = find(~cellfun(@isempty,k));
+    % if (isempty(idx) ~=1)
+    %     line = TextAsCells(idx);
+    % 
+    %     params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+    %     line = split(line,')');
+    %     params.MRFFA = str2double(split(line(2),' '));
+    % end
 
 
     k = strfind(TextAsCells,"$MRFSpoiler=");
@@ -612,10 +618,10 @@ function params = LoadBrukerData(path,loadDataFlag)
     %% Load imaging data if required
     if (loadDataFlag == true)
         fileName = strcat(path,'\','rawdata.job0');
-        fid = fopen(fileName,'r','native');
+        fid = fopen(fullfile(fileName),'r','native');
         if (fid == -1)
             fileName = strcat(path,'\','fid');
-            fid = fopen(fileName,'r','native');
+            fid = fopen(fullfile(fileName),'r','native');
         end
         if (fid ~= -1)
             fseek(fid,0,'bof');

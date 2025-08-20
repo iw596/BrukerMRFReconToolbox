@@ -3,7 +3,7 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
         imgs = [];
         dict = [];
         LUT = [];
-        options.EstimateB1Map = true;
+        options.EstimateB1Map = false;
         options.B1Map = [];
         options.parallelFlag = false;
     end
@@ -133,6 +133,8 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
     res.MRFT1Map = T1Map;
     res.MRFT2Map = T2Map;
     res.indexMap = indexMap;
-    res.MRFB1Map = MRFB1Map;
+    if (options.EstimateB1Map == true)
+        res.MRFB1Map = MRFB1Map;
+    end
    
 end
