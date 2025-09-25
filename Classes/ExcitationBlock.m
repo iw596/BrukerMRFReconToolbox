@@ -17,15 +17,12 @@ classdef ExcitationBlock
         %% T_Rise is the gradient rise time. All times are in second, all gradient ampltidues are in Hz/cm, B1 amplitude is in Hz
         function obj = ExcitationBlock(B1,FANom,GA_SS,T_SS,GA_Rphs,T_SR,T_Rise,dt)
             % Set-up slice selection gradient
-            nr = round(T_Rise/dt);
-            nf_SS = round(T_SS/dt);
+            nr = round(T_Rise/dt); % Number of points for gradient rise time
+            nf_SS = round(T_SS/dt); % Number of flat-top points on  slice selection gradient
+            nf_SR = round(T_SR/dt); % Number of flat-top points of slice rephasing gradient
+
         end
     
-        function outputArg = method1(obj,inputArg)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
-            outputArg = obj.Property1 + inputArg;
-        end
 
         function M = RunRFSimulation(obj,M,FA,plotFlag)
             if (nargin < 4)

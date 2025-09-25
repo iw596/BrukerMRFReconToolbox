@@ -489,6 +489,17 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.MRFT2InversionPulse.power = str2double(cell2mat(tmp(end-1)));
     end
 
+    k = strfind(TextAsCells,"T2PrepPulse3=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFT2BIRPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.MRFT2BIRPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFT2BIRPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
     k = strfind(TextAsCells,"PVM_TrajKx=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -583,7 +594,7 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'='));
-        params.EPICB1Map.RFPulseEnd = str2double(line);
+        params.EPICB1Map.RFPulseEnd = str2double(line(1));
     end
 
     k = strfind(TextAsCells,"ShotWait=");
