@@ -626,6 +626,17 @@ function params = LoadBrukerData(path,loadDataFlag)
     end
     
 
+    k = strfind(TextAsCells,"PVM_ObjOrderList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.sliceOrder = tmp(2:end)+1;
+    end
+
     %% Load imaging data if required
     if (loadDataFlag == true)
         fileName = strcat(path,'\','rawdata.job0');
