@@ -639,10 +639,10 @@ function params = LoadBrukerData(path,loadDataFlag)
 
     %% Load imaging data if required
     if (loadDataFlag == true)
-        fileName = strcat(path,'\','rawdata.job0');
+        fileName = strcat(path,'/','rawdata.job0');
         fid = fopen(fullfile(fileName),'r','native');
         if (fid == -1)
-            fileName = strcat(path,'\','fid');
+            fileName = strcat(path,'/','fid');
             fid = fopen(fullfile(fileName),'r','native');
         end
         if (fid ~= -1)
@@ -655,7 +655,7 @@ function params = LoadBrukerData(path,loadDataFlag)
 
             %% Load calibration data if present
             if (params.Calibration == true)
-                fileName = strcat(path,'\','rawdata.job1');
+                fileName = strcat(path,'/','rawdata.job1');
                 fid = fopen(fileName,'r','native');
                 fseek(fid,0,'bof');
                 rawdata = fread(fid,'int32');
