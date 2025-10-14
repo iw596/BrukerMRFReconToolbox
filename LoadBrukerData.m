@@ -290,7 +290,9 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.BW = str2double(cell2mat(tmp(2)));
+        params.ExcPulse.power = str2double(cell2mat(tmp(end-1)));
     end
 
     k = strfind(TextAsCells,'$ExcPul=');
@@ -299,9 +301,12 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.BW = str2double(cell2mat(tmp(2)));
+        params.ExcPulse.power = str2double(cell2mat(tmp(end-1)));
     end
     
+
     k = strfind(TextAsCells,'$ExcPulShape=');
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)

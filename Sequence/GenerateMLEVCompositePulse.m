@@ -5,7 +5,8 @@ function [RF,dur] = GenerateMLEVCompositePulse(tau,dt,phaseSwitch)
     dur = tau*4; % x4 as two 90 degree pulses and one 180 degree pulse
     
     if (phaseSwitch == false)   
-    % Gem
+        RFPosx = GenerateBlockPulse(pi/2,dur,dt,0);
+        RFPosy = GenerateBlockPulse(pi/2,dur,dt,0);
     else
     end
 
