@@ -527,6 +527,51 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.ky = tmp(2:end);
     end
 
+
+    k = strfind(TextAsCells,"PVM_SpiralInterleavCos=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_SpiralInterleavCos = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_SpiralInterleavSin=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_SpiralInterleavSin = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRF_InterShotSpiralInterleavCos=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.MRF_InterShotSpiralInterleavCos = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRF_InterShotSpiralInterleavSin=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.MRF_InterShotSpiralInterleavSin = tmp(2:end);
+    end
+
     k = strfind(TextAsCells,"PVM_SpiralSize=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -560,6 +605,15 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.MRFNoInterleaves = str2double(line{1});
     end
 
+    k = strfind(TextAsCells,"MRF_SpiralInPlaneAcclerationFactor");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Traj.MRF_SpiralInPlaneAcclerationFactor = str2double(line{1});
+    end
+
     k = strfind(TextAsCells,"PVM_TrajKScale=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -571,7 +625,7 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.PVM_TrajKScale = tmp(2:end);
     end
 
-    k = strfind(TextAsCells,"EnableMRFSpiralRotation=");
+    k = strfind(TextAsCells,"MRFInterShotRotYesNo=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);

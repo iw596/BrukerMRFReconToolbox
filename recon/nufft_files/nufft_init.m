@@ -255,7 +255,7 @@ end, clear c arg gam phase phase_scale koff N J K
 % build sparse matrix that is [M,*Kd]
 % with *Jd nonzero entries per frequency point
 %
-if dd >= 3, printf('Needs at least %g Gbyte RAM', prod(Jd)*M*8/10^9*2), end
+if dd >= 3, fprintf('Needs at least %g Gbyte RAM', prod(Jd)*M*8/10^9*2), end
 
 kk = kd{1};	% [J1,M]
 uu = ud{1};	% [J1,M]
