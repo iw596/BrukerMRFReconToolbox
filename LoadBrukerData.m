@@ -653,6 +653,7 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
         params.EPICB1Map.RFPulseEnd = str2double(line(1));
     end
 
@@ -694,6 +695,28 @@ function params = LoadBrukerData(path,loadDataFlag)
         tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
         tmp = str2double(tmp);
         params.sliceOrder = tmp(2:end)+1;
+    end
+
+    k = strfind(TextAsCells,"MRF_spatial_phase_1_coords=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.CartPE1 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
+    end
+
+    k = strfind(TextAsCells,"MRF_spatial_phase_2_coords=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.CartPE2 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
     end
 
     %% Load imaging data if required
