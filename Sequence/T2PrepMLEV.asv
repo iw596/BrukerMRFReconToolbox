@@ -31,9 +31,6 @@ classdef T2PrepMLEV
             % Create first wait period (TE/8)
             d1 = obj.TE/8;
 
-            % Generate first composite pulse
-            
-        
 
             
         end
