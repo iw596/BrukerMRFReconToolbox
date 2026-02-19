@@ -203,7 +203,7 @@ function params = LoadBrukerData(path,loadDataFlag)
         sliceSpoiler.duration = str2num(tmp{3})/1000; % Spoiler duration in s
         sliceSpoiler.NCycles = str2num(tmp{2});
         amp = cell2mat(tmp(4));
-        amp = amp(1:end-1);
+        %amp = amp(1:end-1);
         sliceSpoiler.amplitude = str2double(amp);
         params.sliceSpoiler = sliceSpoiler;
     end
@@ -290,7 +290,9 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.BW = str2double(cell2mat(tmp(2)));
+        params.ExcPulse.power = str2double(cell2mat(tmp(end-1)));
     end
 
     k = strfind(TextAsCells,'$ExcPul=');
@@ -299,9 +301,12 @@ function params = LoadBrukerData(path,loadDataFlag)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'=('));
         tmp = strsplit(line,',');
-        params.ExcRFDur = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.BW = str2double(cell2mat(tmp(2)));
+        params.ExcPulse.power = str2double(cell2mat(tmp(end-1)));
     end
     
+
     k = strfind(TextAsCells,'$ExcPulShape=');
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -522,6 +527,51 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.ky = tmp(2:end);
     end
 
+
+    k = strfind(TextAsCells,"PVM_SpiralInterleavCos=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_SpiralInterleavCos = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_SpiralInterleavSin=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_SpiralInterleavSin = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRF_InterShotSpiralInterleavCos=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.MRF_InterShotSpiralInterleavCos = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRF_InterShotSpiralInterleavSin=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.MRF_InterShotSpiralInterleavSin = tmp(2:end);
+    end
+
     k = strfind(TextAsCells,"PVM_SpiralSize=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -555,6 +605,15 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.MRFNoInterleaves = str2double(line{1});
     end
 
+    k = strfind(TextAsCells,"MRF_SpiralInPlaneAcclerationFactor");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Traj.MRF_SpiralInPlaneAcclerationFactor = str2double(line{1});
+    end
+
     k = strfind(TextAsCells,"PVM_TrajKScale=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
@@ -566,7 +625,7 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.PVM_TrajKScale = tmp(2:end);
     end
 
-    k = strfind(TextAsCells,"EnableMRFSpiralRotation=");
+    k = strfind(TextAsCells,"MRFInterShotRotYesNo=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
@@ -594,6 +653,7 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
         params.EPICB1Map.RFPulseEnd = str2double(line(1));
     end
 
@@ -635,6 +695,28 @@ function params = LoadBrukerData(path,loadDataFlag)
         tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
         tmp = str2double(tmp);
         params.sliceOrder = tmp(2:end)+1;
+    end
+
+    k = strfind(TextAsCells,"MRF_spatial_phase_1_coords=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.CartPE1 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
+    end
+
+    k = strfind(TextAsCells,"MRF_spatial_phase_2_coords=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.CartPE2 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
     end
 
     %% Load imaging data if required

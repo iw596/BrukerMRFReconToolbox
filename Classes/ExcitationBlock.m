@@ -20,7 +20,12 @@ classdef ExcitationBlock
             nr = round(T_Rise/dt); % Number of points for gradient rise time
             nf_SS = round(T_SS/dt); % Number of flat-top points on  slice selection gradient
             nf_SR = round(T_SR/dt); % Number of flat-top points of slice rephasing gradient
-
+           
+            % Create slice selection gradient shape
+            ru = (round(1:1:nr(ii))-0.5) / nr;
+            ft = ones(1, nf_SS);
+            rd = (round(nr:-1:1)-0.5) /nr;
+            Grad_SS  = GA_SS * [ru, ft, rd];
         end
     
 
