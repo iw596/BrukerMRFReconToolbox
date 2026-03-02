@@ -1,6 +1,6 @@
 
 addpath(genpath("./."));
-params = LoadBrukerData("C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\10");
+params = LoadBrukerData("Data/MouseBrain_20022026/11",false);
 FA = pi/2;
 RFwaveform = params.ExcRFShape;
 RFDur = params.ExcRFDur;

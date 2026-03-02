@@ -54,14 +54,6 @@ classdef T2PrepMLEV
             % Create third wait period (TE/4)
             d3 = d2;
 
-            % Create fourth wait period (TE/4);
-            d4 = d3;
-
-            % Create final wait period (TE/8)
-            
-            d5 = TE/8 - (tau/2 + (3.*tau + 4.*tau/)2); % Take into account RF pulse durations
-
-
 
             % Run bloch-simulation
             [mx,my,mz] = bloch_Hz(InversionB1,zeros(length(B1TipDown),1),dt,T1,T2,df,dp,dv,0,M(1,:),M(2,:),M(3,:));

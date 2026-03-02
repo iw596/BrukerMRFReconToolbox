@@ -210,10 +210,11 @@ function params = LoadBrukerData(path,loadDataFlag)
     
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RefPowCh1'));
     line = TextAsCells(mask);
-    line = strtrim(extractAfter(cell2mat(line),'='));
-    line = splitlines(line);
-    params.RefPow = str2num(cell2mat(line(1)));
-        
+    if (isempty(line) ~=1)
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.RefPow = str2num(cell2mat(line(1)));
+    end
     
     % Extract Bloch Siegert frequency offset in Hz
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSFreqOffset'));
