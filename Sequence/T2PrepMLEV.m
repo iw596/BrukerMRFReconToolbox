@@ -41,15 +41,24 @@ classdef T2PrepMLEV
             B1_270xpos = GenerateBlockPulse(3*pi/2,tau*3,dt,0) * gyro; % Multiply by gyro to get to Hz unit
             % set-up 360 (-x) pulse
             B1_360xneg = GenerateBlockPulse(2*pi,tau*4,dt,pi) * gyro; % Multiply by gyro to get to Hz unit
+            
 
+            % Generate (+y) composite pulse
+            compPulsePos = [B1_90xpos,B1_180ypos,B1_90xpos];
+            
+            % Generate (-y) composite pulse
+            compPulseNeg = [B1_90xneg,B1_180yneg,B1_90xneg];  
 
+            % Generate tip-up pulse (-x)
+            tipUpPulse = [B1_270xpos,B1_360xneg];
+        
             % Create first wait period (TE/8)
             d1 = TE/8 - (tau/2 + tau + tau*2/2); % Take into account RF pulse durations
-            d1 = zeros([round(d1./dt),1]);
+            d1 = zeros([1,round(d1./dt)]);
 
             % Create the second wait period (TE/4)
             d2 = TE/4 - (tau*2/2 + tau + tau + tau*2/2); % Take into account RF pulse durations
-            d2 = zeros([round(d1./dt),1]);
+            d2 = zeros([1,round(d2./dt),1]);
             
             % Create third wait period (TE/4)
             d3 = d2;
@@ -58,15 +67,16 @@ classdef T2PrepMLEV
             d4 = d3;
 
             % Create final wait period (TE/8)
+            d5 = TE/8 - (2.*tau/2 +tau+ (3.*tau + 4.*tau)./2); % Take into account RF pulse durations
+            d5 = zeros([1,round(d5./dt),1]);
+
             
-            d5 = TE/8 - (tau/2 + (3.*tau + 4.*tau/)2); % Take into account RF pulse durations
-
-
+            % Set-up B1 matrix
+            B1 = [B1_90xpos,d1,compPulsePos,d2,compPulsePos,d3,compPulseNeg,d4,compPulseNeg,d5,tipUpPulse];
 
             % Run bloch-simulation
-            [mx,my,mz] = bloch_Hz(InversionB1,zeros(length(B1TipDown),1),dt,T1,T2,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            [mx,my,mz] = bloch_Hz(B1,zeros(length(B1),1),dt,T1,T2,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
             M = [mx(:)'; my(:)'; mz(:)'];   % Forces column
-            outputArg = obj.Property1 + inputArg;
         end
 
         function GenerateModule(obj)
