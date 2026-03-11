@@ -7,13 +7,15 @@ classdef T2PrepMLEV
         tau = []
         dt = [];
         gyro = 42.577e6; %Hz/T
+        G = [];
     end
 
-    methods
-        function obj = T2PrepMLEV(TE,tau,dt)
+    methods (Access = public)
+        function obj = T2PrepMLEV(TE,tau,dt,riseTime,flatTime,spoilerAmp)
             obj.TE = TE;
             obj.tau = tau;
             obj.dt = dt;
+            obj.G = GenerateGradientWaveform(riseTime,flatTime,spoilerAmp,dt);
         end
 
         function M = run(obj,M,T1,T2,df,dp,dv,index)
@@ -72,26 +74,36 @@ classdef T2PrepMLEV
 
             
             % Set-up B1 matrix
-            B1 = [B1_90xpos,d1,compPulsePos,d2,compPulsePos,d3,compPulseNeg,d4,compPulseNeg,d5,tipUpPulse];
+            B1 = [B1_90xpos,d1,compPulsePos,d2,compPulsePos,d3,compPulseNeg,d4,compPulseNeg,d5,tipUpPulse,zeros(length(obj.G),1)];
+
+            % Set-up Gradient matrix
+            G = [zeros(size(B1),obj.G)]; % Combine the gradient waveform with zeros for timing
 
             % Run bloch-simulation
-            [mx,my,mz] = bloch_Hz(B1,zeros(length(B1),1),dt,T1,T2,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            [mx,my,mz] = bloch_Hz(B1,G,dt,T1,T2,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
             M = [mx(:)'; my(:)'; mz(:)'];   % Forces column
         end
 
-        function GenerateModule(obj)
-            FA = pi/2;
-            gamma = 42.57e6;
-            B1 = [];
-            % Generate the initial 90 (+x) degree pulse
-            RF90 = one
-            
 
+    end
 
-            % Generate first composite pulse
+    methods (Access = protected)
+        % Generates the trapezoidal spoiler gradient waveform. Code based on:
+        % https://github.com/JosephGWoods/ISMRM2022_VSASL_Bloch_Simulations/blob/main/PulseGen/gengrad.m
+        function G3xN = GenerateGradientWaveform(riseTime,flatTime,Gmax,dt)
             
+            nr = round(riseTime./dt); % ramp time resolution
+            nf = round(flatTime./dt); % flat top time resolution
+            ru = (round(1:1:nr)-0.5) / nr;
+            ft = ones(1, nf);
+            rd = (round(nr:-1:1)-0.5) / nr;
+            G  = Gmax * [ru, ft, rd];
+             % assume G is a 1xN row vector
+            G = G(:).';                   % ensure G is a row vector
+            N = numel(G);
+            G3xN = [zeros(2, N); G];      % 3xN matrix, rows 1-2 are zeros, row 3 is G
+
         end
-
     end
 
     
