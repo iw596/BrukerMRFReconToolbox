@@ -1,0 +1,107 @@
+addpath("Simulations\")
+addpath("recon\")
+addpath("B1Mapping\")
+addpath("Fitting\")
+addpath(genpath("qMRLab-2.4.2\"))
+
+
+%% Open bruker MRF dataset
+%pth = "datasets\MRF_ISMRM_Dataset\17";
+pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35";
+params = LoadBrukerData(pth);
+
+
+
+%% Reconstruct data (assuming 128 points,64 lines and 600 FA)
+rawdata  = params.data;
+%[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
+[FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
+rawdata = reshape(rawdata, [params.NCol length(FA)*8 params.NLin]);
+rawdata = permute(rawdata, [1 3 2]);
+imgs = ifftcn(rawdata,[1 2]);
+figure(1); plot(FA); title("Flip Angle Pattern");
+%% Create binary mask from mean of images
+se = strel('disk', 20, 0);
+mask = mean(imgs,3);
+mask = imbinarize(mat2gray(abs(mask)));
+
+
+% Normalise Dictionary
+normalisedDict = zeros(size(dict));
+
+cnt=size(dict,2);
+parfor c = 1:cnt  
+    scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
+    normalisedDict(:,c) = dict(:,c) / scaleFactor;
+end
+T1Map = [];
+T2Map = [];
+indexMap = [];
+% Iterate through each voxel
+parfor i = 1:128
+    i
+    for j = 1:128
+
+       scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
+       normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
+       inner_product=abs(squeeze(normalized_mrfsignal)'* (normalisedDict));
+       % Find best matching pattern
+       [maxValue, max_index] = max(abs(inner_product));
+       T1Map(i,j) = LUT(max_index,1);
+       T2Map(i,j) = LUT(max_index,2);
+       MRFMask(i,j) = 1;
+       dotProductMaximums(i,j) = maxValue;
+       indexMap(i,j) = max_index;
+
+    end
+end
+figure(13);
+subplot(2,1,1); plot(squeeze(angle(imgs(56,108,:)))); hold on; plot(angle((normalisedDict(:,end))));
+subplot(2,1,2); plot(squeeze(imag(imgs(56,108,:)))); hold on; plot(imag((normalisedDict(:,end))));
+
+
+%% Load T1 FAIR RARE
+pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\33";
+params = LoadBrukerData(pth);
+fid = fopen(pth + '\pdata\1\2dseq');
+data = fread(fid,"int16");
+data = reshape(data,[params.NCol 128 1 params.NInv]);
+fclose(fid);
+
+Model = inversion_recovery;
+% TI in ms
+TI = [params.InvTimes];
+Model.Prot.IRData.Mat = [TI];
+Model.Prot.TimingTable.Mat = [params.TR * 1000];
+T1RefData = struct();
+T1RefData.IRData = double(data);
+T1FitResults = FitData(T1RefData,Model,0);
+
+
+
+
+%% Load T2 MSME
+pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\34";
+params = LoadBrukerData(pth);
+fid = fopen(pth + '\pdata\1\2dseq');
+data = fread(fid,"int16");
+data = reshape(data,[params.NCol 128 1 params.NEcho]);
+fclose(fid);
+
+
+Model = mono_t2;
+EchoTime  = params.MSMETimes;
+% EchoTime (ms) is a vector of [30X1]
+Model.Prot.SEdata.Mat = [EchoTime];
+T2MSMEdata = struct();
+T2MSMEdata.SEdata=double(data);
+T2FitResults = FitData(T2MSMEdata,Model,0);
+
+
+figure(2); 
+subplot(1,2,1); imagesc(T1Map,[0,2500]); colormap("turbo"); colorbar; title("MRF T1 Map")
+subplot(1,2,2); imagesc(T1FitResults.T1); colormap("turbo"); colorbar; title("Ref T1 Map")
+
+figure(3); 
+subplot(1,2,1);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
+subplot(1,2,2);imagesc(T2FitResults.T2,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;

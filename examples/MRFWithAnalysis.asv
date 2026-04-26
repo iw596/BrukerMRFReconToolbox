@@ -1,0 +1,302 @@
+addpath("Simulations\")
+addpath("recon\")
+addpath("B1Mapping\")
+addpath("Fitting\")
+
+
+%% Open bruker MRF dataset
+%pth = "datasets\MRF_ISMRM_Dataset\17";
+pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\35";
+params = LoadBrukerData(pth);
+
+
+
+%% Reconstruct data (assuming 128 points,64 lines and 600 FA)
+rawdata  = params.data;
+%[FA,TR] = ReadMRFList("datasets\MRFPattern.txt");
+[FA,~] = ReadMRFList("datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\MRFPattern.txt");
+rawdata = reshape(rawdata, [params.NCol length(FA)*8 params.NLin]);
+rawdata = permute(rawdata, [1 3 2]);
+imgs = ifftcn(rawdata,[1 2]);
+figure(1); plot(FA); title("Flip Angle Pattern");
+%% Create binary mask from mean of images
+se = strel('disk', 20, 0);
+mask = mean(imgs,3);
+mask = imbinarize(mat2gray(abs(mask)));
+
+
+% Normalise Dictionary
+normalisedDict = zeros(size(dict));
+
+cnt=size(dict,2);
+parfor c = 1:cnt  
+    scaleFactor = sqrt(sum(dict(:,c).*conj(dict(:,c))));
+    normalisedDict(:,c) = dict(:,c) / scaleFactor;
+end
+T1Map = [];
+T2Map = [];
+% Iterate through each voxel
+parfor i = 1:128
+    i
+    for j = 1:128
+
+       scaleFactor = sqrt(sum(imgs(i,j,:).*conj(imgs(i,j,:))));
+       normalized_mrfsignal = conj(imgs(i,j,:))/scaleFactor;
+       inner_product=abs(squeeze(normalized_mrfsignal)'* (normalisedDict));
+       % Find best matching pattern
+       [maxValue, max_index] = max(abs(inner_product));
+       T1Map(i,j) = LUT(max_index,1);
+       T2Map(i,j) = LUT(max_index,2);
+       MRFMask(i,j) = 1;
+       dotProductMaximums(i,j) = maxValue;
+
+    end
+end
+
+
+%% Load T1 FAIR RARE
+pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\33";
+params = LoadBrukerData(pth);
+fid = fopen(pth + '\pdata\1\2dseq');
+data = fread(fid,"int16");
+data = reshape(data,[params.NCol 128 params.NInv]);
+fclose(fid);
+T1RefMap = T1Fitting(data,params.InvTimes);
+
+%% Load T2 MSME
+pth = "datasets\20250211_141529_IW_Phantom_NiCl2_MRF_Dev_11_02_2025_1_5\34";
+params = LoadBrukerData(pth);
+fid = fopen(pth + '\pdata\1\2dseq');
+data = fread(fid,"int16");
+data = reshape(data,[params.NCol 128 params.NEcho]);
+T2RefMapMask = imbinarize(mat2gray(data));
+T2RefMapMask = T2RefMapMask(:,:,1);
+fclose(fid);
+T2RefMap = T2Fitting(data,params.MSMETimes);
+
+figure(2); 
+subplot(1,2,1); imagesc(T1Map,[0,2500]); colormap("turbo"); colorbar; title("MRF T1 Map")
+subplot(1,2,2); imagesc(T1RefMap,[0,2500]); colormap("turbo"); colorbar; title("Ref T1 Map")
+
+figure(3); 
+subplot(1,2,1);imagesc(T2Map,[0,500]); colormap("turbo"); colorbar; title("MRF T2 Map"); axis square;
+subplot(1,2,2);imagesc(T2RefMap,[0,500]); colormap("turbo"); colorbar; title("Ref T2 Map"); axis image;
+
+
+
+
+
+
+ROI1Row = [93:103];
+ROI1Col = [34:44];
+T1MRFROI1 = T1Map(ROI1Row,ROI1Col);
+T1MRFROI1Mean = mean(T1Map(ROI1Row,ROI1Col),'all');
+T1MRFROI1Std = std(T1MRFROI1,1,"all");
+T1RefROI1 = mean(T1RefMap(ROI1Row,ROI1Col),'all');
+
+ROI2Row = [67:77];
+ROI2Col = [18:28];
+T1MRFROI2 = T1Map(ROI2Row,ROI2Col);
+T1MRFROI2Mean = mean(T1Map(ROI2Row,ROI2Col),'all');
+T1MRFROI2Std = std(T1MRFROI2,1,"all");
+T1RefROI2 = mean(T1RefMap(ROI2Row,ROI2Col),'all');
+
+ROI3Row = [39:49];
+ROI3Col = [22:32];
+T1MRFROI3 = T1Map(ROI3Row,ROI3Col);
+T1MRFROI3Mean = mean(T1Map(ROI3Row,ROI3Col),'all');
+T1MRFROI3Std = std(T1MRFROI3,1,"all");
+T1RefROI3 = mean(T1RefMap(ROI3Row,ROI3Col),'all');
+
+ROI4Row = [20:30];
+ROI4Col = [46:56];
+T1MRFROI4 = T1Map(ROI4Row,ROI4Col);
+T1MRFROI4Mean = mean(T1Map(ROI4Row,ROI4Col),'all');
+T1MRFROI4Std = std(T1MRFROI4,1,"all");
+T1RefROI4 = mean(T1RefMap(ROI4Row,ROI4Col),'all');
+
+ROI5Row = [49:59];
+ROI5Col = [62:72];
+T1MRFROI5 = T1Map(ROI5Row,ROI5Col);
+T1MRFROI5Mean = mean(T1Map(ROI5Row,ROI5Col),'all');
+T1MRFROI5Std = std(T1MRFROI5,1,"all");
+T1RefROI5 = mean(T1RefMap(ROI5Row,ROI5Col),'all');
+
+
+ROI6Row = [98:108];
+ROI6Col = [71:81];
+T1MRFROI6 = T1Map(ROI6Row,ROI6Col);
+T1MRFROI6Mean = mean(T1Map(ROI6Row,ROI6Col),'all');
+T1MRFROI6Std = std(T1MRFROI6,1,"all");
+T1RefROI6 = mean(T1RefMap(ROI6Row,ROI6Col),'all');
+
+ROI7Row = [81:92];
+ROI7Col = [92:102];
+RefROI7Row = [52:62];
+RefROI7Col = [9:106];
+T1MRFROI7 = T1Map(ROI7Row,ROI7Col);
+T1MRFROI7Mean = mean(T1Map(ROI7Row,ROI7Col),'all');
+T1MRFROI7Std = std(T1MRFROI7,1,"all");
+T1RefROI7 = mean(T1RefMap(ROI7Row,ROI7Col),'all');
+
+MRFROI8Row = [52:62];
+MRFROI8Col = [100:110];
+RefROI8Row = [52:62];
+RefROI8Col = [94:106];
+T1MRFROI8 = T1Map(ROI8Row,ROI8Col);
+T1MRFROI8Mean = mean(T1Map(ROI8Row,ROI8Col),'all');
+T1MRFROI8Std = std(T1MRFROI8,1,"all");
+T1RefROI8 = mean(T1RefMap(RefROI8Row,RefROI8Col),'all');
+
+
+
+
+MRFT1MeanRes = [T1MRFROI1Mean,T1MRFROI2Mean,T1MRFROI3Mean,T1MRFROI4Mean,T1MRFROI5Mean,T1MRFROI6Mean,T1MRFROI7Mean,T1MRFROI8Mean];
+RefT1MeanRes = [T1RefROI1,T1RefROI2,T1RefROI3,T1RefROI4,T1RefROI5,T1RefROI6,T1RefROI7,T1RefROI8];
+SD = [T1MRFROI1Std,T1MRFROI2Std,T1MRFROI3Std,T1MRFROI4Std,T1MRFROI5Std,T1MRFROI6Std,T1MRFROI7Std,T1MRFROI8Std];
+% Fit a polynomial p of degree 1 to the data:
+degree = 1;
+p = polyfit(RefT1MeanRes,MRFT1MeanRes,degree);
+
+% Evaluate the fitted polynomial p and plot:
+f = polyval(p,RefT1MeanRes);
+eqn = poly_equation(p); % polynomial equation (string)
+Rsquared = my_Rsquared_coeff(MRFT1MeanRes,f); % correlation coefficient
+
+
+
+
+figure(3);
+plot(RefT1MeanRes,MRFT1MeanRes,'x',RefT1MeanRes,f,'--',LineWidth=2)
+hold on;
+% Add error bars for standard deviation
+errorbar(RefT1MeanRes, MRFT1MeanRes, SD, 'LineStyle', 'none', 'Color', 'k', 'CapSize', 10);
+plot(RefT1MeanRes,MRFT1MeanRes,'x',RefT1MeanRes,f,'--',LineWidth=2)
+legend('data',eqn)
+xlabel("T1 ground truth [ms]","Fontsize",20);
+ylabel("T1 MRF [ms]","Fontsize",20)
+axis = gca;
+axis.FontSize = 20;
+title(['Data fit - R squared = ' num2str(Rsquared)]);
+
+
+
+
+%% Repeat analysis for T2
+ROI1Row = [93:103];
+ROI1Col = [34:44];
+RefROI1Row = [92:101];
+RefROI1Col = [41:51];
+T2MRFROI1 = T2Map(ROI1Row,ROI1Col);
+T2MRFROI1Mean = mean(T2Map(ROI1Row,ROI1Col),'all');
+T2MRFROI1Std = std(T2MRFROI1,1,"all");
+T2RefROI1 = mean(T2RefMap(RefROI1Row,RefROI1Col),'all');
+
+ROI2Row = [67:77];
+ROI2Col = [18:28];
+T2MRFROI2 = T2Map(ROI2Row,ROI2Col);
+T2MRFROI2Mean = mean(T2Map(ROI2Row,ROI2Col),'all');
+T2MRFROI2Std = std(T2MRFROI2,1,"all");
+T2RefROI2 = mean(T2RefMap(ROI2Row,ROI2Col),'all');
+
+ROI3Row = [39:49];
+ROI3Col = [32:42];
+T2MRFROI3 = T2Map(ROI3Row,ROI3Col);
+T2MRFROI3Mean = mean(T2Map(ROI3Row,ROI3Col),'all');
+T2MRFROI3Std = std(T2MRFROI3,1,"all");
+T2RefROI3 = mean(T2RefMap(ROI3Row,ROI3Col),'all');
+
+ROI4Row = [20:30];
+ROI4Col = [56:66];
+T2MRFROI4 = T2Map(ROI4Row,ROI4Col);
+T2MRFROI4Mean = mean(T2Map(ROI4Row,ROI4Col),'all');
+T2MRFROI4Std = std(T2MRFROI4,1,"all");
+T2RefROI4 = mean(T2RefMap(ROI4Row,ROI4Col),'all');
+
+ROI5Row = [49:59];
+ROI5Col = [62:72];
+T2MRFROI5 = T2Map(ROI5Row,ROI5Col);
+T2MRFROI5Mean = mean(T2Map(ROI5Row,ROI5Col),'all');
+T2MRFROI5Std = std(T2MRFROI5,1,"all");
+T2RefROI5 = mean(T2RefMap(ROI5Row,ROI5Col),'all');
+
+
+ROI6Row = [98:108];
+ROI6Col = [71:81];
+T2MRFROI6 = T2Map(ROI6Row,ROI6Col);
+T2MRFROI6Mean = mean(T2Map(ROI6Row,ROI6Col),'all');
+T2MRFROI6Std = std(T2MRFROI6,1,"all");
+T2RefROI6 = mean(T2RefMap(ROI6Row,ROI6Col),'all');
+
+ROI7Row = [81:92];
+ROI7Col = [92:102];
+RefROI7Row = [52:62];
+RefROI7Col = [9:106];
+T2MRFROI7 = T2Map(ROI7Row,ROI7Col);
+T2MRFROI7Mean = mean(T2Map(ROI7Row,ROI7Col),'all');
+T2MRFROI7Std = std(T2MRFROI7,1,"all");
+T2RefROI7 = mean(T2RefMap(ROI7Row,ROI7Col),'all');
+
+MRFROI8Row = [52:62];
+MRFROI8Col = [100:110];
+RefROI8Row = [52:62];
+RefROI8Col = [94:106];
+T2MRFROI8 = T1Map(ROI8Row,ROI8Col);
+T2MRFROI8Mean = mean(T2Map(ROI8Row,ROI8Col),'all');
+T2MRFROI8Std = std(T2MRFROI8,1,"all");
+T2RefROI8 = mean(T2RefMap(RefROI8Row,RefROI8Col),'all');
+
+
+
+
+MRFT2MeanRes = [T2MRFROI1Mean,T2MRFROI2Mean,T2MRFROI3Mean,T2MRFROI4Mean,T2MRFROI5Mean,T2MRFROI6Mean,T2MRFROI7Mean,T2MRFROI8Mean];
+RefT2MeanRes = [T2RefROI1,T2RefROI2,T2RefROI3,T2RefROI4,T2RefROI5,T2RefROI6,T2RefROI7,T2RefROI8];
+SD = [T2MRFROI1Std,T2MRFROI2Std,T2MRFROI3Std,T2MRFROI4Std,T2MRFROI5Std,T2MRFROI6Std,T2MRFROI7Std,T2MRFROI8Std];
+% Fit a polynomial p of degree 1 to the data:
+degree = 1;
+p = polyfit(RefT2MeanRes,MRFT2MeanRes,degree);
+
+% Evaluate the fitted polynomial p and plot:
+f = polyval(p,RefT2MeanRes);
+eqn = poly_equation(p); % polynomial equation (string)
+Rsquared = my_Rsquared_coeff(MRFT2MeanRes,f); % correlation coefficient
+
+
+
+
+figure(4);
+plot(RefT2MeanRes,MRFT2MeanRes,'x',RefT2MeanRes,f,'--',LineWidth=2)
+hold on;
+% Add error bars for standard deviation
+errorbar(RefT2MeanRes, MRFT2MeanRes, SD, 'LineStyle', 'none', 'Color', 'k', 'CapSize', 10);
+plot(RefT2MeanRes,MRFT2MeanRes,'x',RefT2MeanRes,f,'--',LineWidth=2)
+legend('data',eqn)
+xlabel("T2 ground truth [ms]","Fontsize",20);
+ylabel("T2 MRF [ms]","Fontsize",20)
+axis = gca;
+axis.FontSize = 20;
+title(['Data fit - R squared = ' num2str(Rsquared)]);
+
+
+% Remove some points
+degree = 1;
+p = polyfit(RefT2MeanRes(1:4),MRFT2MeanRes(1:4),degree);
+
+% Evaluate the fitted polynomial p and plot:
+f = polyval(p,RefT2MeanRes(1:4));
+eqn = poly_equation(p); % polynomial equation (string)
+Rsquared = my_Rsquared_coeff(MRFT2MeanRes(1:4),f); % correlation coefficient
+
+figure(5);
+plot(RefT2MeanRes(1:4),MRFT2MeanRes(1:4),'x',RefT2MeanRes(1:4),f,'--',LineWidth=2)
+hold on;
+% Add error bars for standard deviation
+errorbar(RefT2MeanRes(1:4), MRFT2MeanRes(1:4), SD(1:4), 'LineStyle', 'none', 'Color', 'k', 'CapSize', 10);
+plot(RefT2MeanRes(1:4),MRFT2MeanRes(1:4),'x',RefT2MeanRes(1:4),f,'--',LineWidth=2)
+legend('data',eqn)
+xlabel("T2 ground truth [ms]","Fontsize",20);
+ylabel("T2 MRF [ms]","Fontsize",20)
+axis = gca;
+axis.FontSize = 20;
+title(['Data fit - R squared = ' num2str(Rsquared)]);
+

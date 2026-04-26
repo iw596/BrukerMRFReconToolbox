@@ -1,0 +1,59 @@
+%%% This function simulates the inversion preparation module
+%%% we define inversion time as the center of the inversion pulse to the
+%%% center of the excitation pulse. Therefore, if we do not assume instant
+%%% RF exitation we need to account for the non-zero exciation and
+%%% inverision pulse lengths. To do this we pass two additional parameters
+%%% InversionRFDur and ExcTime. The latter accounts for the contribution of
+%%% (half) of the exciation pulse (and risetime of slice selection gradient)
+
+function InversionModule(M,TI,T1,T2,options)
+    arguments
+        M double % Magnetization
+        TI double % Inversion time (seconds)
+        T1 double 
+        T2 double
+        options.dt = 0 
+        options.InversionRF = [] % In units of T
+        options.InversionRFDur = 0
+        options.ExcTime  = 0% Inversion time is defined as time between cet 
+        options.gradient_waveform = [];
+        options.spoilerDur  = 0
+        options.pos = [];
+        options.ignore_decay = false
+        options.df = 0;
+    end
+    
+    if (~isempty(options.InversionRF) || ~isempty(options.gradient_waveform)) && options.dt ==0
+        error("Time-step is zero but a waveform is desired");
+        return;
+    end
+    
+    if (~isempty(options.InversionRF) && isempty(options.pos))
+        error("Error: spoiling is desired but spatial positions have not been defined");
+        return;
+    end
+    
+    if (options.ignore_decay == true)
+        T1 = inf;
+        T2 = inf;
+    end
+    
+    timeStep = dt/2;
+    gamma = 42.577e6;
+    E1 = exp(-timeStep/T1);
+    E2 = exp(-timeStep/T2);
+
+    % Calculate actual inversion time
+    TI_actual = TI - options.InversionRFDur/2 - options.ExcTime - options.spoilerDur;
+    
+    % If waveform supplied then run it, else assume instant inversion
+    % Run RF waveform
+    if (~isempty(options.InversionRF))
+            M = RFExcitation(M,T1,T2,options.dt,options.InversionRF,'ignore_decay',options.ignore_decay);  
+        end
+    else
+        R = RotateTheta(pi,0);
+        M = R*M;
+    end
+    
+end

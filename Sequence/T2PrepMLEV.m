@@ -1,0 +1,110 @@
+classdef T2PrepMLEV 
+    %UNTITLED5 Summary of this class goes here
+    %   Detailed explanation goes here
+
+    properties
+        TE = []; 
+        tau = []
+        dt = [];
+        gyro = 42.577e6; %Hz/T
+        G = [];
+    end
+
+    methods (Access = public)
+        function obj = T2PrepMLEV(TE,tau,dt,riseTime,flatTime,spoilerAmp)
+            obj.TE = TE;
+            obj.tau = tau;
+            obj.dt = dt;
+            obj.G = GenerateGradientWaveform(riseTime,flatTime,spoilerAmp,dt);
+        end
+
+        function M = run(obj,M,T1,T2,df,dp,dv,index)
+            % Runs the preparation module, the index determines which TE value should be used
+
+            if (index > length(obj.TE))
+                error("Error: Index is larger than number of echos")
+            end
+            
+            
+            TE = obj.TE(index);
+            tau = obj.tau;
+            dt = obj.dt;
+            gyro = obj.gyro;
+
+            % Set-up 90(+x) pulse
+            B1_90xpos = GenerateBlockPulse(pi/2,tau,dt,0)* gyro; % Multiply by gyro to get to Hz unit
+            % Set-up 90(-x) pulse
+            B1_90xneg = GenerateBlockPulse(pi/2,tau,dt,pi)* gyro; % Multiply by gyro to get to Hz unit
+            % Set-up 180 (+y) pulse
+            B1_180ypos = GenerateBlockPulse(pi,tau*2,dt,pi)* gyro; % Multiply by gyro to get to Hz unit
+            % Set-up 180 (-y) pulse
+            B1_180yneg = GenerateBlockPulse(pi,tau*2,dt,3*pi/2)* gyro; % Multiply by gyro to get to Hz unit
+            % Set-up 270 (+x) pulse
+            B1_270xpos = GenerateBlockPulse(3*pi/2,tau*3,dt,0) * gyro; % Multiply by gyro to get to Hz unit
+            % set-up 360 (-x) pulse
+            B1_360xneg = GenerateBlockPulse(2*pi,tau*4,dt,pi) * gyro; % Multiply by gyro to get to Hz unit
+            
+
+            % Generate (+y) composite pulse
+            compPulsePos = [B1_90xpos,B1_180ypos,B1_90xpos];
+            
+            % Generate (-y) composite pulse
+            compPulseNeg = [B1_90xneg,B1_180yneg,B1_90xneg];  
+
+            % Generate tip-up pulse (-x)
+            tipUpPulse = [B1_270xpos,B1_360xneg];
+        
+            % Create first wait period (TE/8)
+            d1 = TE/8 - (tau/2 + tau + tau*2/2); % Take into account RF pulse durations
+            d1 = zeros([1,round(d1./dt)]);
+
+            % Create the second wait period (TE/4)
+            d2 = TE/4 - (tau*2/2 + tau + tau + tau*2/2); % Take into account RF pulse durations
+            d2 = zeros([1,round(d2./dt),1]);
+            
+            % Create third wait period (TE/4)
+            d3 = d2;
+
+            % Create fourth wait period (TE/4);
+            d4 = d3;
+
+            % Create final wait period (TE/8)
+            d5 = TE/8 - (2.*tau/2 +tau+ (3.*tau + 4.*tau)./2); % Take into account RF pulse durations
+            d5 = zeros([1,round(d5./dt),1]);
+
+            
+            % Set-up B1 matrix
+            B1 = [B1_90xpos,d1,compPulsePos,d2,compPulsePos,d3,compPulseNeg,d4,compPulseNeg,d5,tipUpPulse,zeros(length(obj.G),1)];
+
+            % Set-up Gradient matrix
+            G = [zeros(size(B1),obj.G)]; % Combine the gradient waveform with zeros for timing
+
+            % Run bloch-simulation
+            [mx,my,mz] = bloch_Hz(B1,G,dt,T1,T2,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            M = [mx(:)'; my(:)'; mz(:)'];   % Forces column
+        end
+
+
+    end
+
+    methods (Access = protected)
+        % Generates the trapezoidal spoiler gradient waveform. Code based on:
+        % https://github.com/JosephGWoods/ISMRM2022_VSASL_Bloch_Simulations/blob/main/PulseGen/gengrad.m
+        function G3xN = GenerateGradientWaveform(riseTime,flatTime,Gmax,dt)
+            
+            nr = round(riseTime./dt); % ramp time resolution
+            nf = round(flatTime./dt); % flat top time resolution
+            ru = (round(1:1:nr)-0.5) / nr;
+            ft = ones(1, nf);
+            rd = (round(nr:-1:1)-0.5) / nr;
+            G  = Gmax * [ru, ft, rd];
+             % assume G is a 1xN row vector
+            G = G(:).';                   % ensure G is a row vector
+            N = numel(G);
+            G3xN = [zeros(2, N); G];      % 3xN matrix, rows 1-2 are zeros, row 3 is G
+
+        end
+    end
+
+    
+end

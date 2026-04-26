@@ -1,6 +1,12 @@
-function params = LoadBrukerData(path)
+function params = LoadBrukerData(path,loadDataFlag)
+    if (nargin < 2)
+        loadDataFlag = true;
+    end
+    
+
+
     % Find directory
-    methodFileName = strcat(path,'\','method'); 
+    methodFileName = strcat(path,'/','method'); 
     result = isfile(methodFileName);
     if (result ==0)
         error("Method file is not present");
@@ -8,24 +14,24 @@ function params = LoadBrukerData(path)
     end
 
     % Open the method file and get some useful values 
-    filetext = fileread(methodFileName);
+    filetext = fileread(fullfile(methodFileName));
     TextAsCells = regexp(filetext,'##','split');
     params.System = "Bruker";
     % Check trajectory
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$RadialTraj'));
     line = TextAsCells(mask);
     if (isempty(line))
-        params.Traj = "Cartesian";
+        params.Traj.type = "Cartesian";
     else
         line = strtrim(extractAfter(cell2mat(line),'='));
         if (strcmp(line, 'Yes') == 1)
-            params.Traj = "Radial";
+            params.Traj.type = "Radial";
         else
-            params.Traj = "Cartesian";
+            params.Traj.type = "Cartesian";
         end
     end
     
-    if (params.Traj == "Radial")
+    if (params.Traj.type == "Radial")
         % Extract radial mode if we need it
         mask = ~cellfun(@isempty, strfind(TextAsCells,'$Trajectory'));
           line = TextAsCells(mask);
@@ -77,16 +83,63 @@ function params = LoadBrukerData(path)
     params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
     if (length(line) > 2)
         params.NPar = str2num(cell2mat(line(3))); % NLin is Siemens language for Phase encoding in 3d dimension
+    else
+        params.NPar = 1;
     end
 
+    k = strfind(TextAsCells,"$PVM_NMovieFrames=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.PVM_NMovieFrames = str2num(line{1});
+    end
+
+   k = strfind(TextAsCells,"$PVM_ObjOrderList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NSli = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+    end
+
+    k = strfind(TextAsCells,"$MRFFAList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        
+        line = TextAsCells(idx);
+        params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        tmp =  rmmissing(tmp); % Removes Nans
+        params.MRFFA = tmp(2:end);
+    end
+
+    % Extract number of channels used to record data
+    k = strfind(TextAsCells,"$PVM_EncNReceivers=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NCha = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line);
+        line = split(line(1),'=');
+        params.NCha = str2double(line(2));
+    end
+
+
     % Extract the FOV
-    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov'));
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov='));
     line = TextAsCells(mask);
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     line = split(line(2),' ');
-    params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
-
+    if (size(line,1) == 2)
+        params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
+    else
+        params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2))) str2num(cell2mat(line(3)))];
+    end
 
     % Extract number of repetitions
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
@@ -94,6 +147,17 @@ function params = LoadBrukerData(path)
     line = strtrim(extractAfter(cell2mat(line),'='));
     line = splitlines(line);
     params.NRep = str2num(cell2mat(line(1)));
+
+    
+    k = strfind(TextAsCells,"$EPIC_RFPulseNoExp=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.EPIC_RFPulseNoExp = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line);
+        line = split(line(1),'=');
+        params.EPIC_RFPulseNoExp = str2double(line(2));
+    end
 
     % Extract inversion times
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_FairTIR_Arr'));
@@ -121,6 +185,14 @@ function params = LoadBrukerData(path)
         params.EPICFA = str2double(split(line(2),' '));
     end
 
+     mask = ~cellfun(@isempty, strfind(TextAsCells,'$FAList'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        params.NEPICFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.EPICFA = str2double(split(line(2),' '));
+    end
+
     % Extract information about slice spoiler
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$SliceSpoiler'));
     line = TextAsCells(mask);
@@ -128,17 +200,21 @@ function params = LoadBrukerData(path)
         tmp = cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once'));
         tmp = strsplit(tmp,',');
         % Split comma separated values
-        sliceSpoiler.duration = str2num(tmp{3}); % Spoiler duration in ms
+        sliceSpoiler.duration = str2num(tmp{3})/1000; % Spoiler duration in s
         sliceSpoiler.NCycles = str2num(tmp{2});
+        amp = cell2mat(tmp(4));
+        %amp = amp(1:end-1);
+        sliceSpoiler.amplitude = str2double(amp);
         params.sliceSpoiler = sliceSpoiler;
     end
     
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_RefPowCh1'));
     line = TextAsCells(mask);
-    line = strtrim(extractAfter(cell2mat(line),'='));
-    line = splitlines(line);
-    params.RefPow = str2num(cell2mat(line(1)));
-        
+    if (isempty(line) ~=1)
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.RefPow = str2num(cell2mat(line(1)));
+    end
     
     % Extract Bloch Siegert frequency offset in Hz
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSFreqOffset'));
@@ -149,16 +225,15 @@ function params = LoadBrukerData(path)
         line = splitlines(line);
         params.BSFreqOffset = str2num(cell2mat(line(1)));
     end
-   
-    % Extract Bloch Siegert pulse power (watts)
-    mask = ~cellfun(@isempty, strfind(TextAsCells,'$BSPulsePower'));
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$B1OffsetFrequency'));
     line = TextAsCells(mask);
     if (isempty(line) ~=1)
         line = TextAsCells(mask);
         line = strtrim(extractAfter(cell2mat(line),'='));
         line = splitlines(line);
-        params.BSPulsePower = str2num(cell2mat(line(1)));
+        params.BSFreqOffset = str2num(cell2mat(line(1)));
     end
+   
 
     % Extract AFI ratio if available
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$AFITRRatio'));
@@ -179,44 +254,504 @@ function params = LoadBrukerData(path)
         line = splitlines(line);
         params.TR = str2num(cell2mat(line(1)))/1000;
     end
-
     
-
-    % Find number of read dephasing points
-   % params.NCha
-
-%    params.data
-
- %   params.calibData
-
-    %% Load imaging data
-    fileName = strcat(path,'\','rawdata.job0');
-    fid = fopen(fileName,'r','native');
-    if (fid == -1)
-        fileName = strcat(path,'\','fid');
-        fid = fopen(fileName,'r','native');
+    k = strfind(TextAsCells,"$PVM_EchoTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.TE = str2num(line{1})/1000.0;
     end
-    if (fid ~= -1)
-        fseek(fid,0,'bof');
-        rawdata = fread(fid,'int32');
-        fclose(fid);
-        rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-        params.data =rawdata;
-        clear("rawdata");
+
+    k = strfind(TextAsCells,"$PVM_SliceThick=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Thickness = str2num(line{1})/1000.0; % Convert mm to m
+    end
+
+    k = strfind(TextAsCells,'$ExcPulse1Shape=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = split(line,')');
+        tmp = str2double(split(line(2),' '));
+        magRF = tmp(1:2:end);
+        phs = tmp(2:2:end);
+        params.ExcRFShape = magRF .* exp(1j .*deg2rad(phs));
+    end
     
-        %% Load calibration data if present
-        if (params.Calibration == true)
-            fileName = strcat(path,'\','rawdata.job1');
-            fid = fopen(fileName,'r','native');
+    k = strfind(TextAsCells,'$ExcPulse1=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.ExcPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.BW = str2double(cell2mat(tmp(2)));
+        params.ExcPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+    k = strfind(TextAsCells,'$ExcPul=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.ExcPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.ExcPulse.BW = str2double(cell2mat(tmp(2)));
+        params.ExcPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+    
+
+    k = strfind(TextAsCells,'$ExcPulShape=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = split(line,')');
+        tmp = str2double(split(line(2),' '));
+        magRF = tmp(1:2:end);
+        phs = tmp(2:2:end);
+        params.ExcRFShape = magRF .* exp(1j .*deg2rad(phs));
+    end
+
+    % Extract Bloch Siegert pulse power (watts)
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$B1Pulse1='));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        line = TextAsCells(mask);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.BSPulse.dur = str2double(cell2mat(tmp(1)))/1000;
+        params.BSPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+
+    k = strfind(TextAsCells,'$ExcSliceGradHzmm=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.SliceSelGrad = str2num(line);
+    end
+
+    k = strfind(TextAsCells,'$ExcSliceRephGradHzmm=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.SliceSelRephGrad = str2num(line{1});
+    end
+
+
+    k = strfind(TextAsCells,'$RephGradDur=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.RephGradDur = str2num(line{1})/1000;
+    end
+
+    k = strfind(TextAsCells,'$EncGradDur=');
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.EncGradDur = str2num(line{1})/1000;
+    end
+
+    k = strfind(TextAsCells,"$PVM_FatSupRampTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.RiseTime = str2num(line)/1000;
+    end 
+
+    k = strfind(TextAsCells,"$PVM_GradCalConst=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.PVM_GradCalConst = str2num(line{1});
+    end
+
+    k = strfind(TextAsCells,"$NPointsPerPrep=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.NPointsPerPrep = str2num(line{1});
+    end
+    k = strfind(TextAsCells,"$MRFNPrepModules=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.MRFNPrepModules = str2num(line{1});
+    end
+    % k = strfind(TextAsCells,"$MRFFAList=");
+    % idx = find(~cellfun(@isempty,k));
+    % if (isempty(idx) ~=1)
+    %     line = TextAsCells(idx);
+    % 
+    %     params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+    %     line = split(line,')');
+    %     params.MRFFA = str2double(split(line(2),' '));
+    % end
+
+
+    k = strfind(TextAsCells,"$MRFSpoiler=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFSpoiler.amplitude = str2double(cell2mat(tmp(2)));
+        params.MRFSpoiler.duration = str2double(cell2mat(tmp(1)));
+        amp = [];
+    end
+    
+    k = strfind(TextAsCells,"$InversionSliceSpoiler=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,{',','\n'});
+        params.T1PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
+        params.T1PrepSpoiler.duration = str2double(cell2mat(tmp(3)))/1000; % Convert to seconds
+        amp = cell2mat(tmp(4));
+        amp = amp(1:end-1);
+        params.T1PrepSpoiler.amplitude = str2double(amp);
+        amp = [];
+    end
+
+    k = strfind(TextAsCells,"$T2PrepSliceSpoiler=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.T2PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
+        params.T2PrepSpoiler.duration = str2double(cell2mat(tmp(3)))/1000; % Convert to seconds
+        amp = cell2mat(tmp(4));
+        amp = amp(1:end-1);
+        params.T2PrepSpoiler.amplitude = str2double(amp);
+        amp = [];
+    end
+
+    k = strfind(TextAsCells,"$MRFWaitingTime=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.MRFWaitingTimes =  tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"InvPulse1=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFInversionPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.MRFInversionPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFInversionPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+    k = strfind(TextAsCells,"T2PrepPulse1=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFT2RectPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.MRFT2RectPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFT2RectPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+    k = strfind(TextAsCells,"T2PrepPulse2=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFT2InversionPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.MRFT2InversionPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFT2InversionPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+    k = strfind(TextAsCells,"T2PrepPulse3=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'=('));
+        tmp = strsplit(line,',');
+        params.MRFT2BIRPulse.duration = str2double(cell2mat(tmp(1)))/1000;
+        params.MRFT2BIRPulse.BW = str2double(cell2mat(tmp(2)));
+        params.MRFT2BIRPulse.power = str2double(cell2mat(tmp(end-1)));
+    end
+
+    k = strfind(TextAsCells,"PVM_TrajKx=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.kx =  tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_TrajKy=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.ky = tmp(2:end);
+    end
+
+
+    k = strfind(TextAsCells,"PVM_SpiralInterleavCos=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_SpiralInterleavCos = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_SpiralInterleavSin=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_SpiralInterleavSin = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRF_InterShotSpiralInterleavCos=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.MRF_InterShotSpiralInterleavCos = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRF_InterShotSpiralInterleavSin=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.MRF_InterShotSpiralInterleavSin = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"PVM_SpiralSize=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = split(line,{' ', ')', '\n','$$'});
+        params.Traj.PVM_SpiralSize = str2double(line{1});
+    end
+    k = strfind(TextAsCells,"PVM_SpiralPostSize=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.Traj.PVM_SpiralPostSize = str2double(line);
+    end
+
+     k = strfind(TextAsCells,"PVM_SpiralNbOfInterleaves=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.Traj.PVM_SpiralNbOfInterleaves = str2double(line);
+    end
+    
+    k = strfind(TextAsCells,"MRFNoInterleaves");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Traj.MRFNoInterleaves = str2double(line{1});
+    end
+
+    k = strfind(TextAsCells,"MRF_SpiralInPlaneAcclerationFactor");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.Traj.MRF_SpiralInPlaneAcclerationFactor = str2double(line{1});
+    end
+
+    k = strfind(TextAsCells,"PVM_TrajKScale=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.PVM_TrajKScale = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"MRFInterShotRotYesNo=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        if (strcmp(tmp{1}, 'Yes') == 1)
+            params.Traj.InterShotRot = true;
+        else
+            params.Traj.InterShotRot = false;
+        end
+
+    end
+    
+
+    k = strfind(TextAsCells,"EPIC_RFPulseStart=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.EPICB1Map.RFPulseStart = str2double(line);
+    end
+
+    k = strfind(TextAsCells,"EPIC_RFPulseEnd=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        params.EPICB1Map.RFPulseEnd = str2double(line(1));
+    end
+
+    k = strfind(TextAsCells,"ShotWait=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.ShotWait = str2double(line);
+    end
+
+    k = strfind(TextAsCells,"T2PrepTimes=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.T2PrepTimes = tmp(2:end);
+    end
+
+    k = strfind(TextAsCells,"$MrfFlipAngle=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        params.NMRFFA = str2num(cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once')));
+        line = split(line,')');
+        params.MRFFA = str2double(split(line(2),' '));
+    end
+    
+
+    k = strfind(TextAsCells,"PVM_ObjOrderList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.sliceOrder = tmp(2:end)+1;
+    end
+
+    k = strfind(TextAsCells,"MRF_spatial_phase_1_coords=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.CartPE1 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
+    end
+
+    k = strfind(TextAsCells,"MRF_spatial_phase_2_coords=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.CartPE2 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
+    end
+
+    %% Load imaging data if required
+    if (loadDataFlag == true)
+        fileName = strcat(path,'/','rawdata.job0');
+        fid = fopen(fullfile(fileName),'r','native');
+        if (fid == -1)
+            fileName = strcat(path,'/','fid');
+            fid = fopen(fullfile(fileName),'r','native');
+        end
+        if (fid ~= -1)
             fseek(fid,0,'bof');
             rawdata = fread(fid,'int32');
             fclose(fid);
             rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
-            % Reshape the data using extracted parameters
-            rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
-            params.calibData =rawdata;
+            params.data =rawdata;
             clear("rawdata");
+
+            %% Load calibration data if present
+            if (params.Calibration == true)
+                fileName = strcat(path,'/','rawdata.job1');
+                fid = fopen(fileName,'r','native');
+                fseek(fid,0,'bof');
+                rawdata = fread(fid,'int32');
+                fclose(fid);
+                rawdata = complex(rawdata(1:2:end),rawdata(2:2:end));
+                % Reshape the data using extracted parameters
+                rawdata = reshape(rawdata,[params.NCol params.NCalibLin * 2]);
+                params.calibData =rawdata;
+                clear("rawdata");
+            end
         end
     end
     
 end
+
+

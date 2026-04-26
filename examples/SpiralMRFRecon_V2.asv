@@ -1,0 +1,27 @@
+%% Script to perform spiral MRF recon  
+addpath(genpath('./.'));
+%% Load data
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250606_122813_MRF_Phantom_MRFDev_06062025_1_31\67";
+params = LoadBrukerData(pth,true);
+
+%% Trim raw data 
+nextMultiple = 128 * ceil((params.Traj.PVM_SpiralSize + params.Traj.PVM_SpiralPostSize) / 128);
+padding = nextMultiple - params.Traj.PVM_SpiralSize;
+data = params.data;
+data = reshape(data,[nextMultiple,params.NPointsPerPrep*params.MRFNPrepModules,params.Traj.MRFNoInterleaves]);
+data = data(1:params.Traj.PVM_SpiralSize,:,:);
+data = permute(data,[1 3 2]);
+
+%% Form entire trajectory
+k = params.Traj.PVM_TrajKScale(1) .* params.Traj.kx + 1j*params.Traj.PVM_TrajKScale(2) .*params.Traj.ky;
+k = reshape(k,[params.Traj.PVM_SpiralSize + params.Traj.PVM_SpiralPostSize ,params.Traj.PVM_SpiralNbOfInterleaves]);
+
+
+
+
+counter = 1;
+NAcq = params.MRFNPrepModules * params.NPointsPerPrep;
+for i = 1:NAcq
+    indices = mod((i:i+params.Traj.MRFNoInterleaves):-1, params.Traj.PVM_SpiralNbOfInterleaves) + 1;  % Wrap-around index
+
+end

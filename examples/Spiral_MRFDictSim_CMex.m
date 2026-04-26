@@ -1,0 +1,270 @@
+addpath(genpath(".\."))
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250801_085320_MRF_Phantom_MRFDev_01082025_1_38\40";
+params = LoadBrukerData(pth,false);
+% Read preplist and preptimes
+prepList = ReadMRFPrepList("C:\Users\kpqv532\OneDrive - University of Leeds\20250801_085320_MRF_Phantom_MRFDev_01082025_1_38\PrepList2.txt");
+
+
+
+%% Set-up LUT
+T1Range = [10e-3:10e-3:500e-3 500e-3:50e-3:2800e-3];
+T2Range = [1e-3:1e-3:10e-3 20e-3:2.5e-3:100e-3 100e-3:10e-3:350e-3];
+%T1Range = [2800e-3];
+%T2Range = [350e-3];
+B1Range = [0.9:0.025:1.1];
+% Exclude T2 > T1
+NDictionaryEntries = 0 ;
+% Prepare look-up table containing all valid pairs
+LUT = [];
+for kk = 1:length(B1Range)
+    for ii = 1:length(T1Range)
+        for jj = 1:length(T2Range)
+            % Only keep physically feasible pairs (i.e. T1 > T2)
+            if (T1Range(ii)>=T2Range(jj))
+                LUT(NDictionaryEntries+1,[1:3]) = [T1Range(ii),T2Range(jj),B1Range(kk)];
+                NDictionaryEntries = NDictionaryEntries + 1;
+            end
+        end
+    end
+end
+
+NSpin = 200;
+gyro = 42.577e6; %Hz/T
+thickness = params.Thickness;
+df = 0;
+dp = zeros([NSpin,3]); 
+dp(:,3) = linspace(-1e-3,1e-3,NSpin)*100; % Multiply by 100 to get from m to cm
+dv = 0;
+
+NPos = NSpin;
+%% Extract useful timing parameters
+TR = params.TR;
+TE = params.TE ;
+RiseT = params.RiseTime;
+dt = 10e-6;
+
+%% Simulation Flags
+instantInversionFlag = true;
+instantExcitationFlag = true;
+instantT2PrepFlag = true;
+
+%% Generate spoiler for inversion module
+flatTime = params.T1PrepSpoiler.duration - RiseT;
+amplitude = (params.PVM_GradCalConst *  (params.T1PrepSpoiler.amplitude/100)); % Hz/mm
+amplitude =  amplitude * 1000; % Hz/m
+amplitude = amplitude./gyro; % Hz/m -> T/m
+spoiler_inv = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+spoiler_inv = spoiler_inv * gyro/100; % Convert to Hz/cm
+G_invspoiler = zeros(length(spoiler_inv),3);
+G_invspoiler(:,3) = spoiler_inv;
+%% Generate spoiler for acquisition
+flatTime =  params.sliceSpoiler.duration - RiseT;
+%flatTime = params.sliceSpoiler.duration - RiseT;
+amplitude = (params.PVM_GradCalConst *  (params.sliceSpoiler.amplitude/100));
+amplitude = amplitude * 1000; % Hz/m
+amplitude = amplitude./gyro;
+spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+spoiler_acq = spoiler_acq * gyro/100; % Convert to Hz/cm
+G_slispoiler = zeros(length(spoiler_acq),3);
+G_slispoiler(:,3) = spoiler_acq;
+%% If required set-up inversion pulse
+if (instantInversionFlag == false)
+    refPower = params.RefPow;
+    refVol = sqrt(refPower*50);
+    % Calculate pulse B1 required to achieve pi/2 flip
+    % for 1 ms block pulse
+    refB1 = (pi/2)./(2*pi*42.57*10^6*1e-3); % Peak B1 in T
+    % Calculate pulse peak voltage assuming 50 ohm load
+    pulsePeakVoltage = sqrt(params.MRFInversionPulse.power * 50);
+    % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
+    peakB1 = (refB1./refVol) .*  pulsePeakVoltage; % in T
+    [mag,phs] = ReadRFPulseFile("BrukerRFFiles\sech.inv");
+    InversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
+    InversionRF = InterpolateRFWaveform(InversionRF,params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(mag),dt);
+    InversionB1 = InversionRF * gyro;
+    
+end
+
+%% If required set-up T2 prep pulses
+
+if (instantT2PrepFlag == false)
+    refPower = params.RefPow;
+    refVol = sqrt(refPower*50);
+    % Calculate pulse B1 required to achieve pi/2 flip
+    % for 1 ms block pulse
+    refB1 = (pi/2)./(2*pi*42.57*10^6*1e-3); % Peak B1 in T
+    % Calculate pulse peak voltage assuming 50 ohm load
+    pulsePeakVoltage = sqrt(params.MRFInversionPulse.power * 50);
+    % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
+    peakB1 = (refB1./refVol) .*  pulsePeakVoltage; % in T
+    [mag,phs] = ReadRFPulseFile("BrukerRFFiles\sech.inv");
+    T2PrepInversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
+    T2PrepInversionRF = InterpolateRFWaveform(T2PrepInversionRF,params.MRFT2InversionPulse.duration,params.MRFT2InversionPulse.duration/length(mag),dt);
+    T2PrepInversionB1 = T2PrepInversionRF * gyro;
+
+end
+
+
+%% If required set-up RF excitation waveform
+if (instantExcitationFlag == false)
+    % As excitation pulse is non-adiabatic we can set-up reference pulse
+    % and scale by ratio of reference to actual flip angle
+    refFA = pi/2;
+    ExcRF = InterpolateRFWaveform(params.ExcRFShape,params.ExcRFDur,params.ExcRFDur/length(params.ExcRFShape),dt);
+    ExcRFDur = params.ExcRFDur;
+    % Scale waveform
+    ExcRF = ExcRF.*refFA/(sum(ExcRF))/(2*pi*gyro*dt);
+    % Extract gradient parameters
+    % Convert gradient in Hz/mm to T/m
+    GSliSel = (params.SliceSelGrad * 1000)/(gyro);
+    GSliRphs = (params.SliceSelRephGrad * 1000)/(gyro);
+    durSliSel = params.ExcRFDur;
+    riseTime = params.RiseTime; 
+    durSliRphs = params.RephGradDur - riseTime;
+    
+    % Generate excitation module (gradient + paddedwage
+    [RF,G_slisel] = GenerateExcitationBlock(ExcRF,GSliSel,GSliRphs,durSliSel,durSliRphs,riseTime,dt);
+    
+    % Convert RF to Hz and G to Hz/cm
+    ExcB1 = RF * gyro;
+    G_exc = zeros(length(G_slisel),3);
+    G_exc(:,3) = G_slisel* gyro/100; % Convert to Hz/cm
+    % Adjust TR and TE values to account for non-instant RF and spoilers
+    d1 = TE - ExcRFDur/2 - RiseT - RiseT- params.RephGradDur;
+    d2 = TR - TE - RiseT - ExcRFDur/2;
+
+end
+
+
+
+%% Adjust preparation timings based on flags
+if (instantInversionFlag == false && instantExcitationFlag==true)
+    % Adjust all inversion times to account for inversion pulse length
+    for p = 1:size(prepList,1)
+        if (prepList(p,1) == 0)
+             prepList(p,2) = prepList(p,2) - (params.MRFInversionPulse.duration/2 * 1000);
+        end
+    end
+
+elseif (instantInversionFlag == true && instantExcitationFlag==true)
+    % Adjust all inversion times to account for inversion pulse length and
+    % excitation pulse length
+    for p = 1:size(prepList,1)
+        if (prepList(p,1) == 0)
+             prepList(p,2) = prepList(p,2);% - RiseT*1000 - params.T1PrepSpoiler.duration*1000 ;
+        end
+    end
+end
+
+
+
+
+% Format FA array
+FAList = repmat(params.MRFFA, ceil((params.NMRFFA * size(prepList,1)) / length(params.MRFFA)), 1);
+% Truncate FAList to correct dimensions
+FAList = deg2rad(FAList(1:params.NPointsPerPrep * size(prepList,1)));
+
+
+
+waitTimes = params.MRFWaitingTimes;
+
+InversionModSpoilerCycles =params.T1PrepSpoiler.NCycles*2;
+NPointsPerPrep = params.NPointsPerPrep;
+dict = zeros(size(prepList,1) * NPointsPerPrep,size(LUT,1));
+tic
+parfor i = 1:size(LUT,1)
+    i
+    dictEntry = zeros(size(prepList,1) * NPointsPerPrep,1);
+    T1Tmp = LUT(i,1);
+    T2Tmp = LUT(i,2);
+    B1Tmp = LUT(i,3);
+    % Set-up starting magnetization
+    M = zeros([3,NSpin]);
+    M(3,:) = 1;
+    curEntry = 1;
+    faCounter = 1;
+     % Run through prep modules
+    for p = 1:size(prepList,1)
+        if (prepList(p,1) == 0)
+            if (instantInversionFlag == true)
+                % Instant inversion
+                M = InstantRFExcitation(M,pi,0);
+            else
+                %M = RFExcitation(M,T1Tmp,T2Tmp,dt,InversionRF);
+                [mx,my,mz] = bloch_Hz(InversionB1,zeros(length(InversionB1),1),dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+                M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+            end
+            % Apply spoiler
+            [mx,my,mz] = bloch_Hz(0,G_invspoiler,dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+            % Delay for time TI
+            [A,B] = freeprecess(prepList(p,2)/1000,T1Tmp,T2Tmp);
+            M = A*M + B; 
+        elseif (prepList(p,1) == 1)
+            T2PrepTE = prepList(p,2)/1000;
+            M = InstantRFExcitation(M,pi/2,0);
+            [A,B] = freeprecess(T2PrepTE/4,T1Tmp,T2Tmp);
+            M = A*M + B;
+            M = InstantRFExcitation(M,pi,pi/2);
+            [A,B] = freeprecess(T2PrepTE/2,T1Tmp,T2Tmp);
+            M = A*M + B;
+            M = InstantRFExcitation(M,pi,pi/2);
+            [A,B] = freeprecess(T2PrepTE/4,T1Tmp,T2Tmp);
+            M = A*M + B;
+            M = InstantRFExcitation(M,pi/2,pi);
+            [mx,my,mz] = bloch_Hz(0,G_invspoiler,dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+            % T2-prep spoiler
+        end
+       % Run through the correct portion of the FA train
+         for f = 1:NPointsPerPrep
+            if (instantExcitationFlag == true)
+                R = RotateTheta(FAList(faCounter).*B1Tmp,0);
+                M = R*M;
+                % Precess to TE
+                [A,B] = freeprecess(TE,T1Tmp,T2Tmp);
+                M = A*M + B; 
+            else
+                % M = RFExcitation(M,T1Tmp,T2Tmp,dt,RF.*FAList(faCounter)/refFA,"gradient_waveform",G_slisel,"pos",pos);
+                % [mx,my,mz] = bloch_Hz(ExcB1.*FAList(faCounter)/refFA,G_exc(1:end-1,:),dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+                % M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+                % Precess to TE
+                % [A,B] = freeprecess(d1,T1Tmp,T2Tmp);
+                % M = A*M + B; 
+            end
+            % Store signal 
+            dictEntry(curEntry) =mean(complex(M(1,:),M(2,:)));
+            % Precess until next TR
+            if (instantExcitationFlag == true)
+                [A,B] = freeprecess(TR - TE,T1Tmp,T2Tmp);
+                M = A*M + B;
+            else
+                [A,B] = freeprecess(d2,T1Tmp,T2Tmp);
+                M = A*M + B;
+            end
+            % Slice spoiler
+            [mx,my,mz] = bloch_Hz(zeros(length(G_slispoiler),1),G_slispoiler,dt,T1Tmp,T2Tmp,df,dp,dv,0,M(1,:),M(2,:),M(3,:));
+            M = [mx(:)'; my(:)'; mz(:)'];   % Forces column → transpose → 3×N
+
+
+            % Apply spoiling as rotation in z direction
+            % for ii = 1:NPos
+            %     for jj = 1:length(spoiler_acq)
+            %         Rz = zrot(2*pi*gyro*G(jj)*pos(3,ii)*dt);
+            %         M(:,ii) = Rz *M(:,ii);
+            %     end
+            % end
+            faCounter = faCounter + 1;
+            curEntry = curEntry + 1;
+        end
+        
+        % Wait for delay time
+        [A,B] = freeprecess(waitTimes(p),T1Tmp,T2Tmp);
+        M = A*M + B;
+
+    end
+    dict(:,i) = dictEntry;
+    
+end
+toc
+save("Dictionaries\SpiralDict_Positions_inversionRF","dict","LUT");

@@ -4,28 +4,24 @@ addpath("B1Mapping\")
 addpath("recon\")
 
 % Load 45 degree dataset
-pth = "datasets\Yasaman_MRF10122024\12";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250724_164854_MRF_Phantom_MRF_24072025_1_37\9";
 params = LoadBrukerData(pth);
-data = reshape(params.data,[params.NCol,params.NLin,params.NPar]);
-DAMImg1 = ifftcn(data,[1 2 3]);
+data = reshape(params.data,[params.NCol,params.NLin,params.NPar params.NRep]);
+DAMImgs = ifftcn(data,[1 2 3]);
 
-% Load 90 degree dataset
-pth = "datasets\Yasaman_MRF10122024\13";
-params = LoadBrukerData(pth);
-data = reshape(params.data,[params.NCol,params.NLin,params.NPar]);
-DAMImg2 = ifftcn(data,[1 2 3]);
-B1= DAMB1(DAMImg1,DAMImg2,45);
-figure; imagesc(abs(squeeze(B1(:,:,24)).*mask(:,:,24)), [0.8,1.2]);
-colormap("turbo")
+alphaNom = 45;
+DAMB1 = acosd(abs(DAMImgs(:,:,:,2))./(2*abs(DAMImgs(:,:,:,1))));
+DAMB1 = DAMB1./alphaNom;
 
-figure; imagesc(abs(squeeze(B1(:,:,24)).*mask(:,:,24)));
-colormap("turbo")
+
 
 % Load AFI data
-pth = "datasets\20241101_185137_TubeArray_ISMRMDatv2_1_2\AFI_29";
+pth = "C:\Users\kpqv532\OneDrive - University of Leeds\20250515_171014_MRF_Phantom_MRF_Phantom_b1mapping_1_25\20";
 params = LoadBrukerData(pth);
 AFIdata = reshape(params.data,[params.NCol,2,params.NLin,params.NPar]);
 AFIdata = permute(AFIdata, [1 3 4 2]);
 AFIImgs = ifftcn(AFIdata,[1 2 3]);
 AFIB1 =  FitAFIB1(AFIImgs,60,params.TR,params.TR * params.AFIRatio);
-figure; imagesc(medfilt2(abs(AFIB1(:,:,15)),[5 5]), [0.9,1.1]);
+AFIB1_filt = medfilt3(abs(AFIB1),[5,5,5]);
+
+figure; imagesc(abs(AFIB1_filt(:,:,64)),[0.5,1.1]);colormap("turbo")

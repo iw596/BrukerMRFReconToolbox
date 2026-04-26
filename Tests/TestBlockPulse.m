@@ -1,0 +1,30 @@
+addpath(genpath("./."));
+%% Script to test generation and excitation using a block pulse with a FA of 90 and
+%% then 180 degrees
+
+NSpin = 200;
+M = zeros([3,NSpin]);
+M(3,:) = 1;
+FA = pi/2;
+dur= 1e-3; %ms
+dt = 1e-6;
+phs = 0;
+T1 = 1.5;
+T2 = 5e-3;
+RF = GenerateBlockPulse(FA,dur,dt,phs);
+options.ignore_decay = true;
+MNew = RFExcitation(M,T1,T2,dt,RF,'ignore_decay',true);
+
+% Repeat with FA of 180
+NSpin = 200;
+M = zeros([3,NSpin]);
+M(3,:) = 1;
+FA = pi;
+dur= 1e-3; %ms
+dt = 1e-6;
+phs = 0;
+T1 = 1.5;
+T2 = 5e-3;
+RF = GenerateBlockPulse(FA,dur,dt,phs);
+options.ignore_decay = true;
+MNew = RFExcitation(M,T1,T2,dt,RF,'ignore_decay',true);
