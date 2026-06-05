@@ -1,0 +1,446 @@
+classdef MRFViewer < handle
+
+    properties
+
+        % GUI
+        Fig
+        MRFAxes
+        GTAxes
+
+        LoadMRFButton
+        LoadGTButton
+
+        SliceSlider
+        SliceLabel
+
+        MapDropdown
+        MapLabel
+
+        InfoLabel
+
+        % Data
+        MRFData = []
+        GTData = []
+
+        CurrentSlice = 1
+        CurrentMap = 1
+
+        MapNames = {}
+
+    end
+
+    methods
+
+        function app = MRFViewer()
+
+            app.createUI();
+
+        end
+
+        %% ============================================================
+        % UI
+        %% ============================================================
+
+        function createUI(app)
+
+            app.Fig = uifigure( ...
+                'Name','MRF Viewer', ...
+                'Position',[100 100 1300 750]);
+
+            app.Fig.WindowScrollWheelFcn = ...
+                @(src,event)app.scrollSlices(event);
+
+            % ---------------------------------------------------------
+            % Buttons
+            % ---------------------------------------------------------
+
+            app.LoadMRFButton = uibutton(app.Fig,...
+                'Text','Load MRF',...
+                'Position',[20 700 120 30],...
+                'ButtonPushedFcn',...
+                @(src,event)app.loadMRF());
+
+            app.LoadGTButton = uibutton(app.Fig,...
+                'Text','Load Ground Truth',...
+                'Position',[160 700 140 30],...
+                'ButtonPushedFcn',...
+                @(src,event)app.loadGT());
+
+            % ---------------------------------------------------------
+            % Map selector
+            % ---------------------------------------------------------
+
+            app.MapLabel = uilabel(app.Fig,...
+                'Position',[340 700 40 25],...
+                'Text','Map');
+
+            app.MapDropdown = uidropdown(app.Fig,...
+                'Position',[380 700 150 30],...
+                'Items',{'Map 1'},...
+                'ValueChangedFcn',...
+                @(src,event)app.changeMap());
+
+            % ---------------------------------------------------------
+            % Axes
+            % ---------------------------------------------------------
+
+            app.MRFAxes = uiaxes(app.Fig,...
+                'Position',[50 180 550 470]);
+
+            title(app.MRFAxes,'MRF')
+
+            app.GTAxes = uiaxes(app.Fig,...
+                'Position',[700 180 550 470]);
+
+            title(app.GTAxes,'Ground Truth')
+
+            % ---------------------------------------------------------
+            % Slice controls
+            % ---------------------------------------------------------
+
+            app.SliceLabel = uilabel(app.Fig,...
+                'Position',[50 120 120 25],...
+                'Text','Slice: 1');
+
+            app.SliceSlider = uislider(app.Fig,...
+                'Position',[180 135 1000 3],...
+                'Limits',[1 1],...
+                'Value',1,...
+                'ValueChangedFcn',...
+                @(src,event)app.changeSlice());
+
+            % ---------------------------------------------------------
+            % Info
+            % ---------------------------------------------------------
+
+            app.InfoLabel = uilabel(app.Fig,...
+                'Position',[50 40 1200 40],...
+                'Text','No data loaded');
+
+        end
+
+        %% ============================================================
+        % Load MRF
+        %% ============================================================
+
+        function loadMRF(app)
+
+            [file,path] = uigetfile( ...
+                {'*.mat;*.nii','MAT/NIFTI Files'}, ...
+                'Select MRF Dataset');
+
+            if isequal(file,0)
+                return
+            end
+
+            filename = fullfile(path,file);
+
+            app.MRFData = app.readVolume(filename);
+
+            app.CurrentSlice = 1;
+            app.CurrentMap = 1;
+
+            app.configureSliceSlider();
+            app.configureMapDropdown();
+
+            app.updateDisplay();
+
+        end
+
+        %% ============================================================
+        % Load GT
+        %% ============================================================
+
+        function loadGT(app)
+
+            [file,path] = uigetfile( ...
+                {'*.mat;*.nii','MAT/NIFTI Files'}, ...
+                'Select Ground Truth Dataset');
+
+            if isequal(file,0)
+                return
+            end
+
+            filename = fullfile(path,file);
+
+            app.GTData = app.readVolume(filename);
+
+            app.updateDisplay();
+
+        end
+
+        %% ============================================================
+        % Read volume
+        %% ============================================================
+
+        function data = readVolume(~,filename)
+
+            [~,~,ext] = fileparts(filename);
+
+            switch lower(ext)
+
+                case '.mat'
+
+                    S = load(filename);
+
+                    fn = fieldnames(S);
+
+                    data = S.(fn{1});
+
+                case '.nii'
+
+                    data = niftiread(filename);
+
+                otherwise
+
+                    error('Unsupported file format');
+
+            end
+
+        end
+
+        %% ============================================================
+        % Slice slider configuration
+        %% ============================================================
+
+        function configureSliceSlider(app)
+
+            if isempty(app.MRFData)
+                app.SliceSlider.Enable = 'off';
+                return
+            end
+
+            sz = size(app.MRFData);
+
+            if numel(sz) < 3
+                nSlices = 1;
+            else
+                nSlices = sz(3);
+            end
+
+            % IMPORTANT: ensure valid range
+            nSlices = max(nSlices,1);
+
+            app.SliceSlider.Limits = [1 nSlices];
+            app.SliceSlider.Value  = 1;
+
+            app.SliceSlider.Enable = 'on';
+
+        end
+
+        %% ============================================================
+        % Map dropdown configuration
+        %% ============================================================
+
+        function configureMapDropdown(app)
+
+            if isempty(app.MRFData)
+                return
+            end
+
+            sz = size(app.MRFData);
+
+            if numel(sz) < 4
+
+                nMaps = 1;
+
+            else
+
+                nMaps = sz(4);
+
+            end
+
+            items = cell(1,nMaps);
+
+            for k = 1:nMaps
+                items{k} = sprintf('Map %d',k);
+            end
+
+            app.MapDropdown.Items = items;
+            app.MapDropdown.Value = items{1};
+
+        end
+
+        %% ============================================================
+        % Slice callback
+        %% ============================================================
+
+        function changeSlice(app)
+
+            if isempty(app.MRFData)
+                return
+            end
+
+            app.CurrentSlice = round(app.SliceSlider.Value);
+
+            app.SliceLabel.Text = sprintf('Slice: %d', app.CurrentSlice);
+
+            app.updateDisplay();
+
+        end
+
+        %% ============================================================
+        % Map callback
+        %% ============================================================
+
+        function changeMap(app)
+
+            idx = find(strcmp( ...
+                app.MapDropdown.Value,...
+                app.MapDropdown.Items));
+
+            if isempty(idx)
+                idx = 1;
+            end
+
+            app.CurrentMap = idx;
+
+            app.updateDisplay();
+
+        end
+
+        %% ============================================================
+        % Mouse wheel scrolling
+        %% ============================================================
+
+        function scrollSlices(app,event)
+
+            if isempty(app.MRFData)
+                return
+            end
+
+            maxSlice = round(app.SliceSlider.Limits(2));
+
+            app.CurrentSlice = ...
+                app.CurrentSlice - sign(event.VerticalScrollCount);
+
+            app.CurrentSlice = ...
+                max(1,min(maxSlice,app.CurrentSlice));
+
+            app.SliceSlider.Value = app.CurrentSlice;
+
+            app.SliceLabel.Text = ...
+                sprintf('Slice: %d',app.CurrentSlice);
+
+            app.updateDisplay();
+
+        end
+
+        %% ============================================================
+        % Display update
+        %% ============================================================
+
+        function updateDisplay(app)
+
+            cla(app.MRFAxes)
+            cla(app.GTAxes)
+
+            % ---------------------------------------------------------
+            % MRF
+            % ---------------------------------------------------------
+
+            if ~isempty(app.MRFData)
+
+                img = app.extractImage(app.MRFData);
+
+                imagesc(app.MRFAxes,img);
+
+                axis(app.MRFAxes,'image');
+
+                colormap(app.MRFAxes,gray);
+
+                colorbar(app.MRFAxes);
+
+            end
+
+            % ---------------------------------------------------------
+            % Ground Truth
+            % ---------------------------------------------------------
+
+            if ~isempty(app.GTData)
+
+                gt = app.extractImage(app.GTData);
+
+                imagesc(app.GTAxes,gt);
+
+                axis(app.GTAxes,'image');
+
+                colormap(app.GTAxes,gray);
+
+                colorbar(app.GTAxes);
+
+            end
+
+            app.updateInfo();
+
+        end
+
+        %% ============================================================
+        % Extract image from 2D/3D/4D data
+        %% ============================================================
+
+        function img = extractImage(app,data)
+
+            sz = size(data);
+
+            switch numel(sz)
+
+                case 2
+
+                    img = data;
+
+                case 3
+
+                    slice = min(app.CurrentSlice,sz(3));
+
+                    img = data(:,:,slice);
+
+                otherwise
+
+                    slice = min(app.CurrentSlice,sz(3));
+                    map   = min(app.CurrentMap,sz(4));
+
+                    img = data(:,:,slice,map);
+
+            end
+
+        end
+
+        %% ============================================================
+        % Info display
+        %% ============================================================
+
+        function updateInfo(app)
+
+            txt = '';
+
+            if ~isempty(app.MRFData)
+
+                txt = sprintf( ...
+                    'MRF: %s', ...
+                    mat2str(size(app.MRFData)));
+
+            end
+
+            if ~isempty(app.GTData)
+
+                txt = sprintf( ...
+                    '%s     GT: %s', ...
+                    txt,...
+                    mat2str(size(app.GTData)));
+
+            end
+
+            txt = sprintf( ...
+                '%s     Slice=%d     Map=%d', ...
+                txt,...
+                app.CurrentSlice,...
+                app.CurrentMap);
+
+            app.InfoLabel.Text = txt;
+
+        end
+
+    end
+
+end

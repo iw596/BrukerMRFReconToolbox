@@ -1,0 +1,471 @@
+classdef MRFViewer < handle
+    % MRFViewer - Main MRF/GT image viewer with ROI analysis
+    %   Manages tab-based UI, data loading, ROI analysis, and display
+    %
+    %   This class is refactored to use separate tab classes:
+    %   - ViewerTab: Handles the Viewer tab UI and display
+    %   - ReconstructionTab: Handles the Reconstruction tab UI
+    %
+    %   MRFViewer retains shared data, ROI file I/O, and helper methods
+
+    properties
+
+        % GUI
+        Fig
+        TabGroup
+        ViewerTabObj    % ViewerTab instance
+        ReconTabObj     % ReconstructionTab instance
+
+        % Data
+        MRFData = []
+        GTData = []
+
+        CurrentSlice = 1
+        CurrentMap = 1
+
+        MapNames = {}
+
+        % ROI
+        ROIs = []
+
+        % Colormaps
+        t1cmp = [];
+        t2cmp = [];
+
+    end
+
+    methods
+
+        function app = MRFViewer()
+            % Initialize MRFViewer application
+            app.createUI();
+        end
+
+        %% ============================================================
+        % UI Creation and Layout
+        %% ============================================================
+
+        function createUI(app)
+            % Create main figure and tabs, initialize tab objects
+
+            app.Fig = uifigure( ...
+                'Name','MRF Viewer', ...
+                'Position',[100 100 1300 750]);
+
+            app.Fig.WindowScrollWheelFcn = ...
+                @(src,event)app.scrollSlices(event);
+
+            app.Fig.SizeChangedFcn = ...
+                @(src,event)app.resizeUI();
+
+            app.TabGroup = uitabgroup(app.Fig, ...
+                'Position',[10 10 1280 700]);
+
+            % Create tab handles
+            viewerTabHandle = uitab(app.TabGroup, 'Title','Viewer');
+            reconTabHandle = uitab(app.TabGroup, 'Title','Reconstruction');
+
+            % Initialize tab objects which create their own UI
+            app.ViewerTabObj = GUI.ViewerTab(app, viewerTabHandle);
+            app.ReconTabObj = GUI.ReconstructionTab(app, reconTabHandle);
+
+            % Initialize colormaps
+            %initalizeColourMaps(app);
+
+            app.resizeUI();
+        end
+
+        function resizeUI(app)
+            % Update UI element positions based on figure size
+
+            if isempty(app.Fig) || ~isvalid(app.Fig)
+                return
+            end
+
+            figPos = app.Fig.Position;
+
+            app.TabGroup.Position = [10 10 figPos(3)-20 figPos(4)-20];
+
+            % Delegate resize to tabs
+            if ~isempty(app.ViewerTabObj)
+                app.ViewerTabObj.resizeUI(figPos);
+            end
+
+            if ~isempty(app.ReconTabObj)
+                app.ReconTabObj.resizeUI(figPos);
+            end
+        end
+
+        %% ============================================================
+        % Data Loading
+        %% ============================================================
+
+        function loadMRF(app)
+            % Load MRF data from file
+
+            [file,path] = uigetfile( ...
+                {'*.mat;*.nii','MAT/NIFTI Files'}, ...
+                'Select MRF Dataset');
+
+            if isequal(file,0)
+                return
+            end
+
+            filename = fullfile(path,file);
+
+            [app.MRFData,app.MapNames] = app.readVolume(filename);
+
+            if isempty(app.MRFData)
+                return
+            end
+
+            app.CurrentSlice = 1;
+            app.CurrentMap = 1;
+
+            app.ViewerTabObj.configureSliceSlider();
+            app.ViewerTabObj.configureMapDropdown();
+
+            app.ViewerTabObj.updateDisplay();
+        end
+
+        function loadGT(app)
+            % Load Ground Truth data from file
+
+            [file,path] = uigetfile( ...
+                {'*.mat;*.nii','MAT/NIFTI Files'}, ...
+                'Select Ground Truth Dataset');
+
+            if isequal(file,0)
+                return
+            end
+
+            filename = fullfile(path,file);
+
+            [app.GTData,~] = app.readVolume(filename);
+
+            if isempty(app.GTData)
+                return
+            end
+
+            app.ViewerTabObj.updateDisplay();
+        end
+
+        function [data,mapNames] = readVolume(app,filename)
+            % Read volume data from file
+            %   Supports .mat and .nii files
+
+            [~,~,ext] = fileparts(filename);
+
+            mapNames = {};
+
+            switch lower(ext)
+
+                case '.mat'
+
+                    S = load(filename);
+                    [data,mapNames] = app.parseMRFMat(S);
+
+                case '.nii'
+
+                    data = niftiread(filename);
+
+                otherwise
+
+                    error('Unsupported file format');
+
+            end
+        end
+
+        function [data,mapNames] = parseMRFMat(app,S)
+            % Parse MAT file to extract MRF data
+            %   Looks for T1, T2 fields; combines into 4D array
+
+            mapNames = {};
+            fn = fieldnames(S);
+
+            % If the MAT file contains top-level T1 and T2 variables,
+            % combine them into a 4D MRF volume.
+            if ismember('T1',fn) && ismember('T2',fn)
+
+                t1 = S.T1;
+                t2 = S.T2;
+
+                if ~isequal(size(t1),size(t2))
+                    uialert(app.Fig, ...
+                        'T1 and T2 maps must have the same dimensions.', ...
+                        'Invalid MRF file', ...
+                        'Icon','error');
+                    data = [];
+                    return
+                end
+
+                data = cat(4,t1,t2);
+                mapNames = {'T1','T2'};
+                return
+            end
+
+            % If the MAT file contains exactly one variable that is a struct,
+            % look inside it for T1 and T2 fields.
+            if numel(fn) == 1 && isstruct(S.(fn{1}))
+
+                st = S.(fn{1});
+                if isfield(st,'T1') && isfield(st,'T2')
+
+                    t1 = st.T1;
+                    t2 = st.T2;
+
+                    if ~isequal(size(t1),size(t2))
+                        uialert(app.Fig, ...
+                            'T1 and T2 maps must have the same dimensions.', ...
+                            'Invalid MRF file', ...
+                            'Icon','error');
+                        data = [];
+                        return
+                    end
+
+                    data = cat(4,t1,t2);
+                    mapNames = {'T1','T2'};
+                    return
+                end
+            end
+
+            % Fall back to the first variable if the file is not a structured MRF file.
+            if isempty(fn)
+                uialert(app.Fig, ...
+                    'MAT file contains no variables.', ...
+                    'Invalid MRF file', ...
+                    'Icon','error');
+                data = [];
+                return
+            end
+
+            data = S.(fn{1});
+
+            if isempty(data)
+                uialert(app.Fig, ...
+                    'Unable to read MRF data from MAT file.', ...
+                    'Invalid MRF file', ...
+                    'Icon','error');
+            end
+        end
+
+        %% ============================================================
+        % Mouse Wheel Scrolling
+        %% ============================================================
+
+        function scrollSlices(app,event)
+            % Handle mouse wheel scrolling for slice navigation
+
+            if isempty(app.ViewerTabObj) || isempty(app.MRFData)
+                return
+            end
+
+            app.ViewerTabObj.scrollSlices(event);
+        end
+
+        %% ============================================================
+        % ROI File I/O
+        %% ============================================================
+
+        function saveROIs(app)
+            % Save ROI data to file
+
+            if isempty(app.ROIs)
+                uialert(app.Fig, ...
+                    'No ROIs to save.', ...
+                    'Save ROIs', ...
+                    'Icon','warning');
+                return
+            end
+
+            [file,path] = uiputfile('*.mat','Save ROIs');
+            if isequal(file,0)
+                return
+            end
+
+            ROIs = app.ROIs; %#ok<NASGU>
+            save(fullfile(path,file),'ROIs');
+        end
+
+        function loadROIs(app)
+            % Load ROI data from file
+
+            [file,path] = uigetfile('*.mat','Load ROIs');
+            if isequal(file,0)
+                return
+            end
+
+            loaded = load(fullfile(path,file));
+            if isfield(loaded,'ROIs')
+                app.ROIs = loaded.ROIs;
+                if ~isempty(app.ViewerTabObj)
+                    app.ViewerTabObj.updateROIList();
+                end
+            end
+        end
+
+        %% ============================================================
+        % Helper Methods for Display
+        %% ============================================================
+
+        function img = extractImage(app,data)
+            % Extract 2D image from data volume
+            %   Handles 2D, 3D, and 4D data arrays
+
+            sz = size(data);
+
+            if numel(sz) < 3
+                img = data;
+            elseif numel(sz) == 3
+                img = data(:,:,app.CurrentSlice);
+            else
+                img = data(:,:,app.CurrentSlice,app.CurrentMap);
+            end
+        end
+
+        function drawROIs(app)
+            % Draw all ROIs on the axes
+
+            if isempty(app.ROIs) || isempty(app.ViewerTabObj)
+                return
+            end
+
+            for k = 1:numel(app.ROIs)
+                roi = app.ROIs(k);
+
+                if roi.Slice == app.CurrentSlice
+
+                    switch roi.Type
+                        case 'Rectangle'
+                            rectangle(app.ViewerTabObj.MRFAxes, ...
+                                'Position',roi.Position, ...
+                                'EdgeColor','r', ...
+                                'LineWidth',1);
+                        case 'Freehand'
+                            if size(roi.Position,2) == 2
+                                plot(app.ViewerTabObj.MRFAxes, ...
+                                    roi.Position(:,1), ...
+                                    roi.Position(:,2), ...
+                                    'r-','LineWidth',1);
+                            end
+                    end
+                end
+            end
+        end
+
+        function updateInfo(app)
+            % Update info label with data statistics
+
+            if isempty(app.ViewerTabObj)
+                return
+            end
+
+            infoStr = sprintf('Slice: %d | Map: %d', ...
+                app.CurrentSlice, app.CurrentMap);
+
+            if ~isempty(app.MRFData)
+                sz = size(app.MRFData);
+                infoStr = sprintf('%s | MRF size: %dx%dx%d', ...
+                    infoStr, sz(1), sz(2), sz(3));
+            end
+
+            app.ViewerTabObj.InfoLabel.Text = infoStr;
+        end
+
+        %% ============================================================
+        % ROI Analysis Helpers
+        %% ============================================================
+
+        function vals = extractROIMask(~, img, roi)
+            % Extract pixel values from ROI region
+
+            mask = false(size(img));
+
+            switch roi.Type
+                case 'Rectangle'
+                    x = roi.Position(1);
+                    y = roi.Position(2);
+                    w = roi.Position(3);
+                    h = roi.Position(4);
+
+                    x1 = max(round(x),1);
+                    x2 = min(round(x + w),size(img,2));
+                    y1 = max(round(y),1);
+                    y2 = min(round(y + h),size(img,1));
+
+                    if x1 <= x2 && y1 <= y2
+                        mask(y1:y2,x1:x2) = true;
+                    end
+                otherwise
+                    pos = roi.Position;
+                    if size(pos,2) == 2
+                        mask = poly2mask(pos(:,1), pos(:,2), size(img,1), size(img,2));
+                    end
+            end
+
+            vals = img(mask);
+            if isempty(vals)
+                vals = [];
+            end
+        end
+
+        function stats = computeROIStats(~, img, roi)
+            % Compute mean and std of ROI
+            %   Returns struct with .Mean and .Std fields
+
+            mask = false(size(img));
+
+            switch roi.Type
+                case 'Rectangle'
+                    x = roi.Position(1);
+                    y = roi.Position(2);
+                    w = roi.Position(3);
+                    h = roi.Position(4);
+
+                    x1 = max(round(x),1);
+                    x2 = min(round(x + w),size(img,2));
+                    y1 = max(round(y),1);
+                    y2 = min(round(y + h),size(img,1));
+
+                    if x1 <= x2 && y1 <= y2
+                        mask(y1:y2,x1:x2) = true;
+                    end
+                otherwise
+                    pos = roi.Position;
+                    if size(pos,2) == 2
+                        mask = poly2mask(pos(:,1), pos(:,2), size(img,1), size(img,2));
+                    end
+            end
+
+            values = img(mask);
+            if isempty(values)
+                stats.Mean = NaN;
+                stats.Std = NaN;
+                return
+            end
+
+            stats.Mean = mean(values(:),'omitnan');
+            stats.Std  = std(values(:),'omitnan');
+        end
+
+        function match = mapNamesMatch(~, mrfName, gtName)
+            % Check if two map names match by keyword
+            %   Checks for T1, T2, T1rho, MTR, M0
+
+            mrfLower = lower(mrfName);
+            gtLower = lower(gtName);
+
+            patterns = {'t1', 't2', 't1rho', 'mtr', 'm0'};
+
+            match = false;
+            for p = patterns
+                pattern = p{1};
+                if contains(mrfLower, pattern) && contains(gtLower, pattern)
+                    match = true;
+                    return
+                end
+            end
+        end
+
+    end
+end
