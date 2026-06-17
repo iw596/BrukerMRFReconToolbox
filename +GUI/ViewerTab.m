@@ -23,6 +23,10 @@ classdef ViewerTab < handle
         ColorScaleMaxLabel
         ColorScaleMaxField
 
+        MaskSectionLabel
+        ApplyMRFMaskCheckbox
+        ApplyGTMaskCheckbox
+
         InfoLabel
 
         % Axes
@@ -37,6 +41,7 @@ classdef ViewerTab < handle
         DeleteROIButton
         SaveROIButton
         LoadROIButton
+        ExportROIButton
         ShowAllROIStatsButton
         CorrelationPlotButton
         ROIListBox
@@ -122,6 +127,26 @@ classdef ViewerTab < handle
                 'ValueChangedFcn',...
                 @(src,event)obj.applyColorScale());
 
+            obj.ApplyMRFMaskCheckbox = uicheckbox(obj.TabHandle,...
+                'Text','Apply MRF Mask',...
+                'Position',[380 585 120 30],...
+                'Value',false,...
+                'Enable','off',...
+                'ValueChangedFcn',...
+                @(src,event)obj.updateDisplay());
+
+            obj.MaskSectionLabel = uilabel(obj.TabHandle,...
+                'Position',[340 590 35 25],...
+                'Text','Mask');
+
+            obj.ApplyGTMaskCheckbox = uicheckbox(obj.TabHandle,...
+                'Text','Apply GT Mask',...
+                'Position',[520 585 110 30],...
+                'Value',false,...
+                'Enable','off',...
+                'ValueChangedFcn',...
+                @(src,event)obj.updateDisplay());
+
             % ---------------------------------------------------------
             % ROI controls
             % ---------------------------------------------------------
@@ -163,28 +188,34 @@ classdef ViewerTab < handle
                 'ButtonPushedFcn',...
                 @(src,event)obj.Parent.loadROIs());
 
+            obj.ExportROIButton = uibutton(obj.ROIPanel,...
+                'Text','Export CSV',...
+                'Position',[10 180 160 30],...
+                'ButtonPushedFcn',...
+                @(src,event)obj.Parent.exportROIsCSV());
+
             obj.ShowAllROIStatsButton = uibutton(obj.ROIPanel,...
                 'Text','All map stats',...
-                'Position',[10 185 160 30],...
+                'Position',[10 145 160 30],...
                 'ButtonPushedFcn',...
                 @(src,event)obj.showAllMapStats());
 
             obj.CorrelationPlotButton = uibutton(obj.ROIPanel,...
                 'Text','Correlation plot',...
-                'Position',[10 155 160 30],...
+                'Position',[10 110 160 30],...
                 'ButtonPushedFcn',...
                 @(src,event)obj.plotCorrelation());
 
             obj.ROIStatsMeanLabel = uilabel(obj.ROIPanel,...
-                'Position',[10 120 160 22],...
+                'Position',[10 75 160 22],...
                 'Text','Mean: -');
 
             obj.ROIStatsStdLabel = uilabel(obj.ROIPanel,...
-                'Position',[10 95 160 22],...
+                'Position',[10 50 160 22],...
                 'Text','Std: -');
 
             obj.ROIListBox = uilistbox(obj.ROIPanel,...
-                'Position',[10 10 160 85],...
+                'Position',[10 10 160 35],...
                 'Items',{},...
                 'Multiselect','on',...
                 'ValueChangedFcn',@(src,event)obj.updateROIStats());
@@ -231,27 +262,33 @@ classdef ViewerTab < handle
             width = max(figPos(3) - 20, 400);
             height = max(figPos(4) - 20, 300);
 
-            contentHeight = height - 90;
-            contentHeight = max(contentHeight, 180);
+            topControlsY = height - 70;
+            topControlsY = max(topControlsY, 520);
+            maskRowY = topControlsY - 35;
 
-            buttonY = contentHeight - 30;
-            buttonY = max(buttonY, 520);
+            contentTopY = maskRowY - 10;
+            contentBottomY = 90;
+            contentHeight = max(contentTopY - contentBottomY, 180);
 
-            obj.LoadMRFButton.Position = [20 buttonY 120 30];
-            obj.LoadGTButton.Position = [160 buttonY 140 30];
-            obj.MapLabel.Position = [340 buttonY+5 40 25];
-            obj.MapDropdown.Position = [380 buttonY 150 30];
-            obj.ColorScaleModeLabel.Position = [560 buttonY+5 80 25];
-            obj.ColorScaleModeDropdown.Position = [640 buttonY 100 30];
-            obj.ColorScaleMinLabel.Position = [760 buttonY+5 30 25];
-            obj.ColorScaleMinField.Position = [795 buttonY 80 30];
-            obj.ColorScaleMaxLabel.Position = [885 buttonY+5 35 25];
-            obj.ColorScaleMaxField.Position = [925 buttonY 80 30];
+            obj.LoadMRFButton.Position = [20 topControlsY 120 30];
+            obj.LoadGTButton.Position = [160 topControlsY 140 30];
+            obj.MapLabel.Position = [340 topControlsY+5 40 25];
+            obj.MapDropdown.Position = [380 topControlsY 150 30];
+            obj.ColorScaleModeLabel.Position = [560 topControlsY+5 80 25];
+            obj.ColorScaleModeDropdown.Position = [640 topControlsY 100 30];
+            obj.ColorScaleMinLabel.Position = [760 topControlsY+5 30 25];
+            obj.ColorScaleMinField.Position = [795 topControlsY 80 30];
+            obj.ColorScaleMaxLabel.Position = [885 topControlsY+5 35 25];
+            obj.ColorScaleMaxField.Position = [925 topControlsY 80 30];
+
+            obj.MaskSectionLabel.Position = [340 maskRowY+5 35 25];
+            obj.ApplyMRFMaskCheckbox.Position = [380 maskRowY 120 30];
+            obj.ApplyGTMaskCheckbox.Position = [520 maskRowY 110 30];
 
             panelWidth = 220;
             mainWidth = max(width - panelWidth - 40, 420);
             axisWidth = max((mainWidth - 80) / 2, 200);
-            axisHeight = max(contentHeight - 140, 200);
+            axisHeight = max(contentHeight - 20, 200);
 
             obj.ROIPanel.Position = [width - panelWidth - 20 90 panelWidth contentHeight];
 
@@ -366,26 +403,74 @@ classdef ViewerTab < handle
             cla(obj.MRFAxes)
             cla(obj.GTAxes)
 
+            mrfImg = [];
+            gtImg = [];
+
+            if ~isempty(obj.Parent.MRFData)
+                mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
+                if obj.ApplyMRFMaskCheckbox.Value && ~isempty(obj.Parent.MRFMask)
+                    mrfImg = obj.Parent.applyMaskToImage(mrfImg, obj.getMaskSlice(obj.Parent.MRFMask));
+                end
+            end
+
+            if ~isempty(obj.Parent.GTData)
+                prevMap = obj.Parent.CurrentMap;
+                gtMapIdx = obj.getEquivalentGTMapIndex(prevMap);
+                obj.Parent.CurrentMap = gtMapIdx;
+                gtImg = obj.Parent.extractImage(obj.Parent.GTData);
+                obj.Parent.CurrentMap = prevMap;
+                if obj.ApplyGTMaskCheckbox.Value && ~isempty(obj.Parent.GTMask)
+                    gtImg = obj.Parent.applyMaskToImage(gtImg, obj.getMaskSlice(obj.Parent.GTMask));
+                end
+            else
+                gtMapIdx = 1;
+            end
+
+            mrfMapName = obj.getMRFMapName(obj.Parent.CurrentMap);
+            gtMapName = obj.getGTMapName(gtMapIdx);
+
+            if isempty(mrfMapName)
+                title(obj.MRFAxes,'MRF');
+            else
+                title(obj.MRFAxes,sprintf('MRF - %s (Map %d)', mrfMapName, obj.Parent.CurrentMap));
+            end
+
+            if isempty(gtMapName)
+                title(obj.GTAxes,'Ground Truth');
+            else
+                title(obj.GTAxes,sprintf('Ground Truth - %s (Map %d)', gtMapName, gtMapIdx));
+            end
+
+            if strcmp(obj.ColorScaleModeDropdown.Value,'Manual')
+                cmin = obj.ColorScaleMinField.Value;
+                cmax = obj.ColorScaleMaxField.Value;
+                if ~(cmin < cmax)
+                    [cmin, cmax] = obj.computeSharedColorLimits(mrfImg, gtImg);
+                end
+            else
+                [cmin, cmax] = obj.computeSharedColorLimits(mrfImg, gtImg);
+                if cmin < cmax
+                    obj.ColorScaleMinField.Value = cmin;
+                    obj.ColorScaleMaxField.Value = cmax;
+                end
+            end
+
+            sharedMap = turbo(256);
+
             % ---------------------------------------------------------
             % MRF
             % ---------------------------------------------------------
 
-            if ~isempty(obj.Parent.MRFData)
+            if ~isempty(mrfImg)
 
-                img = obj.Parent.extractImage(obj.Parent.MRFData);
-
-                imagesc(obj.MRFAxes,img);
+                imagesc(obj.MRFAxes,mrfImg);
 
                 axis(obj.MRFAxes,'image');
 
-                colormap(obj.MRFAxes,"turbo");
+                colormap(obj.MRFAxes,sharedMap);
 
-                if strcmp(obj.ColorScaleModeDropdown.Value,'Manual')
-                    cmin = obj.ColorScaleMinField.Value;
-                    cmax = obj.ColorScaleMaxField.Value;
-                    if cmin < cmax
-                        caxis(obj.MRFAxes,[cmin cmax]);
-                    end
+                if cmin < cmax
+                    caxis(obj.MRFAxes,[cmin cmax]);
                 end
 
                 colorbar(obj.MRFAxes);
@@ -396,22 +481,16 @@ classdef ViewerTab < handle
             % Ground Truth
             % ---------------------------------------------------------
 
-            if ~isempty(obj.Parent.GTData)
+            if ~isempty(gtImg)
 
-                gt = obj.Parent.extractImage(obj.Parent.GTData);
-
-                imagesc(obj.GTAxes,gt);
+                imagesc(obj.GTAxes,gtImg);
 
                 axis(obj.GTAxes,'image');
 
-                colormap(obj.GTAxes,gray);
+                colormap(obj.GTAxes,sharedMap);
 
-                if strcmp(obj.ColorScaleModeDropdown.Value,'Manual')
-                    cmin = obj.ColorScaleMinField.Value;
-                    cmax = obj.ColorScaleMaxField.Value;
-                    if cmin < cmax
-                        caxis(obj.GTAxes,[cmin cmax]);
-                    end
+                if cmin < cmax
+                    caxis(obj.GTAxes,[cmin cmax]);
                 end
 
                 colorbar(obj.GTAxes);
@@ -421,6 +500,149 @@ classdef ViewerTab < handle
             obj.Parent.drawROIs();
             obj.Parent.updateInfo();
             obj.updateROIStats();
+        end
+
+        function msk = getMaskSlice(obj, mask)
+            % Extract the 2D mask slice matching the current slice index
+
+            msk = [];
+
+            if isempty(mask)
+                return
+            end
+
+            sz = size(mask);
+
+            if numel(sz) >= 3
+                sliceIdx = min(max(round(obj.Parent.CurrentSlice),1), sz(3));
+                msk = logical(mask(:,:,sliceIdx));
+            else
+                msk = logical(mask);
+            end
+        end
+
+        function gtMapIdx = getEquivalentGTMapIndex(obj, mrfMapIdx)
+
+            gtMapIdx = 1;
+
+            if isempty(obj.Parent.GTData)
+                return
+            end
+
+            gtSz = size(obj.Parent.GTData);
+            if numel(gtSz) < 4
+                gtMaps = 1;
+            else
+                gtMaps = gtSz(4);
+            end
+
+            if gtMaps <= 1
+                gtMapIdx = 1;
+                return
+            end
+
+            gtMapIdx = min(max(round(mrfMapIdx),1),gtMaps);
+
+            if isempty(obj.Parent.MapNames) || mrfMapIdx > numel(obj.Parent.MapNames)
+                return
+            end
+
+            mrfName = obj.Parent.MapNames{mrfMapIdx};
+
+            if ~isprop(obj.Parent,'GTMapNames') || isempty(obj.Parent.GTMapNames)
+                return
+            end
+
+            gtNames = obj.Parent.GTMapNames;
+            matchIdx = [];
+            for k = 1:min(numel(gtNames),gtMaps)
+                if obj.Parent.mapNamesMatch(mrfName, gtNames{k})
+                    matchIdx = k;
+                    break
+                end
+            end
+
+            if ~isempty(matchIdx)
+                gtMapIdx = matchIdx;
+            end
+        end
+
+        function mapName = getMRFMapName(obj, mapIdx)
+
+            mapName = '';
+
+            if isempty(obj.Parent.MRFData)
+                return
+            end
+
+            idx = max(1,round(mapIdx));
+
+            if ~isempty(obj.Parent.MapNames) && idx <= numel(obj.Parent.MapNames)
+                mapName = obj.Parent.MapNames{idx};
+                return
+            end
+
+            if ~isempty(obj.MapDropdown) && ~isempty(obj.MapDropdown.Items) && idx <= numel(obj.MapDropdown.Items)
+                mapName = obj.MapDropdown.Items{idx};
+                return
+            end
+
+            mapName = sprintf('Map %d', idx);
+        end
+
+        function mapName = getGTMapName(obj, mapIdx)
+
+            mapName = '';
+
+            if isempty(obj.Parent.GTData)
+                return
+            end
+
+            idx = max(1,round(mapIdx));
+
+            if isprop(obj.Parent,'GTMapNames') && ~isempty(obj.Parent.GTMapNames) && idx <= numel(obj.Parent.GTMapNames)
+                mapName = obj.Parent.GTMapNames{idx};
+                return
+            end
+
+            gtSz = size(obj.Parent.GTData);
+            if numel(gtSz) < 4 || gtSz(4) <= 1
+                mapName = 'GT';
+            else
+                mapName = sprintf('GT %d', idx);
+            end
+        end
+
+        function [cmin, cmax] = computeSharedColorLimits(~, mrfImg, gtImg)
+
+            combinedVals = [];
+
+            if ~isempty(mrfImg)
+                mVals = mrfImg(isfinite(mrfImg));
+                if ~isempty(mVals)
+                    combinedVals = [combinedVals; mVals(:)]; %#ok<AGROW>
+                end
+            end
+
+            if ~isempty(gtImg)
+                gVals = gtImg(isfinite(gtImg));
+                if ~isempty(gVals)
+                    combinedVals = [combinedVals; gVals(:)]; %#ok<AGROW>
+                end
+            end
+
+            if isempty(combinedVals)
+                cmin = 0;
+                cmax = 1;
+                return
+            end
+
+            cmin = double(min(combinedVals));
+            cmax = double(max(combinedVals));
+
+            if ~(cmin < cmax)
+                cmax = cmin + 1;
+            end
         end
 
         function configureSliceSlider(obj)
@@ -445,6 +667,14 @@ classdef ViewerTab < handle
             obj.SliceSlider.Value  = 1;
 
             obj.SliceSlider.Enable = 'on';
+
+            % Enable mask checkboxes if masks are present
+            if ~isempty(obj.Parent.MRFMask)
+                obj.ApplyMRFMaskCheckbox.Enable = 'on';
+            else
+                obj.ApplyMRFMaskCheckbox.Enable = 'off';
+                obj.ApplyMRFMaskCheckbox.Value = false;
+            end
 
         end
 
@@ -774,9 +1004,7 @@ classdef ViewerTab < handle
 
             % Create list of matches
             mrfMeanList = [];
-            mrfStdList = [];
             gtMeanList = [];
-            gtStdList = [];
             matchNames = {};
 
             % Match by keyword (T1, T2, etc)
@@ -826,7 +1054,7 @@ classdef ViewerTab < handle
             end
 
             % Create figure with subplots
-            fig = figure('Name','ROI Correlation Plot','NumberTitle','off');
+            figure('Name','ROI Correlation Plot','NumberTitle','off');
             nPlots = numel(mrfMeanList);
             nCols = ceil(sqrt(nPlots));
             nRows = ceil(nPlots / nCols);

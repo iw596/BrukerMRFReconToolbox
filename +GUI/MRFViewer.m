@@ -15,10 +15,14 @@ classdef MRFViewer < handle
         TabGroup
         ViewerTabObj    % ViewerTab instance
         ReconTabObj     % ReconstructionTab instance
+        DictionaryTabObj % DictionaryTab instance
 
         % Data
         MRFData = []
         GTData = []
+        GTMapNames = {}
+        MRFMask = []
+        GTMask = []
 
         CurrentSlice = 1
         CurrentMap = 1
@@ -64,10 +68,11 @@ classdef MRFViewer < handle
             % Create tab handles
             viewerTabHandle = uitab(app.TabGroup, 'Title','Viewer');
             reconTabHandle = uitab(app.TabGroup, 'Title','Reconstruction');
-
+            dictionaryTabHandle = uitab(app.TabGroup,"Title","Dictionary");
             % Initialize tab objects which create their own UI
             app.ViewerTabObj = GUI.ViewerTab(app, viewerTabHandle);
             app.ReconTabObj = GUI.ReconstructionTab(app, reconTabHandle);
+            app.DictionaryTabObj = GUI.DictionaryTab(app,dictionaryTabHandle);
 
             % Initialize colormaps
             %initalizeColourMaps(app);
@@ -113,7 +118,7 @@ classdef MRFViewer < handle
 
             filename = fullfile(path,file);
 
-            [app.MRFData,app.MapNames] = app.readVolume(filename);
+            [app.MRFData,app.MapNames,app.MRFMask] = app.readVolume(filename);
 
             if isempty(app.MRFData)
                 return
@@ -141,29 +146,40 @@ classdef MRFViewer < handle
 
             filename = fullfile(path,file);
 
-            [app.GTData,~] = app.readVolume(filename);
+            [app.GTData,app.GTMapNames,app.GTMask] = app.readVolume(filename);
 
             if isempty(app.GTData)
                 return
             end
 
+            % Enable GT mask checkbox if a mask was found
+            if ~isempty(app.ViewerTabObj)
+                if ~isempty(app.GTMask)
+                    app.ViewerTabObj.ApplyGTMaskCheckbox.Enable = 'on';
+                else
+                    app.ViewerTabObj.ApplyGTMaskCheckbox.Enable = 'off';
+                    app.ViewerTabObj.ApplyGTMaskCheckbox.Value = false;
+                end
+            end
+
             app.ViewerTabObj.updateDisplay();
         end
 
-        function [data,mapNames] = readVolume(app,filename)
+        function [data,mapNames,mask] = readVolume(app,filename)
             % Read volume data from file
             %   Supports .mat and .nii files
 
             [~,~,ext] = fileparts(filename);
 
             mapNames = {};
+            mask = [];
 
             switch lower(ext)
 
                 case '.mat'
 
                     S = load(filename);
-                    [data,mapNames] = app.parseMRFMat(S);
+                    [data,mapNames,mask] = app.parseMRFMat(S);
 
                 case '.nii'
 
@@ -176,12 +192,20 @@ classdef MRFViewer < handle
             end
         end
 
-        function [data,mapNames] = parseMRFMat(app,S)
-            % Parse MAT file to extract MRF data
+        function [data,mapNames,mask] = parseMRFMat(app,S)
+            % Parse MAT file to extract MRF data and optional binary mask
             %   Looks for T1, T2 fields; combines into 4D array
+            %   Extracts 'mask' field if present (case-insensitive)
 
             mapNames = {};
+            mask = [];
             fn = fieldnames(S);
+
+            % Extract mask from top-level fields (case-insensitive)
+            topMaskField = fn(strcmpi(fn,'mask'));
+            if ~isempty(topMaskField)
+                mask = logical(S.(topMaskField{1}));
+            end
 
             % If the MAT file contains top-level T1 and T2 variables,
             % combine them into a 4D MRF volume.
@@ -205,10 +229,20 @@ classdef MRFViewer < handle
             end
 
             % If the MAT file contains exactly one variable that is a struct,
-            % look inside it for T1 and T2 fields.
+            % look inside it for T1, T2, and mask fields.
             if numel(fn) == 1 && isstruct(S.(fn{1}))
 
                 st = S.(fn{1});
+
+                % Extract mask from nested struct if not already found
+                if isempty(mask)
+                    stFields = fieldnames(st);
+                    nestedMaskField = stFields(strcmpi(stFields,'mask'));
+                    if ~isempty(nestedMaskField)
+                        mask = logical(st.(nestedMaskField{1}));
+                    end
+                end
+
                 if isfield(st,'T1') && isfield(st,'T2')
 
                     t1 = st.T1;
@@ -283,8 +317,8 @@ classdef MRFViewer < handle
                 return
             end
 
-            ROIs = app.ROIs; %#ok<NASGU>
-            save(fullfile(path,file),'ROIs');
+            roisToSave = app.ROIs;
+            save(fullfile(path,file),'roisToSave');
         end
 
         function loadROIs(app)
@@ -298,9 +332,108 @@ classdef MRFViewer < handle
             loaded = load(fullfile(path,file));
             if isfield(loaded,'ROIs')
                 app.ROIs = loaded.ROIs;
+            elseif isfield(loaded,'roisToSave')
+                app.ROIs = loaded.roisToSave;
+            elseif isfield(loaded,'ROIsData')
+                app.ROIs = loaded.ROIsData;
                 if ~isempty(app.ViewerTabObj)
                     app.ViewerTabObj.updateROIList();
                 end
+            end
+        end
+
+        function exportROIsCSV(app)
+            % Export ROI definitions and basic statistics to CSV for all maps.
+
+            if isempty(app.ROIs)
+                uialert(app.Fig, ...
+                    'No ROIs to export.', ...
+                    'Export ROIs', ...
+                    'Icon','warning');
+                return
+            end
+
+            [file,path] = uiputfile('*.csv','Export ROIs to CSV');
+            if isequal(file,0)
+                return
+            end
+
+            prevSlice = app.CurrentSlice;
+            prevMap = app.CurrentMap;
+            stateGuard = onCleanup(@()app.restoreSliceMap(prevSlice, prevMap));
+
+            csvRows = {'ROIIndex','Slice','Dataset','MapIndex','MapName','Type','Position','Mean','Std','AreaPx'};
+
+            for k = 1:numel(app.ROIs)
+                roi = app.ROIs(k);
+                posStr = app.roiPositionToString(roi.Position);
+
+                % --- MRF maps ---
+                if ~isempty(app.MRFData)
+                    mrfSize = size(app.MRFData);
+                    if numel(mrfSize) < 4
+                        nMaps = 1;
+                    else
+                        nMaps = mrfSize(4);
+                    end
+
+                    if ~isempty(app.ViewerTabObj) && ~isempty(app.ViewerTabObj.MapDropdown)
+                        mapItems = app.ViewerTabObj.MapDropdown.Items;
+                    else
+                        mapItems = {};
+                    end
+
+                    for mapIdx = 1:nMaps
+                        app.CurrentSlice = roi.Slice;
+                        app.CurrentMap = mapIdx;
+                        img = app.extractImage(app.MRFData);
+                        vals = app.extractROIMask(img, roi);
+                        [meanVal, stdVal, areaPx] = app.roiStatsFromValues(vals);
+
+                        if ~isempty(mapItems) && numel(mapItems) >= mapIdx
+                            mapName = mapItems{mapIdx};
+                        else
+                            mapName = sprintf('Map %d', mapIdx);
+                        end
+
+                        csvRows(end+1,:) = {k, roi.Slice, 'MRF', mapIdx, mapName, roi.Type, posStr, meanVal, stdVal, areaPx}; %#ok<AGROW>
+                    end
+                end
+
+                % --- Ground truth maps ---
+                if ~isempty(app.GTData)
+                    gtSize = size(app.GTData);
+                    if numel(gtSize) < 4
+                        nGtMaps = 1;
+                    else
+                        nGtMaps = gtSize(4);
+                    end
+
+                    for mapIdx = 1:nGtMaps
+                        app.CurrentSlice = roi.Slice;
+                        app.CurrentMap = mapIdx;
+                        img = app.extractImage(app.GTData);
+                        vals = app.extractROIMask(img, roi);
+                        [meanVal, stdVal, areaPx] = app.roiStatsFromValues(vals);
+
+                        if nGtMaps == 1
+                            mapName = 'GT';
+                        else
+                            mapName = sprintf('GT %d', mapIdx);
+                        end
+
+                        csvRows(end+1,:) = {k, roi.Slice, 'GT', mapIdx, mapName, roi.Type, posStr, meanVal, stdVal, areaPx}; %#ok<AGROW>
+                    end
+                end
+            end
+
+            try
+                writecell(csvRows, fullfile(path,file));
+            catch ME
+                uialert(app.Fig, ...
+                    ['Unable to export CSV: ' ME.message], ...
+                    'Export ROIs', ...
+                    'Icon','error');
             end
         end
 
@@ -316,10 +449,15 @@ classdef MRFViewer < handle
 
             if numel(sz) < 3
                 img = data;
-            elseif numel(sz) == 3
-                img = data(:,:,app.CurrentSlice);
             else
-                img = data(:,:,app.CurrentSlice,app.CurrentMap);
+                sliceIdx = min(max(round(app.CurrentSlice),1), sz(3));
+
+                if numel(sz) == 3
+                    img = data(:,:,sliceIdx);
+                else
+                    mapIdx = min(max(round(app.CurrentMap),1), sz(4));
+                    img = data(:,:,sliceIdx,mapIdx);
+                end
             end
         end
 
@@ -341,9 +479,17 @@ classdef MRFViewer < handle
                                 'Position',roi.Position, ...
                                 'EdgeColor','r', ...
                                 'LineWidth',1);
+                            rectangle(app.ViewerTabObj.GTAxes, ...
+                                'Position',roi.Position, ...
+                                'EdgeColor','r', ...
+                                'LineWidth',1);
                         case 'Freehand'
                             if size(roi.Position,2) == 2
                                 plot(app.ViewerTabObj.MRFAxes, ...
+                                    roi.Position(:,1), ...
+                                    roi.Position(:,2), ...
+                                    'r-','LineWidth',1);
+                                plot(app.ViewerTabObj.GTAxes, ...
                                     roi.Position(:,1), ...
                                     roi.Position(:,2), ...
                                     'r-','LineWidth',1);
@@ -351,6 +497,22 @@ classdef MRFViewer < handle
                     end
                 end
             end
+        end
+
+        function img = applyMaskToImage(~, img, mask)
+            % Apply a binary mask to a 2D image, setting masked-out pixels to NaN
+            %   mask: logical 2D array matching img spatial dimensions
+
+            if isempty(mask) || isempty(img)
+                return
+            end
+
+            if ~isequal(size(mask,1), size(img,1)) || ~isequal(size(mask,2), size(img,2))
+                return
+            end
+
+            img = double(img);
+            img(~mask) = NaN;
         end
 
         function updateInfo(app)
@@ -363,10 +525,49 @@ classdef MRFViewer < handle
             infoStr = sprintf('Slice: %d | Map: %d', ...
                 app.CurrentSlice, app.CurrentMap);
 
+            if ~isempty(app.MapNames) && app.CurrentMap <= numel(app.MapNames)
+                infoStr = sprintf('%s (%s)', infoStr, app.MapNames{app.CurrentMap});
+            end
+
+            if ~isempty(app.GTData)
+                gtMapIdx = app.CurrentMap;
+
+                gtSz = size(app.GTData);
+                if numel(gtSz) < 4
+                    nGtMaps = 1;
+                else
+                    nGtMaps = gtSz(4);
+                end
+                gtMapIdx = min(max(round(gtMapIdx),1),nGtMaps);
+
+                if ~isempty(app.ViewerTabObj) && ismethod(app.ViewerTabObj,'getEquivalentGTMapIndex')
+                    gtMapIdx = app.ViewerTabObj.getEquivalentGTMapIndex(app.CurrentMap);
+                end
+
+                if ~isempty(app.GTMapNames) && gtMapIdx <= numel(app.GTMapNames)
+                    gtName = app.GTMapNames{gtMapIdx};
+                elseif nGtMaps <= 1
+                    gtName = 'GT';
+                else
+                    gtName = sprintf('GT %d', gtMapIdx);
+                end
+
+                infoStr = sprintf('%s | GT Pair: %d (%s)', infoStr, gtMapIdx, gtName);
+            end
+
             if ~isempty(app.MRFData)
                 sz = size(app.MRFData);
                 infoStr = sprintf('%s | MRF size: %dx%dx%d', ...
                     infoStr, sz(1), sz(2), sz(3));
+            end
+
+            if ~isempty(app.GTData)
+                szGt = size(app.GTData);
+                if numel(szGt) < 3
+                    szGt(3) = 1;
+                end
+                infoStr = sprintf('%s | GT size: %dx%dx%d', ...
+                    infoStr, szGt(1), szGt(2), szGt(3));
             end
 
             app.ViewerTabObj.InfoLabel.Text = infoStr;
@@ -406,6 +607,25 @@ classdef MRFViewer < handle
             vals = img(mask);
             if isempty(vals)
                 vals = [];
+            end
+        end
+
+        function restoreSliceMap(app, sliceIdx, mapIdx)
+            % Restore viewer state after temporary slice/map changes.
+            app.CurrentSlice = sliceIdx;
+            app.CurrentMap = mapIdx;
+        end
+
+        function [meanVal, stdVal, areaPx] = roiStatsFromValues(~, vals)
+            % Compute summary stats for a set of ROI values.
+            if isempty(vals)
+                meanVal = NaN;
+                stdVal = NaN;
+                areaPx = NaN;
+            else
+                meanVal = mean(vals(:),'omitnan');
+                stdVal = std(vals(:),'omitnan');
+                areaPx = numel(vals);
             end
         end
 
@@ -464,6 +684,21 @@ classdef MRFViewer < handle
                     match = true;
                     return
                 end
+            end
+        end
+
+        function posStr = roiPositionToString(~, pos)
+            % Convert an ROI position array to a compact CSV-friendly string.
+            if isempty(pos)
+                posStr = '';
+            elseif isvector(pos)
+                posStr = sprintf('[%s]', strtrim(sprintf(' %.3f', pos)));
+            else
+                rows = cell(1,size(pos,1));
+                for ii = 1:size(pos,1)
+                    rows{ii} = sprintf('%.3f %.3f', pos(ii,1), pos(ii,2));
+                end
+                posStr = ['[' strjoin(rows,'; ') ']'];
             end
         end
 
