@@ -7,10 +7,6 @@ classdef DictionaryGeneration
         TR
         TE
         InversionPulse
-        inversionPulseAmplitude_uT
-        inversionPulseDuration_ms
-
-        instantInversionFlag
         dt % Simulation time step in seconds
         LUT
         T1Range
@@ -75,29 +71,17 @@ classdef DictionaryGeneration
             G_invspoiler = zeros(length(spoiler_inv),3);
             G_invspoiler(:,3) = spoiler_inv;
 
+
+
+
+            spoiler_acq = GenSliceSpoiler(amplitude,flatTime,RiseT,dt);
+            spoiler_acq = spoiler_acq * gyro/100; % Convert to Hz/cm
+            G_slispoiler = zeros(length(spoiler_acq),3);
+            G_slispoiler(:,3) = spoiler_acq;
+
             
 
             %% If required set-up inversion pulse
-            if (instantInversionFlag == false)
-                refPower = params.RefPow;
-                refVol = sqrt(refPower*50);
-                % Calculate pulse B1 required to achieve pi/2 flip
-                % for 1 ms block pulse
-                refB1 = (pi/2)./(2*pi*42.57*10^6*1e-3); % Peak B1 in T
-                % Calculate pulse peak voltage assuming 50 ohm load
-                pulsePeakVoltage = sqrt(params.MRFInversionPulse.power * 50);
-                % Peak B1 of pulse is refB1/refvoltage * pulse peak voltage
-                peakB1 = (refB1./refVol) .*  pulsePeakVoltage; % in T
-                [mag,phs] = ReadRFPulseFile("BrukerRFFiles/sech.inv");
-                InversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
-                InversionRF = InterpolateRFWaveform(InversionRF,params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(mag),dt);
-                InversionB1 = InversionRF * gyro;
-                
-            end
-
-            %% Run the simulation
-
-
         end
     end
 end

@@ -5,6 +5,7 @@ classdef MRFViewer < handle
     %   This class is refactored to use separate tab classes:
     %   - ViewerTab: Handles the Viewer tab UI and display
     %   - ReconstructionTab: Handles the Reconstruction tab UI
+    %   - FlipAngleGenerationTab: Handles flip angle generation/loading
     %
     %   MRFViewer retains shared data, ROI file I/O, and helper methods
 
@@ -15,6 +16,7 @@ classdef MRFViewer < handle
         TabGroup
         ViewerTabObj    % ViewerTab instance
         ReconTabObj     % ReconstructionTab instance
+        FlipAngleGenTabObj % FlipAngleGenerationTab instance
         DictionaryTabObj % DictionaryTab instance
 
         % Data
@@ -68,10 +70,12 @@ classdef MRFViewer < handle
             % Create tab handles
             viewerTabHandle = uitab(app.TabGroup, 'Title','Viewer');
             reconTabHandle = uitab(app.TabGroup, 'Title','Reconstruction');
+            faGenTabHandle = uitab(app.TabGroup, 'Title','Flip Angle Generation');
             dictionaryTabHandle = uitab(app.TabGroup,"Title","Dictionary");
             % Initialize tab objects which create their own UI
             app.ViewerTabObj = GUI.ViewerTab(app, viewerTabHandle);
             app.ReconTabObj = GUI.ReconstructionTab(app, reconTabHandle);
+            app.FlipAngleGenTabObj = GUI.FlipAngleGenerationTab(app, faGenTabHandle);
             app.DictionaryTabObj = GUI.DictionaryTab(app,dictionaryTabHandle);
 
             % Initialize colormaps
@@ -98,6 +102,10 @@ classdef MRFViewer < handle
 
             if ~isempty(app.ReconTabObj)
                 app.ReconTabObj.resizeUI(figPos);
+            end
+
+            if ~isempty(app.FlipAngleGenTabObj)
+                app.FlipAngleGenTabObj.updateResponsiveLayout();
             end
         end
 

@@ -423,20 +423,22 @@ function params = LoadBrukerData(path,loadDataFlag)
         amp = [];
     end
     
-    k = strfind(TextAsCells,"$InversionSliceSpoiler=");
-    idx = find(~cellfun(@isempty,k));
-    if (isempty(idx) ~=1)
-        line = TextAsCells(idx);
-        line = strtrim(extractAfter(cell2mat(line),'=('));
-        tmp = strsplit(line,{',','\n'});
-        params.T1PrepSpoiler.NCycles = str2double(cell2mat(tmp(2)));
-        params.T1PrepSpoiler.duration = str2double(cell2mat(tmp(3)))/1000; % Convert to seconds
-        amp = cell2mat(tmp(4));
-        amp = amp(1:end-1);
-        params.T1PrepSpoiler.amplitude = str2double(amp);
-        amp = [];
-    end
 
+    % Extract information about slice spoiler
+    mask = ~cellfun(@isempty, strfind(TextAsCells,'$InversionSliceSpoiler'));
+    line = TextAsCells(mask);
+    if (isempty(line) ~=1)
+        tmp = cell2mat(regexp(line, '(?<=\()[^)]*(?=\))', 'match', 'once'));
+        tmp = strsplit(tmp,',');
+        % Split comma separated values
+        params.T1PrepSpoiler.duration = str2num(tmp{3})/1000; % Spoiler duration in s
+        params.T1PrepSpoiler.NCycles = str2num(tmp{2});
+        amp = cell2mat(tmp(4));
+        %amp = amp(1:end-1);
+        params.T1PrepSpoiler.amplitude = str2double(amp);
+
+    end
+    
     k = strfind(TextAsCells,"$T2PrepSliceSpoiler=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
