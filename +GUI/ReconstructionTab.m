@@ -8,8 +8,14 @@ classdef ReconstructionTab < handle
 
         % Controls
         RunReconButton
-
         LoadFileButton
+        RegModeLabel
+        RegModeDropdown
+        LambdaLabel
+        LambdaEdit
+        EstimateMaskCheckbox
+
+        ReconSettings = struct()
 
 
     end
@@ -39,12 +45,60 @@ classdef ReconstructionTab < handle
                 'Position',[20 580 160 30],...
                 'ButtonPushedFcn',...
                 @(src,event)obj.loadFile());
+
+            obj.RegModeLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Regularization mode', ...
+                'Position', [20 540 130 22]);
+            obj.RegModeDropdown = uidropdown(obj.TabHandle, ...
+                'Items', {'Locally-low rank', 'Wavelet', 'Total variation'}, ...
+                'Value', 'Locally-low rank', ...
+                'Position', [160 540 180 22], ...
+                'Tooltip', 'Select regularization method for reconstruction');
+
+            obj.LambdaLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Lambda', ...
+                'Position', [20 510 130 22]);
+            obj.LambdaEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 0.01, ...
+                'Limits', [0 Inf], ...
+                'LowerLimitInclusive', false, ...
+                'Position', [160 510 180 22], ...
+                'Tooltip', 'Regularization strength (must be > 0)');
+
+            obj.EstimateMaskCheckbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Estimate mask', ...
+                'Value', false, ...
+                'Position', [20 478 180 22], ...
+                'Tooltip', 'Estimate mask automatically during reconstruction');
+
+            obj.resizeUI([]);
         end
 
-        function runReconstruction(~)
+        function runReconstruction(obj)
             % Placeholder for the reconstruction action.
-            % The button is present, but no behavior is implemented yet.
-            disp("Reconstruction initated")
+            % Collects current UI parameters for downstream reconstruction.
+
+            regMode = obj.RegModeDropdown.Value;
+            lambda = obj.LambdaEdit.Value;
+            estimateMask = obj.EstimateMaskCheckbox.Value;
+
+            if isempty(lambda) || ~isfinite(lambda) || lambda <= 0
+                uialert(obj.TabHandle.Parent, ...
+                    'Lambda must be a positive number.', ...
+                    'Invalid Lambda', 'Icon', 'warning');
+                return;
+            end
+
+            settings = struct();
+            settings.RegularizationMode = regMode;
+            settings.Lambda = lambda;
+            settings.EstimateMask = estimateMask;
+            settings.LoadDir = obj.Parent.LastLoadDir;
+
+            obj.ReconSettings = settings;
+
+            disp('Reconstruction initiated with settings:');
+            disp(settings);
         end
 
         function loadFile(obj)
@@ -63,11 +117,39 @@ classdef ReconstructionTab < handle
             disp(['Selected directory: ', selectedDir])
         end
         
-        function resizeUI(~, ~)
-            % Update UI element positions based on figure size.
+        function resizeUI(obj, ~)
+            % Update UI element positions based on current tab dimensions.
 
-            % Currently no resize logic needed for minimal Reconstruction tab
-            % Add position updates here as new controls are added
+            if isempty(obj.TabHandle) || ~isvalid(obj.TabHandle)
+                return;
+            end
+
+            tabPos = obj.TabHandle.Position;
+            tabW = max(tabPos(3), 420);
+            tabH = max(tabPos(4), 320);
+
+            margin = 20;
+            rowGap = 10;
+            ctrlH = 28;
+            fieldW = min(220, max(160, floor(0.35 * tabW)));
+
+            yTop = tabH - margin - ctrlH;
+
+            obj.RunReconButton.Position = [margin yTop 180 ctrlH];
+            y = yTop - rowGap - ctrlH;
+
+            obj.LoadFileButton.Position = [margin y 180 ctrlH];
+            y = y - rowGap - 22;
+
+            obj.RegModeLabel.Position = [margin y 130 22];
+            obj.RegModeDropdown.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            obj.LambdaLabel.Position = [margin y 130 22];
+            obj.LambdaEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            obj.EstimateMaskCheckbox.Position = [margin y 180 22];
         end
 
         
