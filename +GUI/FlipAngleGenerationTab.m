@@ -247,11 +247,7 @@ classdef FlipAngleGenerationTab < handle
 
         function updatePlot(obj)
             pattern = obj.buildPattern();
-            if isempty(pattern)
-                pattern = obj.FlipAngles;
-            else
-                obj.FlipAngles = pattern;
-            end
+            obj.FlipAngles = pattern;
             obj.Parent.FlipAngles = pattern;
 
             ax = obj.FAAxes;
