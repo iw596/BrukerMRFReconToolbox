@@ -13,11 +13,16 @@ classdef DictionaryTab < handle
         DictParamPanel      % T1 / T2 / B1
         SeqTimingPanel      % TR / TE / Load Methods
         InversionPanel      % Inversion pulse options
+        PrepListPanel       % Prep list load and preview
 
         % --- Dictionary parameter controls ---
         T1Edit
         T2Edit
         B1Edit
+        
+        %--- RF power parameters ---
+        RefPow
+
 
         % --- Sequence timing controls ---
         TREdit
@@ -31,30 +36,26 @@ classdef DictionaryTab < handle
         LoadMethodsButton
 
         % --- Inversion pulse controls ---
-        InversionCheckbox
-        InversionTimeEdit
-        InversionTypeDropdown
-        RFDurationLabel
-        RFDurationEdit
         RasterTimeLabel
         RasterTimeEdit
-        InversionMaxB1Label
-        InversionMaxB1Edit
-        InvSpoilerAmpLabel
-        InvSpoilerAmpEdit
-        InvSpoilerFlatTopLabel
-        InvSpoilerFlatTopEdit
-        InvSpoilerRiseLabel
-        InvSpoilerRiseEdit
+        InstantInversionCheckbox
 
         % --- Bottom-area buttons ---
         GenerateDictButton
+        LoadPrepListButton
+        PrepListSummaryLabel
+        PrepListTable
 
         % --- Visualisation ---
         FAAxes
 
         % --- Data ---
         FlipAngles  % Combined FA pattern (numeric row vector)
+        LoadedMethodParams = struct()
+        LoadedMethodPath = ''
+        PrepListMatrix = []
+        PrepListNames = {}
+        PrepListDeclaredCount = NaN
 
         %---Dictionary Controller ---
         DictionaryGenerationController
@@ -113,13 +114,26 @@ classdef DictionaryTab < handle
                 'Position', [80 24 85 22], ...
                 'Tooltip', 'MATLAB range or vector, e.g. 0.8:0.05:1.2');
 
+            obj.RasterTimeLabel = uilabel(P, ...
+                'Text', 'Raster Time (µs)', ...
+                'Position', [180 46 100 22], ...
+                'FontWeight', 'bold', ...
+                'Enable', 'on');
+            obj.RasterTimeEdit = uieditfield(P, 'numeric', ...
+                'Value', 10, ...
+                'Limits', [0 Inf], ...
+                'Position', [285 46 65 22], ...
+                'Enable', 'on', ...
+                'Tooltip', 'Editable simulation raster time in µs');
+
             uilabel(P, 'Text', 'Slice thickness (mm)', ...
                 'Position', [180 24 100 22], 'FontWeight', 'bold');
             obj.SliceThicknessEdit = uieditfield(P, 'numeric', ...
                 'Value', 2, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [285 24 65 22], ...
-                'Tooltip', 'Slice thickness in mm for spatial isochromat simulation');
+                'Tooltip', 'Loaded from Bruker method file');
 
             uilabel(P, 'Text', 'N isochromats', ...
                 'Position', [10 2 115 22], 'FontWeight', 'bold');
@@ -127,22 +141,23 @@ classdef DictionaryTab < handle
                 'Value', 200, ...
                 'Limits', [1 Inf], ...
                 'RoundFractionalValues', true, ...
+                'Enable', 'on', ...
                 'Position', [130 2 220 22], ...
-                'Tooltip', 'Number of isochromats used in Bloch simulation (integer only)');
+                'Tooltip', 'User-editable isochromat count used in Bloch simulation');
 
             % ============================================================
             % SECTION 2 – Sequence Timing panel
             % ============================================================
             obj.SeqTimingPanel = uipanel(TAB, ...
-                'Title', 'Sequence Timing', ...
+                'Title', 'Sequence Timing (Loaded from Method)', ...
                 'FontWeight', 'bold', ...
                 'Position', [10 363 370 120]);
             P = obj.SeqTimingPanel;
 
             obj.LoadMethodsButton = uibutton(P, ...
-                'Text', 'Load from Bruker Methods File', ...
+                'Text', 'Select Bruker Method File', ...
                 'Position', [10 88 350 24], ...
-                'Tooltip', 'Parse TR and TE from a Bruker method file', ...
+                'Tooltip', 'Load all sequence parameters from Bruker method file', ...
                 'ButtonPushedFcn', @(~,~) obj.loadMethodsFile());
 
             uilabel(P, 'Text', 'TR (ms)', ...
@@ -150,152 +165,69 @@ classdef DictionaryTab < handle
             obj.TREdit = uieditfield(P, 'numeric', ...
                 'Value', 10, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [65 56 90 22], ...
-                'Tooltip', 'Repetition time in ms');
+                'Tooltip', 'Loaded from Bruker method file');
 
             uilabel(P, 'Text', 'TE (ms)', ...
                 'Position', [190 56 50 22], 'FontWeight', 'bold');
             obj.TEEdit = uieditfield(P, 'numeric', ...
                 'Value', 2, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [245 56 105 22], ...
-                'Tooltip', 'Echo time in ms');
+                'Tooltip', 'Loaded from Bruker method file');
 
             uilabel(P, 'Text', 'Step (µs)', ...
                 'Position', [10 30 80 22], 'FontWeight', 'bold');
             obj.SimTimeStepEdit = uieditfield(P, 'numeric', ...
                 'Value', 10, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [90 30 65 22], ...
-                'Tooltip', 'Simulation time step in µs');
+                'Tooltip', 'Mirrors raster time (editable in dictionary parameters)');
 
             uilabel(P, 'Text', 'Amp (mT)', ...
                 'Position', [190 30 70 22], 'FontWeight', 'bold');
             obj.SpoilerAmpEdit = uieditfield(P, 'numeric', ...
                 'Value', 20, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [265 30 85 22], ...
-                'Tooltip', 'Spoiler gradient amplitude in mT');
+                'Tooltip', 'Loaded from Bruker method file');
 
             uilabel(P, 'Text', 'Flat top (ms)', ...
                 'Position', [10 4 85 22], 'FontWeight', 'bold');
             obj.SpoilerFlatTopEdit = uieditfield(P, 'numeric', ...
                 'Value', 2, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [98 4 57 22], ...
-                'Tooltip', 'Spoiler gradient flat-top duration in ms');
+                'Tooltip', 'Loaded from Bruker method file');
 
             uilabel(P, 'Text', 'Rise (ms)', ...
                 'Position', [190 4 70 22], 'FontWeight', 'bold');
             obj.SpoilerRiseTimeEdit = uieditfield(P, 'numeric', ...
                 'Value', 0.2, ...
                 'Limits', [0 Inf], ...
+                'Enable', 'off', ...
                 'Position', [265 4 85 22], ...
-                'Tooltip', 'Spoiler gradient rise time in ms');
+                'Tooltip', 'Loaded from Bruker method file');
 
             % ============================================================
             % SECTION 3 – Inversion Pulse panel
             % ============================================================
             obj.InversionPanel = uipanel(TAB, ...
-                'Title', 'Inversion Pulse  (180°, not included in FA array)', ...
+                'Title', 'Inversion', ...
                 'FontWeight', 'bold', ...
                 'Position', [10 228 370 131]);
             P = obj.InversionPanel;
 
-            obj.InversionCheckbox = uicheckbox(P, ...
-                'Text', 'Include inversion pulse before acquisition', ...
-                'Value', false, ...
-                'Position', [10 104 350 22], ...
-                'ValueChangedFcn', @(~,~) obj.onInversionToggled());
-
-            uilabel(P, 'Text', 'Inversion Time (ms)', ...
-                'Position', [10 81 120 22], 'FontWeight', 'bold');
-            obj.InversionTimeEdit = uieditfield(P, 'numeric', ...
-                'Value', 1000, ...
-                'Limits', [0 Inf], ...
-                'Position', [133 81 60 22], ...
-                'Enable', 'on', ...
-                'Tooltip', 'Time from inversion pulse to readout start in ms');
-
-            uilabel(P, 'Text', 'Type', ...
-                'Position', [208 81 40 22], 'FontWeight', 'bold');
-            obj.InversionTypeDropdown = uidropdown(P, ...
-                'Items', {'Instant', 'Sech'}, ...
-                'Value', 'Instant', ...
-                'Enable', 'off', ...
-                'Position', [250 81 110 22], ...
-                'Tooltip', 'Instant: ideal inversion; Hard Pulse: specify RF parameters', ...
-                'ValueChangedFcn', @(~,~) obj.onInversionTypeChanged());
-
-            obj.RFDurationLabel = uilabel(P, ...
-                'Text', 'RF Duration (ms)', ...
-                'Position', [10 58 115 22], ...
-                'Enable', 'on');
-            obj.RFDurationEdit = uieditfield(P, 'numeric', ...
-                'Value', 0.5, ...
-                'Limits', [0 Inf], ...
-                'Position', [128 58 60 22], ...
-                'Enable', 'on', ...
-                'Tooltip', 'Duration of the inversion hard pulse in ms');
-
-            obj.RasterTimeLabel = uilabel(P, ...
-                'Text', 'Raster Time (µs)', ...
-                'Position', [200 58 115 22], ...
-                'Enable', 'on');
-            obj.RasterTimeEdit = uieditfield(P, 'numeric', ...
-                'Value', 10, ...
-                'Limits', [0 Inf], ...
-                'Position', [315 58 45 22], ...
-                'Enable', 'on', ...
-                'Tooltip', 'RF raster time in µs');
-
-            obj.InversionMaxB1Label = uilabel(P, ...
-                'Text', 'Max B1 (uT)', ...
-                'Position', [10 35 85 22], ...
-                'FontWeight', 'bold', ...
-                'Enable', 'off');
-            obj.InversionMaxB1Edit = uieditfield(P, 'numeric', ...
-                'Value', 150, ...
-                'Limits', [0 Inf], ...
-                'Position', [98 35 52 22], ...
-                'Enable', 'off', ...
-                'Tooltip', 'Maximum B1 amplitude of the inversion pulse in uT');
-
-            obj.InvSpoilerAmpLabel = uilabel(P, ...
-                'Text', 'Amp (mT)', ...
-                'Position', [162 35 62 22], ...
-                'FontWeight', 'bold', ...
-                'Enable', 'on');
-            obj.InvSpoilerAmpEdit = uieditfield(P, 'numeric', ...
-                'Value', 20, ...
-                'Limits', [0 Inf], ...
-                'Position', [224 35 45 22], ...
-                'Enable', 'on', ...
-                'Tooltip', 'Inversion spoiler gradient amplitude in mT');
-
-            obj.InvSpoilerFlatTopLabel = uilabel(P, ...
-                'Text', 'Flat (ms)', ...
-                'Position', [279 35 62 22], ...
-                'FontWeight', 'bold', ...
-                'Enable', 'on');
-            obj.InvSpoilerFlatTopEdit = uieditfield(P, 'numeric', ...
-                'Value', 2, ...
-                'Limits', [0 Inf], ...
-                'Position', [341 35 20 22], ...
-                'Enable', 'on', ...
-                'Tooltip', 'Inversion spoiler flat-top duration in ms');
-
-            obj.InvSpoilerRiseLabel = uilabel(P, ...
-                'Text', 'Rise (ms)', ...
-                'Position', [10 12 62 22], ...
-                'FontWeight', 'bold', ...
-                'Enable', 'on');
-            obj.InvSpoilerRiseEdit = uieditfield(P, 'numeric', ...
-                'Value', 0.2, ...
-                'Limits', [0 Inf], ...
-                'Position', [72 12 45 22], ...
-                'Enable', 'on', ...
-                'Tooltip', 'Inversion spoiler rise time in ms');
+            obj.InstantInversionCheckbox = uicheckbox(P, ...
+                'Text', 'Instant inversion', ...
+                'Value', true, ...
+                'Position', [10 88 220 24], ...
+                'Tooltip', 'If checked, use ideal instant inversion model');
 
             obj.GenerateDictButton = uibutton(TAB, ...
                 'Text', 'Generate Dictionary', ...
@@ -304,9 +236,36 @@ classdef DictionaryTab < handle
                 'ButtonPushedFcn', @(~,~) obj.generateDictionary());
 
             % ============================================================
-            % SECTION 6 – Flip angle axes (right-hand column)
+            % SECTION 6 – Preparation list panel (right-hand column, top)
             % ============================================================
-            obj.FAAxes = uiaxes(TAB, 'Position', [400 20 540 550]);
+            obj.PrepListPanel = uipanel(TAB, ...
+                'Title', 'Preparation Modules', ...
+                'FontWeight', 'bold', ...
+                'Position', [400 430 540 240]);
+
+            obj.LoadPrepListButton = uibutton(obj.PrepListPanel, ...
+                'Text', 'Load Prep List', ...
+                'Position', [10 200 140 26], ...
+                'Tooltip', 'Load preparation module list from text file', ...
+                'ButtonPushedFcn', @(~,~) obj.loadPrepListFile());
+
+            obj.PrepListSummaryLabel = uilabel(obj.PrepListPanel, ...
+                'Text', 'No prep list loaded', ...
+                'Position', [160 200 360 26], ...
+                'HorizontalAlignment', 'left');
+
+            obj.PrepListTable = uitable(obj.PrepListPanel, ...
+                'Data', cell(0,4), ...
+                'ColumnName', {'#','Module','Prep Time (ms)','Wait Time (ms)'}, ...
+                'ColumnEditable', [false false false false], ...
+                'ColumnWidth', {45 130 130 130}, ...
+                'RowName', {}, ...
+                'Position', [10 10 520 185]);
+
+            % ============================================================
+            % SECTION 7 – Flip angle axes (right-hand column, bottom)
+            % ============================================================
+            obj.FAAxes = uiaxes(TAB, 'Position', [400 20 540 400]);
             title(obj.FAAxes,  'Flip Angle Pattern');
             xlabel(obj.FAAxes, 'Frame Number');
             ylabel(obj.FAAxes, 'Flip Angle (deg)');
@@ -325,90 +284,95 @@ classdef DictionaryTab < handle
                 end
             end
 
-        end
+            obj.refreshFAPlot();
+            obj.updateResponsiveLayout();
 
-        % -------------------------------------------------------------- %
-        % Inversion pulse callbacks
-        % -------------------------------------------------------------- %
-        function onInversionToggled(obj)
-            % Enable / disable inversion type controls when checkbox changes.
-            if obj.InversionCheckbox.Value
-                obj.InversionTypeDropdown.Enable = 'on';
-                obj.onInversionTypeChanged();   % apply current type state
-            else
-                obj.InversionTypeDropdown.Enable  = 'off';
-                obj.RFDurationLabel.Enable   = 'on';
-                obj.RFDurationEdit.Enable    = 'on';
-                obj.RasterTimeLabel.Enable   = 'on';
-                obj.RasterTimeEdit.Enable    = 'on';
-                obj.InversionMaxB1Label.Enable = 'off';
-                obj.InversionMaxB1Edit.Enable = 'off';
-                obj.InvSpoilerAmpLabel.Enable = 'on';
-                obj.InvSpoilerAmpEdit.Enable = 'on';
-                obj.InvSpoilerFlatTopLabel.Enable = 'on';
-                obj.InvSpoilerFlatTopEdit.Enable = 'on';
-                obj.InvSpoilerRiseLabel.Enable = 'on';
-                obj.InvSpoilerRiseEdit.Enable = 'on';
-            end
-        end
-
-        function onInversionTypeChanged(obj)
-            % Keep raster and inversion spoiler parameters always editable.
-            isHard = strcmp(obj.InversionTypeDropdown.Value, 'Hard Pulse') ...
-                     && obj.InversionCheckbox.Value;
-            state = obj.tf2onoff(isHard);
-            obj.RFDurationLabel.Enable  = state;
-            obj.RFDurationEdit.Enable   = state;
-            obj.RasterTimeLabel.Enable  = 'on';
-            obj.RasterTimeEdit.Enable   = 'on';
-            obj.InversionMaxB1Label.Enable = state;
-            obj.InversionMaxB1Edit.Enable = state;
-            obj.InvSpoilerAmpLabel.Enable = 'on';
-            obj.InvSpoilerAmpEdit.Enable = 'on';
-            obj.InvSpoilerFlatTopLabel.Enable = 'on';
-            obj.InvSpoilerFlatTopEdit.Enable = 'on';
-            obj.InvSpoilerRiseLabel.Enable = 'on';
-            obj.InvSpoilerRiseEdit.Enable = 'on';
         end
 
         % -------------------------------------------------------------- %
         function loadMethodsFile(obj)
-            % Load TR and TE from a Bruker method file.
-            % TODO: implement Bruker method file parsing here.
-            pth = uigetdir('Select Bruker Directory');
-            gyro = 42.577e6; %Hz/T
-            params = LoadBrukerData(pth,false);
-            obj.TREdit.Value = params.TR;
-            obj.TEEdit.Value = params.TE;
-            if isfield(params, 'InversionTime')
-                obj.InversionTimeEdit.Value = params.InversionTime;
+            % Load all non-search-space parameters from a Bruker method file.
+
+            [fileName, folderPath] = uigetfile({'*','Bruker method file (usually named method)'}, ...
+                'Select Bruker method file');
+            if isequal(fileName, 0)
+                return;
             end
-                if isfield(params, 'MRFInversionPulse') && isfield(params.MRFInversionPulse, 'maxB1_uT')
-                    obj.InversionMaxB1Edit.Value = params.MRFInversionPulse.maxB1_uT;
-                end
-            obj.InvSpoilerRiseEdit.Value = params.RiseTime .* 1000; % Convert into ms
-            obj.InvSpoilerFlatTopEdit.Value = (params.T1PrepSpoiler.duration - params.RiseTime).* 1000;
-            params.T1PrepSpoiler
-            tmp =  (params.PVM_GradCalConst *  (params.T1PrepSpoiler.amplitude/100)); % Hz/m
-            tmp =  tmp * 1000; % Hz/m
-            obj.InvSpoilerAmpEdit.Value =  (tmp./gyro).*1000; % mT/m
-            if (size(params.FOV,2) == 2)
-                obj.SliceThicknessEdit.Value = params.Thickness;
+
+            selectedPath = fullfile(folderPath, fileName);
+            scanDir = folderPath;
+
+            try
+                params = LoadBrukerData(scanDir, false);
+            catch ME
+                uialert(obj.TabHandle.Parent, ...
+                    ['Unable to parse Bruker method file: ' ME.message], ...
+                    'Method Load Error', 'Icon', 'error');
+                return;
+            end
+
+            obj.LoadedMethodParams = params;
+            obj.LoadedMethodPath = selectedPath;
+
+            if isfield(params, 'TR')
+                obj.TREdit.Value = params.TR * 1000;
+            end
+            if isfield(params, 'TE')
+                obj.TEEdit.Value = params.TE * 1000;
+            end
+
+            if isfield(params, 'RiseTime')
+                riseMs = params.RiseTime * 1000;
+                obj.SpoilerRiseTimeEdit.Value = riseMs;
             else
-                obj.SliceThicknessEdit.Value = params.Thickness/params.NPar;
+                riseMs = obj.SpoilerRiseTimeEdit.Value;
             end
-            
-            % obj.TREdit.Value = params.TR;
-            % obj.TEEdit.Value = params.TE;
-            % uialert(obj.TabHandle.Parent, ...
-            %     sprintf('Selected: %s\nImplement parsing in loadMethodsFile().', ...
-            %         pth, ...
-            %     'Methods File', 'Icon', 'info');
+
+            if isfield(params, 'MRFSpoiler')
+                if isfield(params.MRFSpoiler, 'duration')
+                    obj.SpoilerFlatTopEdit.Value = max(0, params.MRFSpoiler.duration - 2 * riseMs);
+                end
+                if isfield(params.MRFSpoiler, 'amplitude')
+                    obj.SpoilerAmpEdit.Value = obj.convertBrukerGradientToMT(params.MRFSpoiler.amplitude, params);
+                end
+            end
+
+            if isfield(params, 'Thickness')
+                obj.SliceThicknessEdit.Value = params.Thickness * 1000;
+            end
+
+            if isfield(params, 'RefPow')
+                obj.RefPow = params.RefPow;
+            end
+
+            if isfield(params, 'MRFInversionPulse')
+                obj.InstantInversionCheckbox.Value = false;
+            else
+                obj.InstantInversionCheckbox.Value = true;
+            end
+
+            if isfield(params, 'MRFFA') && ~isempty(params.MRFFA)
+                obj.FlipAngles = params.MRFFA(:).';
+                obj.refreshFAPlot();
+            end
+
+            obj.SimTimeStepEdit.Value = obj.RasterTimeEdit.Value;
+
+            [~, loadedName, loadedExt] = fileparts(selectedPath);
+            obj.LoadMethodsButton.Text = ['Loaded: ' loadedName loadedExt];
         end
 
         % -------------------------------------------------------------- %
         function generateDictionary(obj)
-            % Validate inputs and pass all parameters to dictionary engine.
+            % Validate inputs and generate dictionary using loaded method params
+            % plus T1/T2/B1/raster-time overrides.
+
+            if isempty(fieldnames(obj.LoadedMethodParams))
+                uialert(obj.TabHandle.Parent, ...
+                    'Load a Bruker method file first. Sequence parameters are now method-driven.', ...
+                    'Method File Required', 'Icon', 'warning');
+                return;
+            end
 
             % --- Parse search-space ranges ---
             try
@@ -420,67 +384,68 @@ classdef DictionaryTab < handle
                 return;
             end
 
-            % --- Collect sequence timing ---
-            TR = obj.TREdit.Value;
-            TE = obj.TEEdit.Value;
-            simTimeStep_us = obj.SimTimeStepEdit.Value;
+            % --- Start from loaded Bruker method parameters ---
+            params = obj.LoadedMethodParams;
+
+            % --- User-overridable fields ---
+            rasterTime = obj.RasterTimeEdit.Value;
+            params.T1 = T1;
+            params.T2 = T2;
+            params.B1 = B1;
+            params.dt = rasterTime * 1e-6;
+            params.RasterTime = rasterTime * 1e-6;
+
+            % --- Method-derived sequence settings ---
+            params.TR = obj.TREdit.Value / 1000;
+            params.TE = obj.TEEdit.Value / 1000;
+            params.SliceThickness_mm = obj.SliceThicknessEdit.Value;
+            params.NIsochromats = round(obj.NIsochromatsEdit.Value);
+            obj.NIsochromatsEdit.Value = params.NIsochromats;
+            params.RefPow = obj.RefPow;
+            params.InstantInversion = obj.InstantInversionCheckbox.Value;
+            params.PrepList = obj.PrepListMatrix;
+
+            if ~isfield(params, 'MRFSpoiler')
+                params.MRFSpoiler = struct();
+            end
+            params.MRFSpoiler.amplitude = obj.SpoilerAmpEdit.Value;
+            params.MRFSpoiler.duration = obj.SpoilerFlatTopEdit.Value + 2 * obj.SpoilerRiseTimeEdit.Value;
+            params.RiseTime = obj.SpoilerRiseTimeEdit.Value / 1000;
+
+            % Prefer FA from flip-angle generation tab; fall back to method file.
+            fa = obj.resolveFlipAngles();
+            if isempty(fa)
+                uialert(obj.TabHandle.Parent, ...
+                    'No flip-angle pattern available. Generate/load FA first or ensure MRFFA exists in method file.', ...
+                    'Flip Angles Missing', 'Icon', 'warning');
+                return;
+            end
+            obj.FlipAngles = fa;
+            params.FA = fa;
+
+            useInstantInversion = obj.InstantInversionCheckbox.Value;
             spoilerAmp_mT = obj.SpoilerAmpEdit.Value;
             spoilerFlatTop_ms = obj.SpoilerFlatTopEdit.Value;
             spoilerRise_ms = obj.SpoilerRiseTimeEdit.Value;
-            sliceThickness_mm = obj.SliceThicknessEdit.Value;
-            nIsochromats = round(obj.NIsochromatsEdit.Value);
-            obj.NIsochromatsEdit.Value = nIsochromats;
-
-            % --- Collect inversion pulse parameters ---
-            useInversion = obj.InversionCheckbox.Value;
-            invType      = obj.InversionTypeDropdown.Value;
-            rfDuration   = obj.RFDurationEdit.Value;
-            rasterTime   = obj.RasterTimeEdit.Value;
-            inversionTime_ms = obj.InversionTimeEdit.Value;
-            inversionMaxB1_uT = obj.InversionMaxB1Edit.Value;
-            invSpoilerAmp_mT = obj.InvSpoilerAmpEdit.Value;
-            invSpoilerFlatTop_ms = obj.InvSpoilerFlatTopEdit.Value;
-            invSpoilerRise_ms = obj.InvSpoilerRiseEdit.Value;
+            TR = params.TR * 1000;
+            TE = params.TE * 1000;
+            simTimeStep_us = rasterTime;
+            sliceThickness_mm = params.SliceThickness_mm;
+            nIsochromats = params.NIsochromats;
 
             fprintf(['Generating dictionary:\n' ...
                 '  T1: %d values  T2: %d values  B1: %d values\n' ...
                 '  TR: %.2f ms  TE: %.2f ms\n' ...
                 '  Step: %.2f µs  Slice: %.2f mm  N Iso: %d\n' ...
                 '  Spoiler: Amp=%.3f mT  Flat=%.3f ms  Rise=%.3f ms\n' ...
-                '  Inv Spoiler: Amp=%.3f mT  Flat=%.3f ms  Rise=%.3f ms\n' ...
-                '  Inversion Time: %.3f ms\n' ...
-                '  Inversion Max B1: %.3f uT\n' ...
                 '  FA frames: %d\n' ...
-                '  Inversion: %s'], ...
+                '  Instant inversion: %s'], ...
                 numel(T1), numel(T2), numel(B1), TR, TE, ...
                 simTimeStep_us, sliceThickness_mm, nIsochromats, ...
                 spoilerAmp_mT, spoilerFlatTop_ms, spoilerRise_ms, ...
-                invSpoilerAmp_mT, invSpoilerFlatTop_ms, invSpoilerRise_ms, inversionTime_ms, inversionMaxB1_uT, ...
-                numel(obj.FlipAngles), ...
-                obj.inversionSummary(useInversion, invType, rfDuration, rasterTime));
-            
-            % Pass parameters to your dictionary engine, e.g.:
-             params.T1          = T1;
-             params.T2          = T2;
-             params.B1          = B1;
-             params.TR          = TR;
-             params.TE          = TE;
-             params.dt          = simTimeStep_us * 1e-6;   % [s]
-             params.RasterTime  = simTimeStep_us * 1e-6;   % [s]
-             params.NIsochromats = nIsochromats;
-             params.InversionTime = inversionTime_ms;
-             params.MRFInversionPulse.maxB1_uT = inversionMaxB1_uT;
-             params.SliceThickness_mm = sliceThickness_mm;
+                numel(fa), ...
+                obj.tf2onoff(useInstantInversion));
 
-
-
-
-
-
-            % params.Thickness   = sliceThickness_mm * 1e-3; % [m]
-            % params.MRFSpoiler.amplitude = spoilerAmp_mT;      % [mT]
-            % params.MRFSpoiler.duration  = spoilerFlatTop_ms;  % [ms]
-            % params.RiseTime    = spoilerRise_ms * 1e-3;       % [s]
             dictionary = DictionaryGeneration(params);
             dictionary.RunSimulation;
         end
@@ -497,17 +462,18 @@ classdef DictionaryTab < handle
             end
 
             tabPos = obj.TabHandle.Position;
-            tabW = max(tabPos(3), 720);
-            tabH = max(tabPos(4), 520);
+            tabW = max(tabPos(3), 420);
+            tabH = max(tabPos(4), 360);
 
             margin = 10;
             colGap = 10;
             rowGap = 6;
 
-            leftW = 370;
-            minAxesW = 220;
+            % Give controls more room while preserving a usable right column.
+            minAxesW = 170;
+            leftW = max(340, min(520, round(0.42 * tabW)));
             if tabW < (leftW + minAxesW + 3*margin)
-                leftW = max(360, tabW - minAxesW - 3*margin);
+                leftW = max(220, tabW - minAxesW - 3*margin);
             end
 
             rightX = margin + leftW + colGap;
@@ -515,16 +481,21 @@ classdef DictionaryTab < handle
 
             % Bottom controls block
             genH = 36;
-            smallBtnH = 28;
             yGen = 15;
-            ySmall = yGen + genH + 5;
-            stackBottom = ySmall + smallBtnH + rowGap;
+            stackBottom = yGen + genH + rowGap;
             stackTop = tabH - margin;
 
-            available = max(240, stackTop - stackBottom - 2*rowGap);
-            weights = [0.30 0.34 0.36];  % Dict / Seq / Inv
+            available = max(140, stackTop - stackBottom - 2*rowGap);
+            if leftW < 430
+                % Reserve extra height for single-column Sequence Timing mode.
+                weights = [0.28 0.40 0.32];  % Dict / Seq / Inv
+                minH = [132 176 150];
+            else
+                weights = [0.30 0.34 0.36];  % Dict / Seq / Inv
+                minH = [118 120 146];
+            end
+
             h = round(available * weights);
-            minH = [88 104 128];
             h = max(h, minH);
 
             totalH = sum(h);
@@ -554,16 +525,171 @@ classdef DictionaryTab < handle
             obj.SeqTimingPanel.Position = [margin y leftW h(2)];
 
             y = y - rowGap - h(3);
-            obj.InversionPanel.Position = [margin y leftW max(h(3), 128)];
+            obj.InversionPanel.Position = [margin y leftW h(3)];
 
             % Generate button
             obj.GenerateDictButton.Position = [margin yGen leftW genH];
 
-            % Right-side plot area
-            obj.FAAxes.Position = [rightX margin rightW max(120, tabH - 2*margin)];
+            % Right-side area split: prep list panel (top) and FA plot (bottom)
+            rightGap = 8;
+            rightAvailH = max(100, tabH - 2*margin - rightGap);
+            minAxesH = 95;
+            prepPanelH = min(260, max(120, round(0.38 * rightAvailH)));
+            if prepPanelH + minAxesH > rightAvailH
+                prepPanelH = max(90, rightAvailH - minAxesH);
+            end
+            axesH = max(80, rightAvailH - prepPanelH);
+            prepPanelY = margin + axesH + rightGap;
+
+            obj.PrepListPanel.Position = [rightX prepPanelY rightW prepPanelH];
+            obj.FAAxes.Position = [rightX margin rightW axesH];
 
             % Internal per-panel control layouts (fully dynamic)
+            obj.layoutDictParamPanelControls();
+            obj.layoutSeqTimingPanelControls();
             obj.layoutInversionPanelControls();
+            obj.layoutPrepListPanelControls();
+        end
+
+        function layoutDictParamPanelControls(obj)
+            p = obj.DictParamPanel.Position;
+            pw = p(3);
+            ph = p(4);
+
+            margin = 10;
+            h = 22;
+            rowGap = 2;
+            titlePad = 24;
+
+            y1 = ph - titlePad - h;
+            y2 = y1 - (h + rowGap);
+            y3 = y2 - (h + rowGap);
+            y4 = y3 - (h + rowGap);
+
+            useSingleCol = (pw < 430) && (ph >= 128);
+            if useSingleCol
+                lblW = 110;
+                editX = margin + lblW + 8;
+                editW = max(80, pw - editX - margin);
+
+                obj.positionLabel(obj.DictParamPanel, 'T1 values (ms)', [margin y1 lblW h]);
+                obj.T1Edit.Position = [editX y1 editW h];
+
+                obj.positionLabel(obj.DictParamPanel, 'T2 values (ms)', [margin y2 lblW h]);
+                obj.T2Edit.Position = [editX y2 editW h];
+
+                obj.positionLabel(obj.DictParamPanel, 'B1 values', [margin y3 lblW h]);
+                obj.B1Edit.Position = [editX y3 max(45, floor(editW*0.42)) h];
+
+                rightX = editX + max(45, floor(editW*0.42)) + 6;
+                rightW = max(45, pw - rightX - margin);
+                obj.RasterTimeLabel.Position = [rightX y3 95 h];
+                obj.RasterTimeEdit.Position = [rightX + 98 y3 max(45, rightW - 98) h];
+
+                obj.positionLabel(obj.DictParamPanel, 'Slice thickness (mm)', [margin y4 lblW h]);
+                obj.SliceThicknessEdit.Position = [editX y4 editW h];
+
+                y5 = y4 - (h + rowGap);
+                obj.positionLabel(obj.DictParamPanel, 'N isochromats', [margin y5 lblW h]);
+                obj.NIsochromatsEdit.Position = [editX y5 editW h];
+            else
+                lblW = 110;
+                editX = margin + lblW + 8;
+                editW = max(80, pw - editX - margin);
+
+                obj.positionLabel(obj.DictParamPanel, 'T1 values (ms)', [margin y1 lblW h]);
+                obj.T1Edit.Position = [editX y1 editW h];
+
+                obj.positionLabel(obj.DictParamPanel, 'T2 values (ms)', [margin y2 lblW h]);
+                obj.T2Edit.Position = [editX y2 editW h];
+
+                halfW = floor((pw - 2*margin - 10) / 2);
+                leftX = margin;
+                rightX = leftX + halfW + 10;
+
+                obj.positionLabel(obj.DictParamPanel, 'B1 values', [leftX y3 70 h]);
+                obj.B1Edit.Position = [leftX + 73 y3 max(45, halfW - 73) h];
+
+                obj.positionLabel(obj.DictParamPanel, 'Slice thickness (mm)', [rightX y3 100 h]);
+                obj.SliceThicknessEdit.Position = [rightX + 103 y3 max(45, halfW - 103) h];
+
+                obj.RasterTimeLabel.Position = [leftX y4 95 h];
+                obj.RasterTimeEdit.Position = [leftX + 98 y4 max(45, halfW - 98) h];
+
+                obj.positionLabel(obj.DictParamPanel, 'N isochromats', [rightX y4 95 h]);
+                obj.NIsochromatsEdit.Position = [rightX + 98 y4 max(45, halfW - 98) h];
+            end
+        end
+
+        function layoutSeqTimingPanelControls(obj)
+            p = obj.SeqTimingPanel.Position;
+            pw = p(3);
+            ph = p(4);
+
+            margin = 10;
+            h = 22;
+            rowGap = 2;
+            titlePad = 24;
+
+            y1 = ph - titlePad - h;
+            y2 = y1 - (h + rowGap);
+            y3 = y2 - (h + rowGap);
+            y4 = y3 - (h + rowGap);
+
+            obj.LoadMethodsButton.Position = [margin y1 max(120, pw - 2*margin) h];
+
+            useSingleCol = (pw < 430) && (ph >= 170);
+            if useSingleCol
+                y = y2;
+                labelW = 88;
+                fieldX = margin + labelW + 6;
+                fieldW = max(60, pw - fieldX - margin);
+
+                obj.positionLabel(obj.SeqTimingPanel, 'TR (ms)', [margin y labelW h]);
+                obj.TREdit.Position = [fieldX y fieldW h];
+
+                y = y - (h + rowGap);
+                obj.positionLabel(obj.SeqTimingPanel, 'TE (ms)', [margin y labelW h]);
+                obj.TEEdit.Position = [fieldX y fieldW h];
+
+                y = y - (h + rowGap);
+                obj.positionLabel(obj.SeqTimingPanel, 'Step (µs)', [margin y labelW h]);
+                obj.SimTimeStepEdit.Position = [fieldX y fieldW h];
+
+                y = y - (h + rowGap);
+                obj.positionLabel(obj.SeqTimingPanel, 'Amp (mT)', [margin y labelW h]);
+                obj.SpoilerAmpEdit.Position = [fieldX y fieldW h];
+
+                y = y - (h + rowGap);
+                obj.positionLabel(obj.SeqTimingPanel, 'Flat top (ms)', [margin y labelW h]);
+                obj.SpoilerFlatTopEdit.Position = [fieldX y fieldW h];
+
+                y = y - (h + rowGap);
+                obj.positionLabel(obj.SeqTimingPanel, 'Rise (ms)', [margin y labelW h]);
+                obj.SpoilerRiseTimeEdit.Position = [fieldX y fieldW h];
+            else
+                halfW = floor((pw - 2*margin - 10) / 2);
+                leftX = margin;
+                rightX = leftX + halfW + 10;
+
+                obj.positionLabel(obj.SeqTimingPanel, 'TR (ms)', [leftX y2 50 h]);
+                obj.TREdit.Position = [leftX + 53 y2 max(45, halfW - 53) h];
+
+                obj.positionLabel(obj.SeqTimingPanel, 'TE (ms)', [rightX y2 50 h]);
+                obj.TEEdit.Position = [rightX + 53 y2 max(45, halfW - 53) h];
+
+                obj.positionLabel(obj.SeqTimingPanel, 'Step (µs)', [leftX y3 70 h]);
+                obj.SimTimeStepEdit.Position = [leftX + 73 y3 max(45, halfW - 73) h];
+
+                obj.positionLabel(obj.SeqTimingPanel, 'Amp (mT)', [rightX y3 65 h]);
+                obj.SpoilerAmpEdit.Position = [rightX + 68 y3 max(45, halfW - 68) h];
+
+                obj.positionLabel(obj.SeqTimingPanel, 'Flat top (ms)', [leftX y4 85 h]);
+                obj.SpoilerFlatTopEdit.Position = [leftX + 88 y4 max(45, halfW - 88) h];
+
+                obj.positionLabel(obj.SeqTimingPanel, 'Rise (ms)', [rightX y4 65 h]);
+                obj.SpoilerRiseTimeEdit.Position = [rightX + 68 y4 max(45, halfW - 68) h];
+            end
         end
 
         function layoutInversionPanelControls(obj)
@@ -573,52 +699,192 @@ classdef DictionaryTab < handle
 
             margin = 10;
             h = 22;
-            rowGap = 1;
             titlePad = 24;
 
             y1 = ph - titlePad - h;
-            y2 = y1 - (h + rowGap);
-            y3 = y2 - (h + rowGap);
-            y4 = y3 - (h + rowGap);
+            obj.InstantInversionCheckbox.Position = [margin y1 max(140, pw - 2*margin) h + 2];
+        end
 
-            obj.InversionCheckbox.Position = [margin y1 max(120, pw - 2*margin) h];
+        function layoutPrepListPanelControls(obj)
+            if isempty(obj.PrepListPanel) || ~isvalid(obj.PrepListPanel)
+                return;
+            end
 
-            obj.positionLabel(obj.InversionPanel, 'Inversion Time (ms)', [margin y2 120 h]);
-            obj.InversionTimeEdit.Position = [133 y2 max(45, floor(pw*0.22)) h];
+            p = obj.PrepListPanel.Position;
+            pw = p(3);
+            ph = p(4);
 
-            obj.positionLabel(obj.InversionPanel, 'Type', [208 y2 40 h]);
-            obj.InversionTypeDropdown.Position = [250 y2 max(80, pw - 260 - margin) h];
-
-            % Hard pulse row
-            halfW = floor((pw - 2*margin - 10)/2);
-            leftX = margin;
-            rightX = leftX + halfW + 10;
-
-            obj.RFDurationLabel.Position = [leftX y3 115 h];
-            obj.RFDurationEdit.Position = [leftX + 118 y3 max(45, halfW - 118) h];
-
-            obj.RasterTimeLabel.Position = [rightX y3 90 h];
-            obj.RasterTimeEdit.Position = [rightX + 92 y3 max(45, halfW - 92) h];
-
-            % Inversion spoiler row (3 groups) and max B1 row
-            obj.InversionMaxB1Label.Position = [margin y4 85 h];
-            obj.InversionMaxB1Edit.Position = [98 y4 max(45, floor(pw*0.22)) h];
-
+            margin = 10;
             gap = 6;
-            groupW = floor((pw - 2*margin - 2*gap) / 3);
-            x1 = margin;
-            x2 = x1 + groupW + gap;
-            x3 = x2 + groupW + gap;
+            btnH = 26;
+            labelH = 22;
+            titlePad = 24;
 
-            lblW = 54;
-            obj.InvSpoilerAmpLabel.Position = [x1 y4 lblW h];
-            obj.InvSpoilerAmpEdit.Position = [x1 + lblW + 2 y4 max(30, groupW - lblW - 2) h];
+            if ph < 180
+                margin = 8;
+                gap = 4;
+                btnH = 24;
+                labelH = 20;
+                titlePad = 26;
+            end
 
-            obj.InvSpoilerFlatTopLabel.Position = [x2 y4 lblW h];
-            obj.InvSpoilerFlatTopEdit.Position = [x2 + lblW + 2 y4 max(30, groupW - lblW - 2) h];
+            innerW = max(80, pw - 2 * margin);
+            isNarrow = pw < 500;
 
-            obj.InvSpoilerRiseLabel.Position = [x3 y4 lblW h];
-            obj.InvSpoilerRiseEdit.Position = [x3 + lblW + 2 y4 max(30, groupW - lblW - 2) h];
+            topY = ph - titlePad;
+            if isNarrow
+                % Small-width mode: stack controls to avoid collisions.
+                btnW = min(170, max(120, innerW));
+                btnY = topY - btnH;
+                obj.LoadPrepListButton.Position = [margin btnY btnW btnH];
+
+                labelY = btnY - gap - labelH;
+                obj.PrepListSummaryLabel.Position = [margin labelY innerW labelH];
+
+                tableTop = labelY - gap;
+            else
+                btnW = min(160, max(130, floor(0.34 * innerW)));
+                btnY = topY - btnH;
+                obj.LoadPrepListButton.Position = [margin btnY btnW btnH];
+
+                labelX = margin + btnW + 10;
+                labelW = max(80, pw - labelX - margin);
+                obj.PrepListSummaryLabel.Position = [labelX btnY labelW labelH];
+
+                tableTop = btnY - gap;
+            end
+
+            tableY = margin;
+            tableW = max(120, innerW);
+            tableH = max(60, tableTop - tableY);
+            obj.PrepListTable.Position = [margin tableY tableW tableH];
+        end
+
+        function loadPrepListFile(obj)
+            [fileName, folderPath] = uigetfile({'*.txt;*.dat','Prep List Files (*.txt, *.dat)'}, ...
+                'Select Preparation List File');
+            if isequal(fileName, 0)
+                return;
+            end
+
+            filePath = fullfile(folderPath, fileName);
+            try
+                [prepMatrix, prepNames, declaredCount] = obj.parsePrepListFile(filePath);
+            catch ME
+                uialert(obj.TabHandle.Parent, ...
+                    ['Unable to parse prep list: ' ME.message], ...
+                    'Prep List Error', 'Icon', 'error');
+                return;
+            end
+
+            obj.PrepListMatrix = prepMatrix;
+            obj.PrepListNames = prepNames;
+            obj.PrepListDeclaredCount = declaredCount;
+
+            nRows = size(prepMatrix, 1);
+            tableData = cell(nRows, 4);
+            for ii = 1:nRows
+                tableData{ii,1} = ii;
+                tableData{ii,2} = prepNames{ii};
+                tableData{ii,3} = prepMatrix(ii,2);
+                tableData{ii,4} = prepMatrix(ii,3);
+            end
+            obj.PrepListTable.Data = tableData;
+
+            if isnan(declaredCount)
+                obj.PrepListSummaryLabel.Text = sprintf('%d prep module(s) loaded', nRows);
+            else
+                obj.PrepListSummaryLabel.Text = sprintf('%d loaded (header: %d)', nRows, declaredCount);
+            end
+        end
+
+        function [prepMatrix, prepNames, declaredCount] = parsePrepListFile(obj, filePath)
+            txt = fileread(filePath);
+            rawLines = splitlines(txt);
+
+            lines = {};
+            for i = 1:numel(rawLines)
+                ln = strtrim(rawLines{i});
+                if isempty(ln)
+                    continue;
+                end
+                lines{end+1} = ln; %#ok<AGROW>
+            end
+
+            if isempty(lines)
+                error('Prep list file is empty.');
+            end
+
+            declaredCount = NaN;
+            lineStart = 1;
+            if startsWith(lines{1}, '#')
+                declaredCount = str2double(extractAfter(lines{1}, '#'));
+                lineStart = 2;
+            end
+
+            prepMatrix = zeros(0,3);
+            prepNames = {};
+            for i = lineStart:numel(lines)
+                ln = lines{i};
+                parts = strsplit(ln);
+                if numel(parts) < 2
+                    continue;
+                end
+
+                moduleToken = parts{1};
+                prepTime = str2double(parts{2});
+                if isnan(prepTime)
+                    continue;
+                end
+
+                waitTime = 0;
+                if numel(parts) >= 3
+                    wt = str2double(parts{3});
+                    if ~isnan(wt)
+                        waitTime = wt;
+                    end
+                end
+
+                moduleCode = str2double(moduleToken);
+                if isnan(moduleCode)
+                    moduleCode = obj.prepCodeFromName(moduleToken);
+                    moduleName = moduleToken;
+                else
+                    moduleName = obj.prepNameFromCode(moduleCode);
+                end
+
+                prepMatrix(end+1,:) = [moduleCode, prepTime, waitTime]; %#ok<AGROW>
+                prepNames{end+1} = moduleName; %#ok<AGROW>
+            end
+
+            if isempty(prepMatrix)
+                error('No valid preparation rows found in file.');
+            end
+        end
+
+        function code = prepCodeFromName(~, name)
+            switch lower(strtrim(name))
+                case {'t1prep','t1'}
+                    code = 0;
+                case {'t2prep','t2'}
+                    code = 1;
+                case {'bir4','bir'}
+                    code = 2;
+                otherwise
+                    code = NaN;
+            end
+        end
+
+        function name = prepNameFromCode(~, code)
+            if isequal(code,0)
+                name = 'T1Prep';
+            elseif isequal(code,1)
+                name = 'T2Prep';
+            elseif isequal(code,2)
+                name = 'BIR4';
+            else
+                name = sprintf('Code %.3g', code);
+            end
         end
 
         function positionLabel(~, panel, labelText, pos)
@@ -626,6 +892,58 @@ classdef DictionaryTab < handle
             if ~isempty(h)
                 h(1).Position = pos;
             end
+        end
+
+        function ampMT = convertBrukerGradientToMT(~, ampRaw, params)
+            % Convert Bruker gradient amplitudes to mT/m when possible.
+            ampMT = ampRaw;
+            if isfield(params, 'PVM_GradCalConst') && ~isempty(params.PVM_GradCalConst)
+                gyro = 42.577e6; % Hz/T
+                hzPerM = params.PVM_GradCalConst * (ampRaw / 100);
+                ampMT = (hzPerM / gyro) * 1000;
+            end
+        end
+
+        function fa = resolveFlipAngles(obj)
+            fa = [];
+            if ~isempty(obj.Parent) && isprop(obj.Parent, 'FlipAngles') && ~isempty(obj.Parent.FlipAngles)
+                fa = obj.Parent.FlipAngles(:).';
+                return;
+            end
+            if ~isempty(obj.FlipAngles)
+                fa = obj.FlipAngles(:).';
+                return;
+            end
+            if ~isempty(fieldnames(obj.LoadedMethodParams)) ...
+                    && isfield(obj.LoadedMethodParams, 'MRFFA') ...
+                    && ~isempty(obj.LoadedMethodParams.MRFFA)
+                fa = obj.LoadedMethodParams.MRFFA(:).';
+            end
+        end
+
+        function refreshFAPlot(obj)
+            ax = obj.FAAxes;
+            if isempty(ax) || ~isvalid(ax)
+                return;
+            end
+
+            fa = obj.resolveFlipAngles();
+            cla(ax);
+
+            if isempty(fa)
+                title(ax, 'Flip Angle Pattern (none loaded)');
+                xlabel(ax, 'Frame Number');
+                ylabel(ax, 'Flip Angle (deg)');
+                grid(ax, 'on');
+                return;
+            end
+
+            plot(ax, 1:numel(fa), fa, 'b-', 'LineWidth', 1.2);
+            title(ax, sprintf('Flip Angle Pattern (%d frames)', numel(fa)));
+            xlabel(ax, 'Frame Number');
+            ylabel(ax, 'Flip Angle (deg)');
+            grid(ax, 'on');
+            ylim(ax, [0 max(fa) * 1.15 + 1]);
         end
 
         % -------------------------------------------------------------- %
@@ -648,19 +966,6 @@ classdef DictionaryTab < handle
                 s = 'on';
             else
                 s = 'off';
-            end
-        end
-
-        % -------------------------------------------------------------- %
-        function s = inversionSummary(~, useInv, invType, rfDur, raster)
-            % Build a compact summary string for console output.
-            if ~useInv
-                s = 'none';
-            elseif strcmp(invType, 'Instant')
-                s = 'Instant (ideal 180°)';
-            else
-                s = sprintf('Sech  duration=%.3f ms  raster=%.1f µs', ...
-                    rfDur, raster);
             end
         end
 

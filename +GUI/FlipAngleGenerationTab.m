@@ -9,9 +9,15 @@ classdef FlipAngleGenerationTab < handle
 
         GenPanel
 
+        NPointsLabel
         MinFAEdit
         MaxFAEdit
         NPointsEdit
+        RampPointsLabel
+        RampPointsEdit
+        FlatTopPointsLabel
+        FlatTopPointsEdit
+        ShapeLabel
         ShapeDropdown
         AddLobeButton
         LobeListBox
@@ -23,7 +29,9 @@ classdef FlipAngleGenerationTab < handle
         FAAxes
 
         FlipAngles = []
-        Lobes = struct('MinFA', {}, 'MaxFA', {}, 'NPoints', {}, 'Shape', {})
+        LoadedFlipAngles = []
+        Lobes = struct('MinFA', {}, 'MaxFA', {}, 'NPoints', {}, 'Shape', {}, ...
+            'RampPoints', {}, 'FlatTopPoints', {})
 
         FigureResizeListener
     end
@@ -56,18 +64,37 @@ classdef FlipAngleGenerationTab < handle
                 'Position', [263 452 55 22], ...
                 'Tooltip', 'Maximum flip angle in degrees');
 
-            uilabel(P, 'Text', 'N Points', 'Position', [10 425 70 22]);
+            obj.NPointsLabel = uilabel(P, 'Text', 'N Points', 'Position', [10 425 70 22]);
             obj.NPointsEdit = uieditfield(P, 'numeric', ...
                 'Value', 50, 'Limits', [2 10000], ...
                 'RoundFractionalValues', true, ...
                 'Position', [103 425 55 22], ...
                 'Tooltip', 'Number of time points in this lobe');
 
-            uilabel(P, 'Text', 'Shape', 'Position', [170 425 45 22]);
+            obj.RampPointsLabel = uilabel(P, 'Text', 'Ramp Points', ...
+                'Position', [10 398 80 22], 'Visible', 'off');
+            obj.RampPointsEdit = uieditfield(P, 'numeric', ...
+                'Value', 30, 'Limits', [1 10000], ...
+                'RoundFractionalValues', true, ...
+                'Position', [93 398 65 22], ...
+                'Tooltip', 'Number of points in the ramp segment', ...
+                'Visible', 'off');
+
+            obj.FlatTopPointsLabel = uilabel(P, 'Text', 'Flat-top Pts', ...
+                'Position', [170 398 85 22], 'Visible', 'off');
+            obj.FlatTopPointsEdit = uieditfield(P, 'numeric', ...
+                'Value', 20, 'Limits', [1 10000], ...
+                'RoundFractionalValues', true, ...
+                'Position', [258 398 60 22], ...
+                'Tooltip', 'Number of points in the flat-top segment', ...
+                'Visible', 'off');
+
+            obj.ShapeLabel = uilabel(P, 'Text', 'Shape', 'Position', [170 425 45 22]);
             obj.ShapeDropdown = uidropdown(P, ...
-                'Items', {'Sine Lobe', 'Sawtooth'}, ...
+                'Items', {'Sine Lobe', 'Sawtooth', 'Ramp + Flat Top'}, ...
                 'Value', 'Sine Lobe', ...
-                'Position', [220 425 98 22]);
+                'Position', [220 425 98 22], ...
+                'ValueChangedFcn', @(~,~) obj.onShapeChanged());
 
             obj.AddLobeButton = uibutton(P, ...
                 'Text', '+ Add Lobe', ...
@@ -118,6 +145,7 @@ classdef FlipAngleGenerationTab < handle
                 end
             end
 
+            obj.onShapeChanged();
             obj.updateResponsiveLayout();
         end
 
@@ -126,6 +154,8 @@ classdef FlipAngleGenerationTab < handle
             maxFA = obj.MaxFAEdit.Value;
             nPts  = round(obj.NPointsEdit.Value);
             shape = obj.ShapeDropdown.Value;
+            rampPts = [];
+            flatTopPts = [];
 
             if minFA >= maxFA
                 uialert(obj.TabHandle.Parent, ...
@@ -133,15 +163,29 @@ classdef FlipAngleGenerationTab < handle
                 return;
             end
 
+            if obj.usesRampFlatShape(shape)
+                rampPts = round(obj.RampPointsEdit.Value);
+                flatTopPts = round(obj.FlatTopPointsEdit.Value);
+                nPts = rampPts + flatTopPts;
+
+                if rampPts < 1 || flatTopPts < 1
+                    uialert(obj.TabHandle.Parent, ...
+                        'Ramp and flat-top points must both be at least 1.', ...
+                        'Invalid Input');
+                    return;
+                end
+            end
+
             newLobe = struct('MinFA', minFA, 'MaxFA', maxFA, ...
-                             'NPoints', nPts, 'Shape', shape);
+                             'NPoints', nPts, 'Shape', shape, ...
+                             'RampPoints', rampPts, 'FlatTopPoints', flatTopPts);
             obj.Lobes(end+1) = newLobe;
             obj.updateLobeList();
             obj.updatePlot();
         end
 
         function removeLobe(obj)
-            if isempty(obj.Lobes)
+            if isempty(obj.Lobes) && isempty(obj.LoadedFlipAngles)
                 return;
             end
 
@@ -156,25 +200,58 @@ classdef FlipAngleGenerationTab < handle
                 return;
             end
 
-            obj.Lobes(selIdx) = [];
+            loadedOffset = 0;
+            if ~isempty(obj.LoadedFlipAngles)
+                if selIdx == 1
+                    obj.LoadedFlipAngles = [];
+                    obj.updateLobeList();
+                    obj.updatePlot();
+                    return;
+                end
+                loadedOffset = 1;
+            end
+
+            lobeIdx = selIdx - loadedOffset;
+            if lobeIdx < 1 || lobeIdx > numel(obj.Lobes)
+                return;
+            end
+
+            obj.Lobes(lobeIdx) = [];
             obj.updateLobeList();
             obj.updatePlot();
         end
 
         function updateLobeList(obj)
-            n = numel(obj.Lobes);
-            items = cell(1, n);
-            for k = 1:n
+            items = {};
+            if ~isempty(obj.LoadedFlipAngles)
+                items{end+1} = sprintf('Loaded FA File      N=%d', numel(obj.LoadedFlipAngles)); %#ok<AGROW>
+            end
+
+            for k = 1:numel(obj.Lobes)
                 L = obj.Lobes(k);
-                items{k} = sprintf('%d.  %-10s  %.0f deg - %.0f deg  N=%d', ...
-                    k, L.Shape, L.MinFA, L.MaxFA, L.NPoints);
+                if obj.usesRampFlatShape(L.Shape)
+                    items{end+1} = sprintf('%d.  %-16s  %.0f deg - %.0f deg  Ramp=%d Flat=%d', ...
+                        k, L.Shape, L.MinFA, L.MaxFA, L.RampPoints, L.FlatTopPoints);
+                else
+                    items{end+1} = sprintf('%d.  %-16s  %.0f deg - %.0f deg  N=%d', ...
+                        k, L.Shape, L.MinFA, L.MaxFA, L.NPoints);
+                end
             end
             obj.LobeListBox.Items = items;
+            if isempty(items)
+                obj.LobeListBox.Value = {};
+            else
+                obj.LobeListBox.Value = items{1};
+            end
         end
 
         function updatePlot(obj)
             pattern = obj.buildPattern();
-            obj.FlipAngles = pattern;
+            if isempty(pattern)
+                pattern = obj.FlipAngles;
+            else
+                obj.FlipAngles = pattern;
+            end
             obj.Parent.FlipAngles = pattern;
 
             ax = obj.FAAxes;
@@ -194,7 +271,7 @@ classdef FlipAngleGenerationTab < handle
         end
 
         function pattern = buildPattern(obj)
-            pattern = [];
+            pattern = obj.LoadedFlipAngles(:).';
             for k = 1:numel(obj.Lobes)
                 pattern = [pattern, obj.computeLobeWaveform(obj.Lobes(k))]; %#ok<AGROW>
             end
@@ -208,17 +285,55 @@ classdef FlipAngleGenerationTab < handle
             end
 
             try
-                fa = readmatrix(fullfile(location, file));
-                fa = fa(:).';
+                rawText = fileread(fullfile(location, file));
+                lines = splitlines(rawText);
+
+                fa = [];
+                expectedCount = [];
+                for lineIdx = 1:numel(lines)
+                    lineText = strtrim(lines{lineIdx});
+                    if isempty(lineText)
+                        continue;
+                    end
+
+                    if startsWith(lineText, '#')
+                        if lineIdx == 1
+                            expectedCount = str2double(extractAfter(lineText, '#'));
+                            if isnan(expectedCount)
+                                error('Invalid flip-angle header. Expected first line in the form #N.');
+                            end
+                            continue;
+                        end
+
+                        continue;
+                    end
+
+                    value = str2double(lineText);
+                    if isnan(value)
+                        error('Invalid flip-angle value on line %d.', lineIdx);
+                    end
+
+                    fa(end+1) = value; %#ok<AGROW>
+                end
+
+                if isempty(fa)
+                    error('No flip-angle values found in file.');
+                end
+
+                if ~isempty(expectedCount) && numel(fa) ~= expectedCount
+                    error('Header count (%d) does not match loaded flip angles (%d).', expectedCount, numel(fa));
+                end
             catch ME
                 uialert(obj.TabHandle.Parent, ...
                     ['Could not read file: ' ME.message], 'Load Error');
                 return;
             end
 
+            obj.LoadedFlipAngles = fa;
             obj.FlipAngles = fa;
             obj.Parent.FlipAngles = fa;
-            obj.Lobes = struct('MinFA', {}, 'MaxFA', {}, 'NPoints', {}, 'Shape', {});
+            obj.Lobes = struct('MinFA', {}, 'MaxFA', {}, 'NPoints', {}, 'Shape', {}, ...
+                'RampPoints', {}, 'FlatTopPoints', {});
             obj.updateLobeList();
             obj.updatePlot();
         end
@@ -243,6 +358,7 @@ classdef FlipAngleGenerationTab < handle
                 return;
             end
 
+            fprintf(fid, '#%d\n', numel(obj.FlipAngles));
             fprintf(fid, '%.6f\n', obj.FlipAngles);
             fclose(fid);
 
@@ -252,7 +368,7 @@ classdef FlipAngleGenerationTab < handle
         end
     end
 
-    methods (Access = private)
+    methods
         function updateResponsiveLayout(obj)
             if isempty(obj.TabHandle) || ~isvalid(obj.TabHandle)
                 return;
@@ -295,7 +411,8 @@ classdef FlipAngleGenerationTab < handle
 
             y1 = ph - titlePad - h;
             y2 = y1 - (h + rowGap);
-            yAdd = y2 - (26 + rowGap);
+            y3 = y2 - (h + rowGap);
+            yAdd = y3 - (26 + rowGap);
             yAdded = yAdd - (h + 2);
 
             halfW = floor((pw - 2*margin - 10)/2);
@@ -308,11 +425,17 @@ classdef FlipAngleGenerationTab < handle
             obj.positionLabel(obj.GenPanel, 'Max FA (deg)', [rightX y1 90 h]);
             obj.MaxFAEdit.Position = [rightX + 93 y1 max(40, halfW - 93) h];
 
-            obj.positionLabel(obj.GenPanel, 'N Points', [leftX y2 70 h]);
+            obj.NPointsLabel.Position = [leftX y2 70 h];
             obj.NPointsEdit.Position = [leftX + 73 y2 max(40, halfW - 73) h];
 
-            obj.positionLabel(obj.GenPanel, 'Shape', [rightX y2 45 h]);
+            obj.ShapeLabel.Position = [rightX y2 45 h];
             obj.ShapeDropdown.Position = [rightX + 48 y2 max(60, halfW - 48) h];
+
+            obj.RampPointsLabel.Position = [leftX y3 80 h];
+            obj.RampPointsEdit.Position = [leftX + 83 y3 max(40, halfW - 83) h];
+
+            obj.FlatTopPointsLabel.Position = [rightX y3 85 h];
+            obj.FlatTopPointsEdit.Position = [rightX + 88 y3 max(40, halfW - 88) h];
 
             obj.AddLobeButton.Position = [margin yAdd max(120, pw - 2*margin) 26];
             obj.positionLabel(obj.GenPanel, 'Added Lobes', [margin yAdded 120 h]);
@@ -327,10 +450,35 @@ classdef FlipAngleGenerationTab < handle
             obj.RemoveLobeButton.Position = [margin + listW + 7 listY rmW listH];
         end
 
+        function onShapeChanged(obj)
+            isRampFlat = obj.usesRampFlatShape(obj.ShapeDropdown.Value);
+
+            obj.NPointsLabel.Visible = obj.onOff(~isRampFlat);
+            obj.NPointsEdit.Visible = obj.onOff(~isRampFlat);
+            obj.RampPointsLabel.Visible = obj.onOff(isRampFlat);
+            obj.RampPointsEdit.Visible = obj.onOff(isRampFlat);
+            obj.FlatTopPointsLabel.Visible = obj.onOff(isRampFlat);
+            obj.FlatTopPointsEdit.Visible = obj.onOff(isRampFlat);
+
+            obj.updateResponsiveLayout();
+        end
+
         function positionLabel(~, panel, labelText, pos)
             h = findobj(panel, 'Type', 'uilabel', 'Text', labelText);
             if ~isempty(h)
                 h(1).Position = pos;
+            end
+        end
+
+        function tf = usesRampFlatShape(~, shape)
+            tf = strcmp(shape, 'Ramp + Flat Top');
+        end
+
+        function value = onOff(~, tf)
+            if tf
+                value = 'on';
+            else
+                value = 'off';
             end
         end
 
@@ -343,6 +491,10 @@ classdef FlipAngleGenerationTab < handle
                 case 'Sine Lobe'
                     t = linspace(0, pi, n);
                     waveform = lo + (hi - lo) .* sin(t);
+                case 'Ramp + Flat Top'
+                    rampPts = lobe.RampPoints;
+                    flatTopPts = lobe.FlatTopPoints;
+                    waveform = [linspace(lo, hi, rampPts), repmat(hi, 1, flatTopPts)];
                 otherwise
                     waveform = linspace(lo, hi, n);
             end

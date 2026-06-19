@@ -25,6 +25,8 @@ classdef MRFViewer < handle
         GTMapNames = {}
         MRFMask = []
         GTMask = []
+        FlipAngles = []
+        LastLoadDir = ''
 
         CurrentSlice = 1
         CurrentMap = 1

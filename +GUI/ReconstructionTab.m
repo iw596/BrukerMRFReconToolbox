@@ -41,7 +41,7 @@ classdef ReconstructionTab < handle
                 @(src,event)obj.loadFile());
         end
 
-        function runReconstruction(obj)
+        function runReconstruction(~)
             % Placeholder for the reconstruction action.
             % The button is present, but no behavior is implemented yet.
             disp("Reconstruction initated")
@@ -57,19 +57,14 @@ classdef ReconstructionTab < handle
                 % User cancelled
                 return;
             end
-            % Store selected directory in Parent if available, otherwise in this object
-            if isprop(obj.Parent, 'LastLoadDir')
-                obj.Parent.LastLoadDir = selectedDir;
-            else
-                obj.LastLoadDir = selectedDir;
-            end
+            % Store selected directory in the shared parent state
+            obj.Parent.LastLoadDir = selectedDir;
             % Optionally display the chosen directory
             disp(['Selected directory: ', selectedDir])
         end
         
-        function resizeUI(obj, figPos)
-            % Update UI element positions based on figure size
-            %   figPos: Figure position [x y width height]
+        function resizeUI(~, ~)
+            % Update UI element positions based on figure size.
 
             % Currently no resize logic needed for minimal Reconstruction tab
             % Add position updates here as new controls are added

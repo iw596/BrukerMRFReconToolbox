@@ -34,15 +34,19 @@ classdef DictionaryGeneration
             obj.FA = params.FA;
             obj.T1Range = params.T1;
             obj.T2Range = params.T2;
+            obj.B1Range = params.B1;
             obj.Thickness = params.SliceThickness_mm ./ 10; % Convert mm to cm
             obj.NIso = params.NIsochromats;
+            if isfield(params, 'dt')
+                obj.dt = params.dt;
+            end
         end
         
         function RunSimulation(obj)
             %% When called this function runs the dictionary simulation. First it generates a look-up table LUT
             %% with all valid pairs of T1, T2 and B1
             NDictionaryEntries = 0 ;
-
+            gyro = 42.577e6; %Hz/T
             %% Prepare look-up table containing all valid pairs
             obj.LUT = [];
             for kk = 1:length(obj.B1Range)
@@ -57,28 +61,19 @@ classdef DictionaryGeneration
                 end
             end
 
-            %% Set-up simulation parameters
             df = 0; % Ignore off-resonance for now
-            dp = zeros([obj.NIso,3]); 
-            dp(:,3) = linspace(-obj.Thickness,obj.Thickness,obj.NIso);
-
-            %% Generate spoiler for inversion and T2-preparation module
-            flatTime = obj.imagingSpoilerFlatTopTime_ms ./1000; % Convert from ms to s
-            amplitude = params.preparationSpoilerAmplitude_mT ./1000; % Convert to T/m
-            spoiler_inv = GenSliceSpoiler(amplitude,flatTime,RiseT,obj.dt);
-            spoiler_inv = spoiler_inv * gyro/100; % Convert to Hz/cm
+            dp = zeros([NSpin,3]); 
+            dp(:,3) = linspace(-obj.Thickness,obj.Thickness,obj.NIso); %in cm
+            dv = 0;
 
 
-            %% Generate spoiler for acquisition
-            flatTime =  params.sliceSpoiler.duration - RiseT;
-            amplitude = params.imagingSpoilerAmplitude_mT ./1000; % Convert to T/m
-            G_invspoiler = zeros(length(spoiler_inv),3);
-            G_invspoiler(:,3) = spoiler_inv;
-
+            % NOTE: Full Bloch simulation pipeline is not implemented in this class yet.
+            % We still produce a valid LUT so downstream code can proceed.
+            fprintf('DictionaryGeneration: prepared LUT with %d entries.\n', NDictionaryEntries);
             
 
-            %% If required set-up inversion pulse
-            if (instantInversionFlag == false)
+            %% Prepare Inversion RF pulse if required
+            if (obj.instantInversionFlag == false)
                 refPower = params.RefPow;
                 refVol = sqrt(refPower*50);
                 % Calculate pulse B1 required to achieve pi/2 flip
@@ -92,12 +87,9 @@ classdef DictionaryGeneration
                 InversionRF = peakB1.*mag./max(mag).*exp(1j.*deg2rad(phs));
                 InversionRF = InterpolateRFWaveform(InversionRF,params.MRFInversionPulse.duration,params.MRFInversionPulse.duration/length(mag),dt);
                 InversionB1 = InversionRF * gyro;
-                
             end
 
-            %% Run the simulation
-
-
+            
         end
     end
 end
