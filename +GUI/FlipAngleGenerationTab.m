@@ -158,8 +158,7 @@ classdef FlipAngleGenerationTab < handle
             flatTopPts = [];
 
             if minFA >= maxFA
-                uialert(obj.TabHandle.Parent, ...
-                    'Min FA must be less than Max FA.', 'Invalid Input');
+                obj.safeAlert('Min FA must be less than Max FA.', 'Invalid Input', 'warning');
                 return;
             end
 
@@ -169,9 +168,8 @@ classdef FlipAngleGenerationTab < handle
                 nPts = rampPts + flatTopPts;
 
                 if rampPts < 1 || flatTopPts < 1
-                    uialert(obj.TabHandle.Parent, ...
-                        'Ramp and flat-top points must both be at least 1.', ...
-                        'Invalid Input');
+                    obj.safeAlert('Ramp and flat-top points must both be at least 1.', ...
+                        'Invalid Input', 'warning');
                     return;
                 end
             end
@@ -248,7 +246,6 @@ classdef FlipAngleGenerationTab < handle
         function updatePlot(obj)
             pattern = obj.buildPattern();
             obj.FlipAngles = pattern;
-            obj.Parent.FlipAngles = pattern;
 
             ax = obj.FAAxes;
             cla(ax);
@@ -320,14 +317,12 @@ classdef FlipAngleGenerationTab < handle
                     error('Header count (%d) does not match loaded flip angles (%d).', expectedCount, numel(fa));
                 end
             catch ME
-                uialert(obj.TabHandle.Parent, ...
-                    ['Could not read file: ' ME.message], 'Load Error');
+                obj.safeAlert(['Could not read file: ' ME.message], 'Load Error', 'error');
                 return;
             end
 
             obj.LoadedFlipAngles = fa;
             obj.FlipAngles = fa;
-            obj.Parent.FlipAngles = fa;
             obj.Lobes = struct('MinFA', {}, 'MaxFA', {}, 'NPoints', {}, 'Shape', {}, ...
                 'RampPoints', {}, 'FlatTopPoints', {});
             obj.updateLobeList();
@@ -336,8 +331,7 @@ classdef FlipAngleGenerationTab < handle
 
         function exportFlipAngles(obj)
             if isempty(obj.FlipAngles)
-                uialert(obj.TabHandle.Parent, ...
-                    'No flip angle pattern to export.', 'Export Error');
+                obj.safeAlert('No flip angle pattern to export.', 'Export Error', 'warning');
                 return;
             end
 
@@ -349,8 +343,7 @@ classdef FlipAngleGenerationTab < handle
 
             fid = fopen(fullfile(location, file), 'w');
             if fid == -1
-                uialert(obj.TabHandle.Parent, ...
-                    'Could not open file for writing.', 'Export Error');
+                obj.safeAlert('Could not open file for writing.', 'Export Error', 'error');
                 return;
             end
 
@@ -358,9 +351,9 @@ classdef FlipAngleGenerationTab < handle
             fprintf(fid, '%.6f\n', obj.FlipAngles);
             fclose(fid);
 
-            uialert(obj.TabHandle.Parent, ...
+            obj.safeAlert( ...
                 sprintf('Exported %d values to:\n%s', numel(obj.FlipAngles), fullfile(location, file)), ...
-                'Export Complete', 'Icon', 'success');
+                'Export Complete', 'success');
         end
     end
 
@@ -464,6 +457,27 @@ classdef FlipAngleGenerationTab < handle
             if ~isempty(h)
                 h(1).Position = pos;
             end
+        end
+
+        function safeAlert(obj, messageText, titleText, iconName)
+            if nargin < 4 || isempty(iconName)
+                iconName = 'info';
+            end
+
+            fig = [];
+            if ~isempty(obj.Parent) && isprop(obj.Parent, 'Fig') ...
+                    && ~isempty(obj.Parent.Fig) && isvalid(obj.Parent.Fig)
+                fig = obj.Parent.Fig;
+            elseif ~isempty(obj.TabHandle) && isvalid(obj.TabHandle)
+                fig = ancestor(obj.TabHandle, 'figure');
+            end
+
+            if isempty(fig) || ~isvalid(fig)
+                warning('%s: %s', titleText, messageText);
+                return;
+            end
+
+            uialert(fig, messageText, titleText, 'Icon', iconName);
         end
 
         function tf = usesRampFlatShape(~, shape)

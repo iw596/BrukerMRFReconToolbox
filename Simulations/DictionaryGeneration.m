@@ -62,7 +62,7 @@ classdef DictionaryGeneration
             end
 
             df = 0; % Ignore off-resonance for now
-            dp = zeros([NSpin,3]); 
+            dp = zeros([NIso,3]); 
             dp(:,3) = linspace(-obj.Thickness,obj.Thickness,obj.NIso); %in cm
             dv = 0;
 

@@ -305,9 +305,8 @@ classdef DictionaryTab < handle
             try
                 params = LoadBrukerData(scanDir, false);
             catch ME
-                uialert(obj.TabHandle.Parent, ...
-                    ['Unable to parse Bruker method file: ' ME.message], ...
-                    'Method Load Error', 'Icon', 'error');
+                obj.safeAlert(['Unable to parse Bruker method file: ' ME.message], ...
+                    'Method Load Error', 'error');
                 return;
             end
 
@@ -368,9 +367,14 @@ classdef DictionaryTab < handle
             % plus T1/T2/B1/raster-time overrides.
 
             if isempty(fieldnames(obj.LoadedMethodParams))
-                uialert(obj.TabHandle.Parent, ...
-                    'Load a Bruker method file first. Sequence parameters are now method-driven.', ...
-                    'Method File Required', 'Icon', 'warning');
+                obj.safeAlert('Load a Bruker method file first. Sequence parameters are now method-driven.', ...
+                    'Method File Required', 'warning');
+                return;
+            end
+
+            if isempty(obj.PrepListMatrix)
+                obj.safeAlert('Load a prep list file before generating the dictionary.', ...
+                    'Prep List Required', 'warning');
                 return;
             end
 
@@ -380,7 +384,7 @@ classdef DictionaryTab < handle
                 T2 = obj.parseRangeString(obj.T2Edit.Value);
                 B1 = obj.parseRangeString(obj.B1Edit.Value);
             catch ME
-                uialert(obj.TabHandle.Parent, ME.message, 'Parameter Error');
+                obj.safeAlert(ME.message, 'Parameter Error', 'warning');
                 return;
             end
 
@@ -415,9 +419,8 @@ classdef DictionaryTab < handle
             % Prefer FA from flip-angle generation tab; fall back to method file.
             fa = obj.resolveFlipAngles();
             if isempty(fa)
-                uialert(obj.TabHandle.Parent, ...
-                    'No flip-angle pattern available. Generate/load FA first or ensure MRFFA exists in method file.', ...
-                    'Flip Angles Missing', 'Icon', 'warning');
+                obj.safeAlert('No flip-angle pattern available. Generate/load FA first or ensure MRFFA exists in method file.', ...
+                    'Flip Angles Missing', 'warning');
                 return;
             end
             obj.FlipAngles = fa;
@@ -446,8 +449,10 @@ classdef DictionaryTab < handle
                 numel(fa), ...
                 obj.tf2onoff(useInstantInversion));
 
-            dictionary = DictionaryGeneration(params);
-            dictionary.RunSimulation;
+            %dictionary = DictionaryGeneration(params);
+            %dictionary.RunSimulation;
+            SimulateFISPMRF(params,obj.PrepListMatrix,T1,T2,B1,simTimeStep_us,nIsochromats,useInstantInversion);
+
         end
 
     end % public methods
@@ -771,9 +776,8 @@ classdef DictionaryTab < handle
             try
                 [prepMatrix, prepNames, declaredCount] = obj.parsePrepListFile(filePath);
             catch ME
-                uialert(obj.TabHandle.Parent, ...
-                    ['Unable to parse prep list: ' ME.message], ...
-                    'Prep List Error', 'Icon', 'error');
+                obj.safeAlert(['Unable to parse prep list: ' ME.message], ...
+                    'Prep List Error', 'error');
                 return;
             end
 
@@ -894,6 +898,27 @@ classdef DictionaryTab < handle
             end
         end
 
+        function safeAlert(obj, messageText, titleText, iconName)
+            if nargin < 4 || isempty(iconName)
+                iconName = 'info';
+            end
+
+            fig = [];
+            if ~isempty(obj.Parent) && isprop(obj.Parent, 'Fig') ...
+                    && ~isempty(obj.Parent.Fig) && isvalid(obj.Parent.Fig)
+                fig = obj.Parent.Fig;
+            elseif ~isempty(obj.TabHandle) && isvalid(obj.TabHandle)
+                fig = ancestor(obj.TabHandle, 'figure');
+            end
+
+            if isempty(fig) || ~isvalid(fig)
+                warning('%s: %s', titleText, messageText);
+                return;
+            end
+
+            uialert(fig, messageText, titleText, 'Icon', iconName);
+        end
+
         function ampMT = convertBrukerGradientToMT(~, ampRaw, params)
             % Convert Bruker gradient amplitudes to mT/m when possible.
             ampMT = ampRaw;
@@ -906,10 +931,6 @@ classdef DictionaryTab < handle
 
         function fa = resolveFlipAngles(obj)
             fa = [];
-            if ~isempty(obj.Parent) && isprop(obj.Parent, 'FlipAngles') && ~isempty(obj.Parent.FlipAngles)
-                fa = obj.Parent.FlipAngles(:).';
-                return;
-            end
             if ~isempty(obj.FlipAngles)
                 fa = obj.FlipAngles(:).';
                 return;
