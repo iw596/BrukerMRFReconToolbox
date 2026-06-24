@@ -86,6 +86,24 @@ function params = LoadBrukerData(path,loadDataFlag)
     else
         params.NPar = 1;
     end
+    
+    % Find the entry containing PVM_SpatDimEnum
+    idx = find(contains(TextAsCells,'$PVM_SpatDimEnum='),1);
+    
+    if isempty(idx)
+        error('PVM_SpatDimEnum not found');
+    end
+    
+    % Extract 2D or 3D
+    token = regexp(TextAsCells{idx},'<(2D|3D)>','tokens','once');
+    
+    if isempty(token)
+        error('Could not parse dimensionality');
+    end
+    
+    dim = token{1};     % '2D' or '3D'
+    params.NDim = str2num(dim(1));
+
 
     k = strfind(TextAsCells,"$PVM_NMovieFrames=");
     idx = find(~cellfun(@isempty,k));

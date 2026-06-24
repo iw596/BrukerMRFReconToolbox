@@ -18,6 +18,7 @@ classdef MRFViewer < handle
         ReconTabObj     % ReconstructionTab instance
         FlipAngleGenTabObj % FlipAngleGenerationTab instance
         DictionaryTabObj % DictionaryTab instance
+        CRBOptTabObj    % CRBOptimisationTab instance
 
         % Data
         MRFData = []
@@ -74,11 +75,13 @@ classdef MRFViewer < handle
             reconTabHandle = uitab(app.TabGroup, 'Title','Reconstruction');
             faGenTabHandle = uitab(app.TabGroup, 'Title','Flip Angle Generation');
             dictionaryTabHandle = uitab(app.TabGroup,"Title","Dictionary");
+            crbTabHandle = uitab(app.TabGroup, 'Title', 'CRB Optimisation');
             % Initialize tab objects which create their own UI
             app.ViewerTabObj = GUI.ViewerTab(app, viewerTabHandle);
             app.ReconTabObj = GUI.ReconstructionTab(app, reconTabHandle);
             app.FlipAngleGenTabObj = GUI.FlipAngleGenerationTab(app, faGenTabHandle);
-            app.DictionaryTabObj = GUI.DictionaryTab(app,dictionaryTabHandle);
+            app.DictionaryTabObj = GUI.DictionaryTab(app, dictionaryTabHandle);
+            app.CRBOptTabObj = GUI.CRBOptimisationTab(app, crbTabHandle);
 
             % Initialize colormaps
             %initalizeColourMaps(app);

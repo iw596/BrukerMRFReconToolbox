@@ -12,14 +12,29 @@ classdef ReconstructionTab < handle
         LoadDictionaryButton
         RegModeLabel
         RegModeDropdown
+        DimensionalityLabel
+        DimensionalityDropdown
+        ReconTargetLabel
+        ReconTargetDropdown
         LambdaLabel
         LambdaEdit
+        BlockSizeLabel
+        BlockSizeEdit
+        StrideLabel
+        StrideEdit
+        OuterIterationsLabel
+        OuterIterationsEdit
+        InnerIterationsLabel
+        InnerIterationsEdit
+        RhoLabel
+        RhoEdit
         EstimateMaskCheckbox
         DataInfoLabel
         DataInfoTextArea
         DictionaryInfoLabel
 
         ReconSettings = struct()
+        LoadedMethodParams = struct() % Raw Bruker method parameters
 
 
     end
@@ -45,7 +60,7 @@ classdef ReconstructionTab < handle
                 @(src,event)obj.runReconstruction());
 
             obj.LoadFileButton = uibutton(obj.TabHandle,...
-                'Text','Load Data',...
+                'Text','Load Method File',...
                 'Position',[20 580 160 30],...
                 'ButtonPushedFcn',...
                 @(src,event)obj.loadFile());
@@ -63,7 +78,29 @@ classdef ReconstructionTab < handle
                 'Items', {'Locally-low rank', 'Wavelet', 'Total variation'}, ...
                 'Value', 'Locally-low rank', ...
                 'Position', [160 540 180 22], ...
+                'ValueChangedFcn', @(~,~) obj.updateRegularizationModeUI(), ...
                 'Tooltip', 'Select regularization method for reconstruction');
+
+            obj.DimensionalityLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Dimensionality', ...
+                'Position', [20 560 130 22]);
+            obj.DimensionalityDropdown = uidropdown(obj.TabHandle, ...
+                'Items', {'2D', '3D'}, ...
+                'Value', '2D', ...
+                'Position', [160 560 180 22], ...
+                'Enable', 'off', ...
+                'Tooltip', 'Set automatically from loaded method field NDim');
+
+            obj.ReconTargetLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Reconstruction target', ...
+                'Position', [460 560 150 22], ...
+                'FontWeight', 'bold');
+            obj.ReconTargetDropdown = uidropdown(obj.TabHandle, ...
+                'Items', {'MRF', 'T1', 'T2'}, ...
+                'Value', 'MRF', ...
+                'Position', [620 560 170 22], ...
+                'ValueChangedFcn', @(~,~) obj.updateReconTargetUI(), ...
+                'Tooltip', 'Select which output to reconstruct');
 
             obj.LambdaLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Lambda', ...
@@ -75,14 +112,64 @@ classdef ReconstructionTab < handle
                 'Position', [160 510 180 22], ...
                 'Tooltip', 'Regularization strength (must be > 0)');
 
+            obj.BlockSizeLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Block size', ...
+                'Position', [20 478 130 22]);
+            obj.BlockSizeEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 8, ...
+                'Limits', [1 Inf], ...
+                'RoundFractionalValues', true, ...
+                'Position', [160 478 180 22], ...
+                'Tooltip', 'LLR patch/block size (pixels)');
+
+            obj.StrideLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Stride', ...
+                'Position', [20 446 130 22]);
+            obj.StrideEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 4, ...
+                'Limits', [1 Inf], ...
+                'RoundFractionalValues', true, ...
+                'Position', [160 446 180 22], ...
+                'Tooltip', 'LLR sliding-window stride (pixels)');
+
+            obj.OuterIterationsLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Outer iterations', ...
+                'Position', [20 414 130 22]);
+            obj.OuterIterationsEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 10, ...
+                'Limits', [1 Inf], ...
+                'RoundFractionalValues', true, ...
+                'Position', [160 414 180 22], ...
+                'Tooltip', 'ADMM outer iteration count');
+
+            obj.InnerIterationsLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Inner iterations', ...
+                'Position', [20 382 130 22]);
+            obj.InnerIterationsEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 5, ...
+                'Limits', [1 Inf], ...
+                'RoundFractionalValues', true, ...
+                'Position', [160 382 180 22], ...
+                'Tooltip', 'ADMM inner iteration count');
+
+            obj.RhoLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Rho', ...
+                'Position', [20 350 130 22]);
+            obj.RhoEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 1, ...
+                'Limits', [0 Inf], ...
+                'LowerLimitInclusive', false, ...
+                'Position', [160 350 180 22], ...
+                'Tooltip', 'ADMM penalty parameter (must be > 0)');
+
             obj.EstimateMaskCheckbox = uicheckbox(obj.TabHandle, ...
                 'Text', 'Estimate mask', ...
                 'Value', false, ...
-                'Position', [20 478 180 22], ...
+                'Position', [20 318 180 22], ...
                 'Tooltip', 'Estimate mask automatically during reconstruction');
 
             obj.DataInfoLabel = uilabel(obj.TabHandle, ...
-                'Text', 'Loaded data info', ...
+                'Text', 'Loaded method info', ...
                 'FontWeight', 'bold', ...
                 'Position', [20 430 180 22]);
 
@@ -95,6 +182,8 @@ classdef ReconstructionTab < handle
                 'Text', 'Dictionary: none loaded', ...
                 'Position', [20 252 420 22]);
 
+            obj.updateRegularizationModeUI();
+            obj.updateReconTargetUI();
             obj.resizeUI([]);
         end
 
@@ -103,8 +192,24 @@ classdef ReconstructionTab < handle
             % Collects current UI parameters for downstream reconstruction.
 
             regMode = obj.RegModeDropdown.Value;
+            if isfield(obj.LoadedMethodParams, 'NDim')
+                dimensionality = obj.inferDimensionalityFromNDim(obj.LoadedMethodParams.NDim);
+            else
+                dimensionality = obj.DimensionalityDropdown.Value;
+            end
             lambda = obj.LambdaEdit.Value;
             estimateMask = obj.EstimateMaskCheckbox.Value;
+            reconTarget = obj.ReconTargetDropdown.Value;
+            outerIterations = obj.OuterIterationsEdit.Value;
+            innerIterations = obj.InnerIterationsEdit.Value;
+            rho = obj.RhoEdit.Value;
+
+            if isempty(fieldnames(obj.LoadedMethodParams))
+                uialert(obj.TabHandle.Parent, ...
+                    'Load a Bruker method file first (NDim is required).', ...
+                    'Method File Required', 'Icon', 'warning');
+                return;
+            end
 
             if isempty(lambda) || ~isfinite(lambda) || lambda <= 0
                 uialert(obj.TabHandle.Parent, ...
@@ -113,10 +218,54 @@ classdef ReconstructionTab < handle
                 return;
             end
 
+            if isempty(outerIterations) || ~isfinite(outerIterations) || outerIterations <= 0 || mod(outerIterations,1) ~= 0
+                uialert(obj.TabHandle.Parent, ...
+                    'Outer iterations must be a positive integer.', ...
+                    'Invalid Outer Iterations', 'Icon', 'warning');
+                return;
+            end
+
+            if isempty(innerIterations) || ~isfinite(innerIterations) || innerIterations <= 0 || mod(innerIterations,1) ~= 0
+                uialert(obj.TabHandle.Parent, ...
+                    'Inner iterations must be a positive integer.', ...
+                    'Invalid Inner Iterations', 'Icon', 'warning');
+                return;
+            end
+
+            if isempty(rho) || ~isfinite(rho) || rho <= 0
+                uialert(obj.TabHandle.Parent, ...
+                    'Rho must be a positive number.', ...
+                    'Invalid Rho', 'Icon', 'warning');
+                return;
+            end
+
             settings = struct();
+            settings.Dimensionality = dimensionality;
             settings.RegularizationMode = regMode;
             settings.Lambda = lambda;
+            settings.ReconstructionTarget = reconTarget;
             settings.EstimateMask = estimateMask;
+            settings.OuterIterations = outerIterations;
+            settings.InnerIterations = innerIterations;
+            settings.Rho = rho;
+            if strcmp(regMode, 'Locally-low rank')
+                blockSize = obj.BlockSizeEdit.Value;
+                stride = obj.StrideEdit.Value;
+                if isempty(blockSize) || ~isfinite(blockSize) || blockSize <= 0 || mod(blockSize,1) ~= 0
+                    uialert(obj.TabHandle.Parent, ...
+                        'Block size must be a positive integer.', ...
+                        'Invalid Block Size', 'Icon', 'warning');
+                    return;
+                end
+                if isempty(stride) || ~isfinite(stride) || stride <= 0 || mod(stride,1) ~= 0
+                    uialert(obj.TabHandle.Parent, ...
+                        'Stride must be a positive integer.', ...
+                        'Invalid Stride', 'Icon', 'warning');
+                    return;
+                end
+                settings.BlockSize = blockSize;
+                settings.Stride = stride;
+            end
             settings.LoadDir = obj.Parent.LastLoadDir;
             if isfield(obj.ReconSettings, 'DataPath')
                 settings.DataPath = obj.ReconSettings.DataPath;
@@ -124,49 +273,103 @@ classdef ReconstructionTab < handle
             if isfield(obj.ReconSettings, 'DictionaryPath')
                 settings.DictionaryPath = obj.ReconSettings.DictionaryPath;
             end
+            settings.MethodParams = obj.LoadedMethodParams;
 
             obj.ReconSettings = settings;
 
-            disp('Reconstruction initiated with settings:');
+            try
+                result = runMRFReconstruction(obj.LoadedMethodParams, settings);
+            catch ME
+                uialert(obj.TabHandle.Parent, ...
+                    ['Reconstruction skeleton failed: ' ME.message], ...
+                    'Reconstruction Error', 'Icon', 'error');
+                return;
+            end
+
+            obj.ReconSettings.LastResult = result;
+            obj.DataInfoTextArea.Value = [ ...
+                {['Reconstruction mode: ' char(dimensionality)]}, ...
+                {['Target: ' char(reconTarget)]}, ...
+                {['Regularizer: ' char(regMode)]}, ...
+                {['Status: ' result.Status]}, ...
+                result.Log(:)'];
+
+            disp('Reconstruction skeleton completed with settings:');
             disp(settings);
+            disp(result);
         end
 
         function loadFile(obj)
-            % Load reconstruction data file and display basic metadata.
-            [file, folder] = uigetfile( ...
-                {'*.mat;*.nii;*.nii.gz','MRF Data Files (*.mat, *.nii, *.nii.gz)'; ...
-                 '*.*','All Files (*.*)'}, ...
-                'Select reconstruction data file');
+            % Load Bruker method file and display parsed method metadata.
+            [file, folder] = uigetfile({'*','Bruker method file (usually named method)'}, ...
+                'Select Bruker method file');
             if isequal(file, 0)
                 return;
             end
 
-            fullPath = fullfile(folder, file);
+            methodPath = fullfile(folder, file);
+            scanDir = folder;
             try
-                [dims, nDims, nPoints, sourceText] = obj.getDataDimensions(fullPath);
+                params = LoadBrukerData(scanDir, false);
             catch ME
                 uialert(obj.TabHandle.Parent, ...
-                    ['Could not load data info: ' ME.message], ...
+                    ['Could not load Bruker method file: ' ME.message], ...
                     'Data Load Error', 'Icon', 'error');
                 return;
             end
 
-            sizeStr = strjoin(arrayfun(@num2str, dims, 'UniformOutput', false), ' x ');
+            trMs = NaN;
+            teMs = NaN;
+            nPrep = NaN;
+            nFA = NaN;
+            thickMm = NaN;
+            if isfield(params, 'TR') && ~isempty(params.TR)
+                trMs = params.TR * 1000;
+            end
+            if isfield(params, 'TE') && ~isempty(params.TE)
+                teMs = params.TE * 1000;
+            end
+            if isfield(params, 'NPointsPerPrep') && ~isempty(params.NPointsPerPrep)
+                nPrep = params.NPointsPerPrep;
+            end
+            if isfield(params, 'MRFFA') && ~isempty(params.MRFFA)
+                nFA = numel(params.MRFFA);
+            elseif isfield(params, 'NMRFFA') && ~isempty(params.NMRFFA)
+                nFA = params.NMRFFA;
+            end
+            if isfield(params, 'Thickness') && ~isempty(params.Thickness)
+                thickMm = params.Thickness * 1000;
+            end
+
+            ndimText = 'Unknown';
+            inferredDimensionality = '2D';
+            if isfield(params, 'NDim') && ~isempty(params.NDim)
+                ndimText = num2str(params.NDim);
+                inferredDimensionality = obj.inferDimensionalityFromNDim(params.NDim);
+            end
+            obj.DimensionalityDropdown.Value = inferredDimensionality;
+            obj.LoadedMethodParams = params;
+
             obj.DataInfoTextArea.Value = {
-                ['File: ' file], ...
-                ['Source: ' sourceText], ...
-                ['Size: ' sizeStr], ...
-                ['Dimensions: ' num2str(nDims)], ...
-                ['Points: ' num2str(nPoints)] ...
+                ['Method file: ' file], ...
+                ['Scan dir: ' scanDir], ...
+                ['NDim: ' ndimText], ...
+                ['Reconstruction mode: ' inferredDimensionality], ...
+                sprintf('TR: %.3f ms', trMs), ...
+                sprintf('TE: %.3f ms', teMs), ...
+                sprintf('Slice thickness: %.3f mm', thickMm), ...
+                sprintf('NPointsPerPrep: %d', round(nPrep)), ...
+                sprintf('FA points: %d', round(nFA)) ...
             };
 
             obj.Parent.LastLoadDir = folder;
-            obj.ReconSettings.DataPath = fullPath;
-            obj.ReconSettings.DataSize = dims;
-            obj.ReconSettings.DataDimensions = nDims;
-            obj.ReconSettings.DataPoints = nPoints;
+            obj.ReconSettings.DataPath = methodPath;
+            obj.ReconSettings.MethodPath = methodPath;
+            obj.ReconSettings.ScanDir = scanDir;
+            obj.ReconSettings.MethodParams = params;
+            obj.ReconSettings.Dimensionality = inferredDimensionality;
 
-            disp(['Loaded data file: ', fullPath]);
+            disp(['Loaded Bruker method file: ', methodPath]);
         end
 
         function loadDictionary(obj)
@@ -305,8 +508,40 @@ classdef ReconstructionTab < handle
             obj.RegModeDropdown.Position = [margin + 140 y fieldW 22];
             y = y - rowGap - 22;
 
+            obj.DimensionalityLabel.Position = [margin y 130 22];
+            obj.DimensionalityDropdown.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            rightX = min(tabW - margin - 320, margin + 420);
+            rightX = max(rightX, margin + 360);
+            obj.ReconTargetLabel.Position = [rightX yTop 150 22];
+            obj.ReconTargetDropdown.Position = [rightX + 155 yTop 165 22];
+
             obj.LambdaLabel.Position = [margin y 130 22];
             obj.LambdaEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            isLLR = strcmp(obj.RegModeDropdown.Value, 'Locally-low rank');
+            if isLLR
+                obj.BlockSizeLabel.Position = [margin y 130 22];
+                obj.BlockSizeEdit.Position = [margin + 140 y fieldW 22];
+                y = y - rowGap - 22;
+
+                obj.StrideLabel.Position = [margin y 130 22];
+                obj.StrideEdit.Position = [margin + 140 y fieldW 22];
+                y = y - rowGap - 22;
+            end
+
+            obj.OuterIterationsLabel.Position = [margin y 130 22];
+            obj.OuterIterationsEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            obj.InnerIterationsLabel.Position = [margin y 130 22];
+            obj.InnerIterationsEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            obj.RhoLabel.Position = [margin y 130 22];
+            obj.RhoEdit.Position = [margin + 140 y fieldW 22];
             y = y - rowGap - 22;
 
             obj.EstimateMaskCheckbox.Position = [margin y 180 22];
@@ -318,6 +553,51 @@ classdef ReconstructionTab < handle
             obj.DataInfoTextArea.Position = [margin y - infoH - 4 max(320, tabW - 2*margin) infoH];
 
             obj.DictionaryInfoLabel.Position = [margin y - infoH - 30 max(320, tabW - 2*margin) 22];
+        end
+
+        function updateRegularizationModeUI(obj)
+            isLLR = strcmp(obj.RegModeDropdown.Value, 'Locally-low rank');
+
+            vis = 'off';
+            if isLLR
+                vis = 'on';
+            end
+
+            obj.BlockSizeLabel.Visible = vis;
+            obj.BlockSizeEdit.Visible = vis;
+            obj.StrideLabel.Visible = vis;
+            obj.StrideEdit.Visible = vis;
+
+            obj.resizeUI([]);
+        end
+
+        function updateReconTargetUI(obj)
+            isMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF');
+
+            if isMRF
+                obj.LoadDictionaryButton.Visible = 'on';
+            else
+                obj.LoadDictionaryButton.Visible = 'off';
+            end
+
+            obj.resizeUI([]);
+        end
+
+        function dimensionality = inferDimensionalityFromNDim(~, ndimValue)
+            dimensionality = '2D';
+            if isempty(ndimValue)
+                return;
+            end
+
+            if isnumeric(ndimValue)
+                n = double(ndimValue(1));
+            else
+                n = str2double(char(string(ndimValue)));
+            end
+
+            if ~isnan(n) && n >= 3
+                dimensionality = '3D';
+            end
         end
 
         

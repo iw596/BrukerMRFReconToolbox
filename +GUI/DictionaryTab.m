@@ -39,9 +39,11 @@ classdef DictionaryTab < handle
         RasterTimeLabel
         RasterTimeEdit
         InstantInversionCheckbox
+        ParallelSimulationCheckbox
 
         % --- Bottom-area buttons ---
         GenerateDictButton
+        SaveDictButton
         LoadPrepListButton
         PrepListSummaryLabel
         PrepListTable
@@ -56,6 +58,9 @@ classdef DictionaryTab < handle
         PrepListMatrix = []
         PrepListNames = {}
         PrepListDeclaredCount = NaN
+        GeneratedDictionary = []
+        GeneratedLUT = []
+        GeneratedDictionaryParams = struct()
 
         %---Dictionary Controller ---
         DictionaryGenerationController
@@ -229,11 +234,24 @@ classdef DictionaryTab < handle
                 'Position', [10 88 220 24], ...
                 'Tooltip', 'If checked, use ideal instant inversion model');
 
+            obj.ParallelSimulationCheckbox = uicheckbox(P, ...
+                'Text', 'Use parallel simulation', ...
+                'Value', true, ...
+                'Position', [10 62 220 24], ...
+                'Tooltip', 'If enabled, uses parfor with automatic fallback to serial mode on failure');
+
             obj.GenerateDictButton = uibutton(TAB, ...
                 'Text', 'Generate Dictionary', ...
-                'Position', [10 15 370 36], ...
+                'Position', [10 57 370 36], ...
                 'FontWeight', 'bold', ...
                 'ButtonPushedFcn', @(~,~) obj.generateDictionary());
+
+            obj.SaveDictButton = uibutton(TAB, ...
+                'Text', 'Save Dict/LUT (.mat)', ...
+                'Position', [10 15 370 36], ...
+                'Enable', 'off', ...
+                'Tooltip', 'Save the latest generated dictionary and LUT to a MAT file', ...
+                'ButtonPushedFcn', @(~,~) obj.saveGeneratedDictionary());
 
             % ============================================================
             % SECTION 6 – Preparation list panel (right-hand column, top)
@@ -407,6 +425,7 @@ classdef DictionaryTab < handle
             obj.NIsochromatsEdit.Value = params.NIsochromats;
             params.RefPow = obj.RefPow;
             params.InstantInversion = obj.InstantInversionCheckbox.Value;
+            params.UseParallel = obj.ParallelSimulationCheckbox.Value;
             params.PrepList = obj.PrepListMatrix;
 
             if ~isfield(params, 'MRFSpoiler')
@@ -449,9 +468,64 @@ classdef DictionaryTab < handle
                 numel(fa), ...
                 obj.tf2onoff(useInstantInversion));
 
-            %dictionary = DictionaryGeneration(params);
-            %dictionary.RunSimulation;
-            SimulateFISPMRF(params,obj.PrepListMatrix,T1,T2,B1,simTimeStep_us,nIsochromats,useInstantInversion);
+            obj.GeneratedDictionary = [];
+            obj.GeneratedLUT = [];
+            obj.GeneratedDictionaryParams = struct();
+            if ~isempty(obj.SaveDictButton) && isvalid(obj.SaveDictButton)
+                obj.SaveDictButton.Enable = 'off';
+            end
+
+            obj.ensureToolboxOnPath();
+
+            fig = [];
+            if ~isempty(obj.Parent) && isprop(obj.Parent, 'Fig') ...
+                    && ~isempty(obj.Parent.Fig) && isvalid(obj.Parent.Fig)
+                fig = obj.Parent.Fig;
+            elseif ~isempty(obj.TabHandle) && isvalid(obj.TabHandle)
+                fig = ancestor(obj.TabHandle, 'figure');
+            end
+
+            dlg = [];
+            if ~isempty(fig) && isvalid(fig)
+                try
+                    dlg = uiprogressdlg(fig, ...
+                        'Title', 'Generating Dictionary', ...
+                        'Message', 'Running Bloch simulation. Please wait...', ...
+                        'Indeterminate', 'on', ...
+                        'Cancelable', 'off');
+                catch
+                end
+            end
+
+            originalButtonText = '';
+            if ~isempty(obj.GenerateDictButton) && isvalid(obj.GenerateDictButton)
+                originalButtonText = obj.GenerateDictButton.Text;
+                obj.GenerateDictButton.Enable = 'off';
+                obj.GenerateDictButton.Text = 'Generating...';
+            end
+            drawnow;
+
+            cleanupObj = onCleanup(@() obj.cleanupDictionaryGenerationUI(dlg, originalButtonText)); %#ok<NASGU>
+
+            try
+                %dictionary = DictionaryGeneration(params);
+                %dictionary.RunSimulation;
+                [dict, LUT] = SimulateFISPMRF(params,obj.PrepListMatrix,T1,T2,B1,simTimeStep_us,nIsochromats,useInstantInversion);
+            catch ME
+                obj.safeAlert(['Dictionary generation failed: ' ME.message], ...
+                    'Simulation Error', 'error');
+                return;
+            end
+
+            obj.GeneratedDictionary = dict;
+            obj.GeneratedLUT = LUT;
+            obj.GeneratedDictionaryParams = params;
+            if ~isempty(obj.SaveDictButton) && isvalid(obj.SaveDictButton)
+                obj.SaveDictButton.Enable = 'on';
+            end
+
+            obj.safeAlert('Dictionary generation finished.', ...
+                'Simulation Complete', 'success');
 
         end
 
@@ -486,7 +560,8 @@ classdef DictionaryTab < handle
 
             % Bottom controls block
             genH = 36;
-            yGen = 15;
+            ySave = 15;
+            yGen = ySave + genH + rowGap;
             stackBottom = yGen + genH + rowGap;
             stackTop = tabH - margin;
 
@@ -534,6 +609,7 @@ classdef DictionaryTab < handle
 
             % Generate button
             obj.GenerateDictButton.Position = [margin yGen leftW genH];
+            obj.SaveDictButton.Position = [margin ySave leftW genH];
 
             % Right-side area split: prep list panel (top) and FA plot (bottom)
             rightGap = 8;
@@ -707,7 +783,9 @@ classdef DictionaryTab < handle
             titlePad = 24;
 
             y1 = ph - titlePad - h;
+            y2 = y1 - (h + 4);
             obj.InstantInversionCheckbox.Position = [margin y1 max(140, pw - 2*margin) h + 2];
+            obj.ParallelSimulationCheckbox.Position = [margin y2 max(140, pw - 2*margin) h + 2];
         end
 
         function layoutPrepListPanelControls(obj)
@@ -917,6 +995,59 @@ classdef DictionaryTab < handle
             end
 
             uialert(fig, messageText, titleText, 'Icon', iconName);
+        end
+
+        function cleanupDictionaryGenerationUI(obj, dlg, originalButtonText)
+            if ~isempty(dlg) && isvalid(dlg)
+                close(dlg);
+            end
+
+            if ~isempty(obj.GenerateDictButton) && isvalid(obj.GenerateDictButton)
+                obj.GenerateDictButton.Enable = 'on';
+                if ~isempty(originalButtonText)
+                    obj.GenerateDictButton.Text = originalButtonText;
+                else
+                    obj.GenerateDictButton.Text = 'Generate Dictionary';
+                end
+            end
+        end
+
+        function ensureToolboxOnPath(~)
+            thisFile = mfilename('fullpath');
+            toolboxRoot = fileparts(fileparts(thisFile));
+            if isfolder(toolboxRoot)
+                addpath(genpath(toolboxRoot));
+            end
+        end
+
+        function saveGeneratedDictionary(obj)
+            if isempty(obj.GeneratedDictionary) || isempty(obj.GeneratedLUT)
+                obj.safeAlert('Generate a dictionary first, then save it.', ...
+                    'Nothing To Save', 'warning');
+                return;
+            end
+
+            [fName, fPath] = uiputfile({'*.mat','MAT-file (*.mat)'}, ...
+                'Save dictionary and LUT', ...
+                'dictionary_lut.mat');
+            if isequal(fName,0)
+                return;
+            end
+
+            dict = obj.GeneratedDictionary;
+            LUT = obj.GeneratedLUT;
+            params = obj.GeneratedDictionaryParams;
+
+            try
+                save(fullfile(fPath,fName), 'dict', 'LUT', 'params', '-v7.3');
+            catch ME
+                obj.safeAlert(['Failed to save MAT file: ' ME.message], ...
+                    'Save Error', 'error');
+                return;
+            end
+
+            obj.safeAlert('Dictionary and LUT saved successfully.', ...
+                'Save Complete', 'success');
         end
 
         function ampMT = convertBrukerGradientToMT(~, ampRaw, params)
