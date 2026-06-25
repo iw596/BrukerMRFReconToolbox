@@ -14,7 +14,7 @@ context = buildMRFReconContext(settings);
 geometry = buildMRFReconGeometry(context);
 regularizer = buildMRFReconRegularizer(context);
 
-prepareMRFData(MRFParams);
+data = prepareMRFData(MRFParams);
 
 result = runADMMReconstruction(context, geometry, regularizer);
 end
