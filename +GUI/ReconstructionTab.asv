@@ -263,7 +263,7 @@ classdef ReconstructionTab < handle
             settings.EstimateMask = estimateMask;
             settings.OuterIterations = outerIterations;
             settings.InnerIterations = innerIterations;
-            settings.MRFReconMode = MRFReconMode;
+            settings.MRFReconMode = MRFReconMode
             settings.Rho = rho;
             if strcmp(regMode, 'Locally-low rank')
                 blockSize = obj.BlockSizeEdit.Value;
@@ -328,7 +328,7 @@ classdef ReconstructionTab < handle
             methodPath = fullfile(folder, file);
             scanDir = folder;
             try
-                params = LoadBrukerData(scanDir, true);
+                params = LoadBrukerData(scanDir, false);
             catch ME
                 uialert(obj.TabHandle.Parent, ...
                     ['Could not load Bruker method file: ' ME.message], ...

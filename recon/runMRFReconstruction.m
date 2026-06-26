@@ -14,7 +14,18 @@ context = buildMRFReconContext(settings);
 geometry = buildMRFReconGeometry(context);
 regularizer = buildMRFReconRegularizer(context);
 
+disp("Preparing MRF data for reconstruction....")
 data = prepareMRFData(MRFParams);
 
-result = runADMMReconstruction(context, geometry, regularizer);
+disp("Starting reconstruction...")
+
+
+if strcmp(settings.MRFReconMode, 'Direct')
+    %% Direct recon pathway
+    disp("Direct reconstruction of MRF data pathway")
+else
+    %% Sub-space recon pathway
+    result = runADMMReconstruction(context, geometry, regularizer);
+end
+disp("Reconstruction finished...")
 end
