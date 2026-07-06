@@ -34,6 +34,11 @@ classdef ReconstructionTab < handle
         DictionaryInfoLabel
         MRFReconModeLabel
         MRFReconModeDropdown
+        B1CorrectionLabel
+        B1CorrectionDropdown
+        LoadB1MapButton
+        B1MapInfoLabel
+        OpenReconImagesButton
 
         ReconSettings = struct()
         LoadedMethodParams = struct() % Raw Bruker method parameters
@@ -117,6 +122,35 @@ classdef ReconstructionTab < handle
                 'ValueChangedFcn', @(~,~) obj.updateMRFReconModeUI(), ...
                 'Tooltip', 'Select which output to reconstruct');
 
+            obj.B1CorrectionLabel = uilabel(obj.TabHandle, ...
+                'Text', 'B1 Correction', ...
+                'Position', [460 520 150 22], ...
+                'FontWeight', 'bold');
+
+            obj.B1CorrectionDropdown = uidropdown(obj.TabHandle, ...
+                'Items', {'None', 'Estimate from dictionary', 'Use B1 map'}, ...
+                'Value', 'None', ...
+                'Position', [620 520 170 22], ...
+                'ValueChangedFcn', @(~,~) obj.updateB1CorrectionUI(), ...
+                'Tooltip', 'Select how B1 correction is applied during MRF matching');
+
+            obj.LoadB1MapButton = uibutton(obj.TabHandle, ...
+                'Text', 'Load B1 Map', ...
+                'Position', [460 490 150 24], ...
+                'ButtonPushedFcn', @(~,~) obj.loadB1Map(), ...
+                'Tooltip', 'Load a B1 map for voxel-wise B1-corrected MRF matching');
+
+            obj.B1MapInfoLabel = uilabel(obj.TabHandle, ...
+                'Text', 'B1 map: none loaded', ...
+                'Position', [620 490 320 22]);
+
+            obj.OpenReconImagesButton = uibutton(obj.TabHandle, ...
+                'Text', 'Open Recon Images', ...
+                'Position', [820 580 180 30], ...
+                'Enable', 'off', ...
+                'ButtonPushedFcn', @(~,~) obj.Parent.openReconstructionImagesTab(), ...
+                'Tooltip', 'Open the reconstructed image browser');
+
             obj.LambdaLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Lambda', ...
                 'Position', [20 510 130 22]);
@@ -199,6 +233,8 @@ classdef ReconstructionTab < handle
 
             obj.updateRegularizationModeUI();
             obj.updateReconTargetUI();
+            obj.updateMRFReconModeUI();
+            obj.updateB1CorrectionUI();
             obj.resizeUI([]);
         end
 
@@ -219,40 +255,41 @@ classdef ReconstructionTab < handle
             innerIterations = obj.InnerIterationsEdit.Value;
             rho = obj.RhoEdit.Value;
             MRFReconMode = obj.MRFReconModeDropdown.Value;
+            usesIterativeParams = strcmp(reconTarget, 'MRF') && strcmp(MRFReconMode, 'Iterative');
+            b1CorrectionMode = obj.B1CorrectionDropdown.Value;
+            estimateB1Map = strcmp(b1CorrectionMode, 'Estimate from dictionary');
+            useProvidedB1Map = strcmp(b1CorrectionMode, 'Use B1 map');
 
             if isempty(fieldnames(obj.LoadedMethodParams))
-                uialert(obj.TabHandle.Parent, ...
-                    'Load a Bruker method file first (NDim is required).', ...
-                    'Method File Required', 'Icon', 'warning');
+                obj.showAlert('Load a Bruker method file first (NDim is required).', ...
+                    'Method File Required', 'warning');
                 return;
             end
 
-            if isempty(lambda) || ~isfinite(lambda) || lambda <= 0
-                uialert(obj.TabHandle.Parent, ...
-                    'Lambda must be a positive number.', ...
-                    'Invalid Lambda', 'Icon', 'warning');
-                return;
-            end
+            if usesIterativeParams
+                if isempty(lambda) || ~isfinite(lambda) || lambda <= 0
+                    obj.showAlert('Lambda must be a positive number.', ...
+                        'Invalid Lambda', 'warning');
+                    return;
+                end
 
-            if isempty(outerIterations) || ~isfinite(outerIterations) || outerIterations <= 0 || mod(outerIterations,1) ~= 0
-                uialert(obj.TabHandle.Parent, ...
-                    'Outer iterations must be a positive integer.', ...
-                    'Invalid Outer Iterations', 'Icon', 'warning');
-                return;
-            end
+                if isempty(outerIterations) || ~isfinite(outerIterations) || outerIterations <= 0 || mod(outerIterations,1) ~= 0
+                    obj.showAlert('Outer iterations must be a positive integer.', ...
+                        'Invalid Outer Iterations', 'warning');
+                    return;
+                end
 
-            if isempty(innerIterations) || ~isfinite(innerIterations) || innerIterations <= 0 || mod(innerIterations,1) ~= 0
-                uialert(obj.TabHandle.Parent, ...
-                    'Inner iterations must be a positive integer.', ...
-                    'Invalid Inner Iterations', 'Icon', 'warning');
-                return;
-            end
+                if isempty(innerIterations) || ~isfinite(innerIterations) || innerIterations <= 0 || mod(innerIterations,1) ~= 0
+                    obj.showAlert('Inner iterations must be a positive integer.', ...
+                        'Invalid Inner Iterations', 'warning');
+                    return;
+                end
 
-            if isempty(rho) || ~isfinite(rho) || rho <= 0
-                uialert(obj.TabHandle.Parent, ...
-                    'Rho must be a positive number.', ...
-                    'Invalid Rho', 'Icon', 'warning');
-                return;
+                if isempty(rho) || ~isfinite(rho) || rho <= 0
+                    obj.showAlert('Rho must be a positive number.', ...
+                        'Invalid Rho', 'warning');
+                    return;
+                end
             end
 
             settings = struct();
@@ -265,7 +302,10 @@ classdef ReconstructionTab < handle
             settings.InnerIterations = innerIterations;
             settings.MRFReconMode = MRFReconMode;
             settings.Rho = rho;
-            if strcmp(regMode, 'Locally-low rank')
+            settings.B1CorrectionMode = b1CorrectionMode;
+            settings.EstimateB1Map = estimateB1Map;
+            settings.B1Map = [];
+            if usesIterativeParams && strcmp(regMode, 'Locally-low rank')
                 blockSize = obj.BlockSizeEdit.Value;
                 stride = obj.StrideEdit.Value;
                 if isempty(blockSize) || ~isfinite(blockSize) || blockSize <= 0 || mod(blockSize,1) ~= 0
@@ -283,6 +323,24 @@ classdef ReconstructionTab < handle
                 settings.BlockSize = blockSize;
                 settings.Stride = stride;
             end
+
+            if useProvidedB1Map
+                if ~isfield(obj.ReconSettings, 'B1MapPath') || isempty(obj.ReconSettings.B1MapPath)
+                    obj.showAlert('Select a B1 map file first, or switch B1 correction mode.', ...
+                        'B1 Map Required', 'warning');
+                    return;
+                end
+
+                try
+                    settings.B1Map = obj.loadB1MapData(obj.ReconSettings.B1MapPath);
+                    settings.B1MapPath = obj.ReconSettings.B1MapPath;
+                catch ME
+                    obj.showAlert(['Could not load B1 map: ' ME.message], ...
+                        'B1 Map Error', 'error');
+                    return;
+                end
+            end
+
             settings.LoadDir = obj.Parent.LastLoadDir;
             if isfield(obj.ReconSettings, 'DataPath')
                 settings.DataPath = obj.ReconSettings.DataPath;
@@ -294,23 +352,64 @@ classdef ReconstructionTab < handle
 
             obj.ReconSettings = settings;
 
+            progressDlg = [];
+            fig = ancestor(obj.TabHandle, 'figure');
+            if ~isempty(fig) && isvalid(fig)
+                progressDlg = uiprogressdlg(fig, ...
+                    'Title', 'MRF Reconstruction', ...
+                    'Message', 'Preparing reconstruction settings...', ...
+                    'Indeterminate', 'on');
+                drawnow limitrate;
+            end
+
             try
-                
+                if ~isempty(progressDlg) && isvalid(progressDlg)
+                    progressDlg.Message = 'Running reconstruction pipeline...';
+                    drawnow limitrate;
+                end
+
                 result = runMRFReconstruction(obj.LoadedMethodParams, settings);
             catch ME
-                uialert(obj.TabHandle.Parent, ...
-                    ['Reconstruction skeleton failed: ' ME.message], ...
-                    'Reconstruction Error', 'Icon', 'error');
+                if ~isempty(progressDlg) && isvalid(progressDlg)
+                    close(progressDlg);
+                end
+                obj.showAlert(['Reconstruction skeleton failed: ' ME.message], ...
+                    'Reconstruction Error', 'error');
                 return;
             end
 
+            if ~isempty(progressDlg) && isvalid(progressDlg)
+                progressDlg.Message = 'Finalizing reconstruction output...';
+                drawnow limitrate;
+                close(progressDlg);
+            end
+
             obj.ReconSettings.LastResult = result;
+            hasReconImages = isstruct(result) && isfield(result, 'images') && ~isempty(result.images);
+            if hasReconImages
+                obj.OpenReconImagesButton.Enable = 'on';
+                obj.Parent.ReconResult = result;
+                obj.Parent.openReconstructionImagesTab();
+            else
+                obj.OpenReconImagesButton.Enable = 'off';
+            end
+
+            statusText = 'Completed';
+            if isstruct(result) && isfield(result, 'Status') && ~isempty(result.Status)
+                statusText = result.Status;
+            end
+
+            logLines = {'Reconstruction completed.'};
+            if isstruct(result) && isfield(result, 'Log') && ~isempty(result.Log)
+                logLines = result.Log(:)';
+            end
+
             obj.DataInfoTextArea.Value = [ ...
                 {['Reconstruction mode: ' char(dimensionality)]}, ...
                 {['Target: ' char(reconTarget)]}, ...
                 {['Regularizer: ' char(regMode)]}, ...
-                {['Status: ' result.Status]}, ...
-                result.Log(:)'];
+                {['Status: ' char(string(statusText))]}, ...
+                logLines'];
 
             disp('Reconstruction skeleton completed with settings:');
             disp(settings);
@@ -330,9 +429,8 @@ classdef ReconstructionTab < handle
             try
                 params = LoadBrukerData(scanDir, true);
             catch ME
-                uialert(obj.TabHandle.Parent, ...
-                    ['Could not load Bruker method file: ' ME.message], ...
-                    'Data Load Error', 'Icon', 'error');
+                obj.showAlert(['Could not load Bruker method file: ' ME.message], ...
+                    'Data Load Error', 'error');
                 return;
             end
 
@@ -403,9 +501,8 @@ classdef ReconstructionTab < handle
             try
                 [dictSize, lutSize] = obj.getDictionarySummary(fullPath);
             catch ME
-                uialert(obj.TabHandle.Parent, ...
-                    ['Could not load dictionary: ' ME.message], ...
-                    'Dictionary Load Error', 'Icon', 'error');
+                obj.showAlert(['Could not load dictionary: ' ME.message], ...
+                    'Dictionary Load Error', 'error');
                 return;
             end
 
@@ -538,6 +635,12 @@ classdef ReconstructionTab < handle
             obj.MRFReconModeLabel.Position = [rightX yTop-30 150 22];
             obj.MRFReconModeDropdown.Position = [rightX + 155 yTop-30 165 22];
 
+            obj.B1CorrectionLabel.Position = [rightX yTop-60 150 22];
+            obj.B1CorrectionDropdown.Position = [rightX + 155 yTop-60 165 22];
+            obj.LoadB1MapButton.Position = [rightX yTop-90 150 24];
+            obj.B1MapInfoLabel.Position = [rightX + 155 yTop-92 max(140, tabW - (rightX + 155) - margin) 22];
+            obj.OpenReconImagesButton.Position = [rightX yTop-120 180 30];
+
 
             obj.LambdaLabel.Position = [margin y 130 22];
             obj.LambdaEdit.Position = [margin + 140 y fieldW 22];
@@ -578,7 +681,8 @@ classdef ReconstructionTab < handle
         end
 
         function updateRegularizationModeUI(obj)
-            isLLR = strcmp(obj.RegModeDropdown.Value, 'Locally-low rank');
+            isIterativeMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF') && strcmp(obj.MRFReconModeDropdown.Value, 'Iterative');
+            isLLR = strcmp(obj.RegModeDropdown.Value, 'Locally-low rank') && isIterativeMRF;
 
             vis = 'off';
             if isLLR
@@ -598,28 +702,151 @@ classdef ReconstructionTab < handle
 
             if isMRF
                 obj.LoadDictionaryButton.Visible = 'on';
+                obj.MRFReconModeLabel.Visible = 'on';
                 obj.MRFReconModeDropdown.Visible = 'on';
-                obj.MRFReconModeDropdown.Visible = 'on';
+                obj.B1CorrectionLabel.Visible = 'on';
+                obj.B1CorrectionDropdown.Visible = 'on';
             else
                 obj.LoadDictionaryButton.Visible = 'off';
+                obj.MRFReconModeLabel.Visible = 'off';
                 obj.MRFReconModeDropdown.Visible = 'off';
-                obj.MRFReconModeDropdown.Visible = 'off';
+                obj.B1CorrectionLabel.Visible = 'off';
+                obj.B1CorrectionDropdown.Visible = 'off';
+                obj.LoadB1MapButton.Visible = 'off';
+                obj.B1MapInfoLabel.Visible = 'off';
             end
 
+            obj.updateMRFReconModeUI();
+            obj.updateB1CorrectionUI();
             obj.resizeUI([]);
         end
 
         function updateMRFReconModeUI(obj)
-            %isMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF');
+            isIterativeMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF') && strcmp(obj.MRFReconModeDropdown.Value, 'Iterative');
 
-            %if isMRF
-             %   obj.LoadDictionaryButton.Visible = 'on';
-          
-            %else
-         %       obj.LoadDictionaryButton.Visible = 'off';
-           % end
+            vis = 'off';
+            if isIterativeMRF
+                vis = 'on';
+            end
+
+            obj.RegModeLabel.Visible = vis;
+            obj.RegModeDropdown.Visible = vis;
+            obj.LambdaLabel.Visible = vis;
+            obj.LambdaEdit.Visible = vis;
+            obj.OuterIterationsLabel.Visible = vis;
+            obj.OuterIterationsEdit.Visible = vis;
+            obj.InnerIterationsLabel.Visible = vis;
+            obj.InnerIterationsEdit.Visible = vis;
+            obj.RhoLabel.Visible = vis;
+            obj.RhoEdit.Visible = vis;
+
+            obj.updateRegularizationModeUI();
 
             obj.resizeUI([]);
+        end
+
+        function updateB1CorrectionUI(obj)
+            isMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF');
+            useProvidedB1Map = strcmp(obj.B1CorrectionDropdown.Value, 'Use B1 map');
+
+            vis = 'off';
+            if isMRF && useProvidedB1Map
+                vis = 'on';
+            end
+
+            obj.LoadB1MapButton.Visible = vis;
+            obj.B1MapInfoLabel.Visible = vis;
+
+            obj.resizeUI([]);
+        end
+
+        function loadB1Map(obj)
+            [file, folder] = uigetfile({'*.mat;*.nii;*.nii.gz', 'B1 map files (*.mat, *.nii, *.nii.gz)'}, ...
+                'Select B1 map file');
+            if isequal(file, 0)
+                return;
+            end
+
+            fullPath = fullfile(folder, file);
+            try
+                [dims, nDims, ~, sourceText] = obj.getDataDimensions(fullPath);
+            catch ME
+                obj.showAlert(['Could not read B1 map file: ' ME.message], ...
+                    'B1 Map Load Error', 'error');
+                return;
+            end
+
+            dimsText = strjoin(arrayfun(@num2str, dims, 'UniformOutput', false), ' x ');
+            obj.B1MapInfoLabel.Text = ['B1 map: ', file, ' (', num2str(nDims), 'D, ', dimsText, ', ', sourceText, ')'];
+
+            obj.Parent.LastLoadDir = folder;
+            obj.ReconSettings.B1MapPath = fullPath;
+
+            disp(['Loaded B1 map file: ', fullPath]);
+        end
+
+        function B1Map = loadB1MapData(~, filePath)
+            [~,~,ext] = fileparts(filePath);
+
+            switch lower(ext)
+                case '.mat'
+                    S = load(filePath);
+                    names = fieldnames(S);
+                    if isempty(names)
+                        error('MAT file is empty.');
+                    end
+
+                    idx = find(structfun(@isnumeric, S), 1, 'first');
+                    if isempty(idx)
+                        error('MAT file contains no numeric variable for B1 map.');
+                    end
+
+                    B1Map = double(S.(names{idx}));
+
+                case {'.nii', '.gz'}
+                    info = niftiinfo(filePath);
+                    B1Map = double(niftiread(info));
+
+                otherwise
+                    error('Unsupported B1 map format. Use MAT or NIfTI.');
+            end
+
+            if isempty(B1Map)
+                error('Loaded B1 map is empty.');
+            end
+        end
+
+        function showAlert(obj, messageText, dialogTitle, iconType)
+            parentFig = obj.resolveDialogParent();
+            if ~isempty(parentFig)
+                uialert(parentFig, messageText, dialogTitle, 'Icon', iconType);
+            else
+                errordlg(messageText, dialogTitle);
+            end
+        end
+
+        function parentFig = resolveDialogParent(obj)
+            parentFig = [];
+
+            if ~isempty(obj.TabHandle) && isvalid(obj.TabHandle)
+                try
+                    parentFig = ancestor(obj.TabHandle, 'figure');
+                catch
+                    parentFig = [];
+                end
+            end
+
+            if isempty(parentFig) && ~isempty(obj.Parent) && isvalid(obj.Parent)
+                try
+                    parentFig = ancestor(obj.Parent, 'figure');
+                catch
+                    parentFig = [];
+                end
+            end
+
+            if isempty(parentFig) || ~isvalid(parentFig)
+                parentFig = [];
+            end
         end
 
 

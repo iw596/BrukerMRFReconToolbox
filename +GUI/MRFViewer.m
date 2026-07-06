@@ -1,3 +1,4 @@
+
 classdef MRFViewer < handle
     % MRFViewer - Main MRF/GT image viewer with ROI analysis
     %   Manages tab-based UI, data loading, ROI analysis, and display
@@ -19,6 +20,7 @@ classdef MRFViewer < handle
         FlipAngleGenTabObj % FlipAngleGenerationTab instance
         DictionaryTabObj % DictionaryTab instance
         CRBOptTabObj    % CRBOptimisationTab instance
+        ReconImagesTabObj % ReconstructionImagesTab instance
 
         % Data
         MRFData = []
@@ -28,6 +30,7 @@ classdef MRFViewer < handle
         GTMask = []
         FlipAngles = []
         LastLoadDir = ''
+        ReconResult = struct()
 
         CurrentSlice = 1
         CurrentMap = 1
@@ -46,6 +49,7 @@ classdef MRFViewer < handle
     methods
 
         function app = MRFViewer()
+            addpath("recon\");
             % Initialize MRFViewer application
             app.createUI();
         end
@@ -62,7 +66,10 @@ classdef MRFViewer < handle
                 'Position',[100 100 1300 750]);
 
             app.Fig.WindowScrollWheelFcn = ...
-                @(src,event)app.scrollSlices(event);
+                @(src,event)app.handleWindowScroll(event);
+
+            app.Fig.WindowKeyPressFcn = ...
+                @(src,event)app.handleWindowKeyPress(event);
 
             app.Fig.SizeChangedFcn = ...
                 @(src,event)app.resizeUI();
@@ -109,9 +116,68 @@ classdef MRFViewer < handle
                 app.ReconTabObj.resizeUI(figPos);
             end
 
+            if ~isempty(app.ReconImagesTabObj) && isvalid(app.ReconImagesTabObj)
+                app.ReconImagesTabObj.resizeUI(figPos);
+            end
+
             if ~isempty(app.FlipAngleGenTabObj)
                 app.FlipAngleGenTabObj.updateResponsiveLayout();
             end
+        end
+
+        function handleWindowScroll(app, event)
+            if app.isReconImagesTabActive() && ~isempty(app.ReconImagesTabObj) && isvalid(app.ReconImagesTabObj)
+                app.ReconImagesTabObj.scrollSlices(event);
+                return
+            end
+
+            app.scrollSlices(event);
+        end
+
+        function handleWindowKeyPress(app, event)
+            if app.isReconImagesTabActive() && ~isempty(app.ReconImagesTabObj) && isvalid(app.ReconImagesTabObj)
+                app.ReconImagesTabObj.handleKeyPress(event);
+            end
+        end
+
+        function tf = isReconImagesTabActive(app)
+            tf = false;
+            if isempty(app.TabGroup) || ~isvalid(app.TabGroup)
+                return
+            end
+
+            if isempty(app.ReconImagesTabObj) || ~isvalid(app.ReconImagesTabObj)
+                return
+            end
+
+            tf = isequal(app.TabGroup.SelectedTab, app.ReconImagesTabObj.TabHandle);
+        end
+
+        function openReconstructionImagesTab(app)
+            % Open the reconstruction image browser for the latest result.
+
+            if isempty(app.ReconResult) || ~isstruct(app.ReconResult) || ...
+                    ~isfield(app.ReconResult, 'images') || isempty(app.ReconResult.images)
+                uialert(app.Fig, ...
+                    'Run a reconstruction that returns image data first.', ...
+                    'No Reconstruction Images', ...
+                    'Icon', 'warning');
+                return
+            end
+
+            if isempty(app.ReconImagesTabObj) || ~isvalid(app.ReconImagesTabObj)
+                reconImagesTabHandle = uitab(app.TabGroup, 'Title', 'Recon Images');
+                app.ReconImagesTabObj = GUI.ReconstructionImagesTab(app, reconImagesTabHandle);
+            end
+
+            reconDimensionality = '2D';
+            if ~isempty(app.ReconTabObj) && isvalid(app.ReconTabObj) && ...
+                    isfield(app.ReconTabObj.ReconSettings, 'Dimensionality')
+                reconDimensionality = app.ReconTabObj.ReconSettings.Dimensionality;
+            end
+
+            app.ReconImagesTabObj.loadImages(app.ReconResult.images, reconDimensionality);
+            app.TabGroup.SelectedTab = app.ReconImagesTabObj.TabHandle;
         end
 
         %% ============================================================

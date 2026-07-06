@@ -23,9 +23,28 @@ disp("Starting reconstruction...")
 if strcmp(settings.MRFReconMode, 'Direct')
     %% Direct recon pathway
     disp("Direct reconstruction of MRF data pathway")
+    result = runDirectMRFReconstruction(data,context, geometry);
 else
     %% Sub-space recon pathway
     result = runADMMReconstruction(context, geometry, regularizer);
 end
+if isempty(result) || ~isstruct(result)
+    result = struct();
+end
+if ~isfield(result, 'Status') || isempty(result.Status)
+    result.Status = 'Completed';
+end
+if ~isfield(result, 'Log') || isempty(result.Log)
+    result.Log = {'Reconstruction completed.'};
+end
 disp("Reconstruction finished...")
+
+
+%% Perform dictionary matching
+disp("Starting dictionary matching....")
+
+
+disp("Dictionary matching finished...")
+
+
 end

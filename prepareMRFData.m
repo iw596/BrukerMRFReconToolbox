@@ -4,11 +4,12 @@
 function [data,samplingmask] = prepareMRFData(MRFParams)
     
     FAIndex = 1:MRFParams.NPointsPerPrep * MRFParams.MRFNPrepModules;
-    FAIndex = repmat(FAIndex,1,size(MRFParams.Traj.CartPE1,1)./MRFParams.NPointsPerPrep * MRFParams.MRFNPrepModules);
+   
 
 
     %% Check if undersampled or not
-    if (MRFParams.Traj.CartesianUndersampling == true)
+    if (MRFParams.Traj.cartesianUndersamplingYesNo == true)
+        FAIndex = repmat(FAIndex,1,size(MRFParams.Traj.CartPE1,1)./MRFParams.NPointsPerPrep * MRFParams.MRFNPrepModules);
         fid = params.data;
         fid = reshape(fid,[params.NCol size(params.Traj.CartPE1,1)]);
 
@@ -28,7 +29,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         data = MRFParams.data;
         data = reshape(data,[nextMultiple,MRFParams.NPointsPerPrep*MRFParams.MRFNPrepModules MRFParams.NLin MRFParams.NPar]);
         data = data(1:MRFParams.NCol,:,:);
-        data = permute(data,[1 3 2 ]);
+        data = permute(data,[1 3 4 2 ]);
 
     end
 
