@@ -39,6 +39,10 @@ classdef ReconstructionTab < handle
         LoadB1MapButton
         B1MapInfoLabel
         OpenReconImagesButton
+        SaveOutputsCheckbox
+        SaveBundleCheckbox
+        SaveOutputsButton
+        SaveOutputsInfoLabel
 
         ReconSettings = struct()
         LoadedMethodParams = struct() % Raw Bruker method parameters
@@ -150,6 +154,39 @@ classdef ReconstructionTab < handle
                 'Enable', 'off', ...
                 'ButtonPushedFcn', @(~,~) obj.Parent.openReconstructionImagesTab(), ...
                 'Tooltip', 'Open the reconstructed image browser');
+
+            obj.SaveOutputsCheckbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Save images + maps', ...
+                'Value', false, ...
+                'Position', [820 550 180 22], ...
+                'Tooltip', sprintf(['Save separate output files using one shared base name:\n' ...
+                '  <base>_images.mat : reconstructed images + sampling mask\n' ...
+                '  <base>_maps.mat   : parameter maps (T1/T2/B1/Index when available) + matching struct\n' ...
+                'Use "Select Save Base Name" to choose <base>.']));
+
+            obj.SaveBundleCheckbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Also save recon bundle', ...
+                'Value', false, ...
+                'Position', [1005 550 190 22], ...
+                'Tooltip', sprintf(['Optional third file:\n' ...
+                '  <base>_recon_result.mat\n' ...
+                'Contains lightweight reproducibility metadata (settings, status/log, dictionary path, output paths, matching summary),\n' ...
+                'without duplicating full image/map arrays.']));
+
+            obj.SaveOutputsButton = uibutton(obj.TabHandle, ...
+                'Text', 'Select Save Base Name', ...
+                'Position', [820 520 180 26], ...
+                'ButtonPushedFcn', @(~,~) obj.selectSaveBasePath(), ...
+                'Tooltip', sprintf(['Choose shared output base name and folder.\n' ...
+                'Example base: /path/session01\n' ...
+                'Saved files:\n' ...
+                '  /path/session01_images.mat\n' ...
+                '  /path/session01_maps.mat\n' ...
+                '  /path/session01_recon_result.mat (if enabled)']));
+
+            obj.SaveOutputsInfoLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Save base: auto (timestamped in current folder)', ...
+                'Position', [820 490 360 22]);
 
             obj.LambdaLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Lambda', ...
@@ -348,6 +385,11 @@ classdef ReconstructionTab < handle
             if isfield(obj.ReconSettings, 'DictionaryPath')
                 settings.DictionaryPath = obj.ReconSettings.DictionaryPath;
             end
+            settings.SaveOutputs = logical(obj.SaveOutputsCheckbox.Value);
+            settings.SaveResultBundle = logical(obj.SaveBundleCheckbox.Value);
+            if isfield(obj.ReconSettings, 'SaveBasePath')
+                settings.SaveBasePath = obj.ReconSettings.SaveBasePath;
+            end
             settings.MethodParams = obj.LoadedMethodParams;
 
             obj.ReconSettings = settings;
@@ -410,6 +452,21 @@ classdef ReconstructionTab < handle
                 {['Regularizer: ' char(regMode)]}, ...
                 {['Status: ' char(string(statusText))]}, ...
                 logLines'];
+
+            if isfield(result, 'OutputFiles') && isstruct(result.OutputFiles)
+                if isfield(result.OutputFiles, 'Images') && ~isempty(result.OutputFiles.Images)
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value, ...
+                        {['Saved images: ' result.OutputFiles.Images]}];
+                end
+                if isfield(result.OutputFiles, 'Maps') && ~isempty(result.OutputFiles.Maps)
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value, ...
+                        {['Saved maps: ' result.OutputFiles.Maps]}];
+                end
+                if isfield(result.OutputFiles, 'Bundle') && ~isempty(result.OutputFiles.Bundle)
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value, ...
+                        {['Saved bundle: ' result.OutputFiles.Bundle]}];
+                end
+            end
 
             disp('Reconstruction skeleton completed with settings:');
             disp(settings);
@@ -640,6 +697,10 @@ classdef ReconstructionTab < handle
             obj.LoadB1MapButton.Position = [rightX yTop-90 150 24];
             obj.B1MapInfoLabel.Position = [rightX + 155 yTop-92 max(140, tabW - (rightX + 155) - margin) 22];
             obj.OpenReconImagesButton.Position = [rightX yTop-120 180 30];
+            obj.SaveOutputsCheckbox.Position = [rightX yTop-148 180 22];
+            obj.SaveBundleCheckbox.Position = [rightX + 185 yTop-148 190 22];
+            obj.SaveOutputsButton.Position = [rightX yTop-176 180 26];
+            obj.SaveOutputsInfoLabel.Position = [rightX + 190 yTop-174 max(140, tabW - (rightX + 190) - margin) 22];
 
 
             obj.LambdaLabel.Position = [margin y 130 22];
@@ -783,6 +844,21 @@ classdef ReconstructionTab < handle
             obj.ReconSettings.B1MapPath = fullPath;
 
             disp(['Loaded B1 map file: ', fullPath]);
+        end
+
+        function selectSaveBasePath(obj)
+            [file, folder] = uiputfile({'*.mat', 'MAT file base (*.mat)'}, ...
+                'Select output base filename', 'mrf_recon_outputs.mat');
+            if isequal(file, 0)
+                return;
+            end
+
+            [~, stem, ~] = fileparts(file);
+            basePath = fullfile(folder, stem);
+
+            obj.ReconSettings.SaveBasePath = basePath;
+            obj.Parent.LastLoadDir = folder;
+            obj.SaveOutputsInfoLabel.Text = ['Save base: ' basePath];
         end
 
         function B1Map = loadB1MapData(~, filePath)

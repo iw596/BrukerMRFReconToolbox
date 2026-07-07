@@ -21,6 +21,22 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
 
     %% Normalise the dictioanry
     dictNorm = NormaliseMRFDictionary(dict);
+
+    %% Preallocate outputs
+    T1Map = zeros(NRO, NPE, NSLI, 'like', real(imgs));
+    T2Map = zeros(NRO, NPE, NSLI, 'like', real(imgs));
+    indexMap = zeros(NRO, NPE, NSLI);
+    MRFMask = zeros(NRO, NPE, NSLI);
+    if (options.EstimateB1Map == true)
+        MRFB1Map = zeros(NRO, NPE, NSLI, 'like', real(imgs));
+    end
+
+    if size(LUT,2) < 2
+        error('MRFDictMatching:InvalidLUT', 'LUT must have at least 2 columns (T1, T2).');
+    end
+    if (options.EstimateB1Map == false) && size(LUT,2) < 3
+        error('MRFDictMatching:InvalidLUT', 'LUT must have 3 columns (T1, T2, B1) when B1 is not estimated.');
+    end
     
     %% Begin matching
   
@@ -31,7 +47,10 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
             for j = 1:NPE
                 for k = 1:NSLI       
                     % Scale pixel intensity by L2 norm
-                    scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
+                    scaleFactor = sqrt(sum(abs(imgs(i,j,k,:)).^2));
+                    if ~(isfinite(scaleFactor) && scaleFactor > 0)
+                        continue;
+                    end
                     normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
     
                     % Extract B1 at current pixel position
@@ -39,19 +58,19 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
                     % Find closest B1 val in LUT and extract a sub-LUT
                     [~,idx] = min(abs(B1Tmp-squeeze(LUT(:,3))));
                     closestB1 = LUT(idx,3);
-                    idx=find(LUT(:,3) == closestB1);
-                    subDict = dictNorm(:,idx);
-                    subLUT = LUT(idx,:);
+                    candidateIdx = find(LUT(:,3) == closestB1);
+                    subDict = dictNorm(:,candidateIdx);
+                    subLUT = LUT(candidateIdx,:);
                     % Take inner product of MRF signal and sub dictionary to
                     % calculate best match
                     inner_product=abs(squeeze(normalized_mrfsignal)'* (subDict));
-                    [~, max_index] = max(abs(inner_product));
+                    [~, max_index] = max(inner_product);
+                    bestGlobalIdx = candidateIdx(max_index);
                     % Save parameters
-                    matched_indices(i, j,k) = max_index;
                     T1Map(i,j,k) = subLUT(max_index,1);
                     T2Map(i,j,k) = subLUT(max_index,2);
                     MRFMask(i,j,k) = 1;
-                    indexMap(i,j,k) = max_index;
+                    indexMap(i,j,k) = bestGlobalIdx;
                 end
             end
         end
@@ -60,7 +79,10 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
             for j = 1:NPE
                 for k = 1:NSLI
                     % Scale pixel intensity by L2 norm
-                    scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
+                    scaleFactor = sqrt(sum(abs(imgs(i,j,k,:)).^2));
+                    if ~(isfinite(scaleFactor) && scaleFactor > 0)
+                        continue;
+                    end
                     normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
 
                     % Extract B1 at current pixel position
@@ -68,19 +90,19 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
                     % Find closest B1 val in LUT and extract a sub-LUT
                     [~,idx] = min(abs(B1Tmp-squeeze(LUT(:,3))));
                     closestB1 = LUT(idx,3);
-                    idx=find(LUT(:,3) == closestB1);
-                    subDict = dictNorm(:,idx);
-                    subLUT = LUT(idx,:);
+                    candidateIdx = find(LUT(:,3) == closestB1);
+                    subDict = dictNorm(:,candidateIdx);
+                    subLUT = LUT(candidateIdx,:);
                     % Take inner product of MRF signal and sub dictionary to
                     % calculate best match
                     inner_product=abs(squeeze(normalized_mrfsignal)'* (subDict));
-                    [~, max_index] = max(abs(inner_product));
+                    [~, max_index] = max(inner_product);
+                    bestGlobalIdx = candidateIdx(max_index);
                     % Save parameters
-                    matched_indices(i, j,k) = max_index;
                     T1Map(i,j,k) = subLUT(max_index,1);
                     T2Map(i,j,k) = subLUT(max_index,2);
                     MRFMask(i,j,k) = 1;
-                    indexMap(i,j,k) = max_index;
+                    indexMap(i,j,k) = bestGlobalIdx;
                 end
             end
         end
@@ -91,14 +113,16 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
             for j = 1:NPE
                 for k = 1:NSLI
                     % Scale pixel intensity by L2 norm
-                    scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
+                    scaleFactor = sqrt(sum(abs(imgs(i,j,k,:)).^2));
+                    if ~(isfinite(scaleFactor) && scaleFactor > 0)
+                        continue;
+                    end
                     normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
                     % Take inner product of MRF signal and sub dictionary to
                     % calculate best match
                     inner_product=abs(squeeze(normalized_mrfsignal)'* (dictNorm));
-                    [~, max_index] = max(abs(inner_product));
+                    [~, max_index] = max(inner_product);
                     % Save parameters
-                    matched_indices(i, j,k) = max_index;
                     T1Map(i,j,k) = LUT(max_index,1);
                     T2Map(i,j,k) = LUT(max_index,2);
                     MRFMask(i,j,k) = 1;
@@ -112,14 +136,16 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
             for j = 1:NPE
                 for k = 1:NSLI
                     % Scale pixel intensity by L2 norm
-                    scaleFactor = sqrt(sum(imgs(i,j,k,:).*conj(imgs(i,j,k,:))));
+                    scaleFactor = sqrt(sum(abs(imgs(i,j,k,:)).^2));
+                    if ~(isfinite(scaleFactor) && scaleFactor > 0)
+                        continue;
+                    end
                     normalized_mrfsignal = conj(imgs(i,j,k,:))/scaleFactor;
                     % Take inner product of MRF signal and sub dictionary to
                     % calculate best match
                     inner_product=abs(squeeze(normalized_mrfsignal)'* (dictNorm));
-                    [~, max_index] = max(abs(inner_product));
+                    [~, max_index] = max(inner_product);
                     % Save parameters
-                    matched_indices(i, j,k) = max_index;
                     T1Map(i,j,k) = LUT(max_index,1);
                     T2Map(i,j,k) = LUT(max_index,2);
                     MRFMask(i,j,k) = 1;
@@ -133,6 +159,7 @@ function res = MRFDictMatching(imgs,dict,LUT,options)
     res.MRFT1Map = T1Map;
     res.MRFT2Map = T2Map;
     res.indexMap = indexMap;
+    res.MRFMask = MRFMask;
     if (options.EstimateB1Map == true)
         res.MRFB1Map = MRFB1Map;
     end
