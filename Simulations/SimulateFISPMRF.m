@@ -1,4 +1,4 @@
-function [dict, LUT] = SimulateFISPMRF(MRFParams, prepList, T1Array, T2Array, B1Array, dt, NIso, instantInversionFlag)
+function [dict, LUT] = SimulateFISPMRF(MRFParams, prepList, T1Array, T2Array, B1Array, dt, NIso, instantInversionFlag, progressFcn)
 % SimulateFISPMRF Generate FISP-MRF dictionary for requested T1/T2/B1 ranges.
 arguments (Input)
     MRFParams
@@ -9,6 +9,7 @@ arguments (Input)
     dt % Time step in us
     NIso
     instantInversionFlag = true
+    progressFcn = []
 end
 
 arguments (Output)
@@ -160,6 +161,18 @@ end
 % Allocate dictionary
 nSignals = size(prepList,1) * nPointsPerPrep;
 dict = zeros(nSignals, size(LUT,1));
+totalEntries = size(LUT,1);
+
+% Progress reporting state. The same callback works in serial and parallel
+% modes; in the parallel case the workers only send completion ticks back to
+% the client and the ETA is computed centrally here.
+completedEntries = 0;
+lastProgressUpdate = tic;
+progressUpdatePeriodSec = 1.0;
+
+if isempty(progressFcn)
+    progressFcn = @defaultProgressReporter;
+end
 
 % Parallel setup with worker file/path propagation.
 pool = [];
@@ -221,6 +234,14 @@ end
 % Run simulation
 fprintf('DictionaryGeneration: starting simulation over %d LUT entries.\n', size(LUT,1));
 tic;
+progressQueue = [];
+if useParallel && totalEntries > 0
+    progressQueue = parallel.pool.DataQueue;
+    afterEach(progressQueue, @progressTick);
+end
+
+reportProgress(true);
+
 if useParallel
     try
         parfor i = 1:size(LUT,1)
@@ -228,6 +249,7 @@ if useParallel
                 instantInversionFlag, inversionB1, gInvSpoiler, gSliSpoiler, ...
                 dt, df, dp, dv, faList, TR, TE, riseT, sliceSpoilerDuration, ...
                 waitTimes, nSpin);
+            send(progressQueue, 1);
         end
     catch ME
         lowerMsg = lower(ME.message);
@@ -235,6 +257,9 @@ if useParallel
             warning('SimulateFISPMRF:ParforSourceUnavailable', ...
                 'Parallel source lookup failed (%s). Retrying in serial mode.', ME.message);
             useParallel = false;
+            completedEntries = 0;
+            lastProgressUpdate = tic;
+            reportProgress(true);
         else
             rethrow(ME);
         end
@@ -247,10 +272,103 @@ if ~useParallel
             instantInversionFlag, inversionB1, gInvSpoiler, gSliSpoiler, ...
             dt, df, dp, dv, faList, TR, TE, riseT, sliceSpoilerDuration, ...
             waitTimes, nSpin);
+        progressTick(1);
     end
 end
 
 elapsedSec = toc;
+reportProgress(true);
 fprintf('DictionaryGeneration: completed in %.2f s.\n', elapsedSec);
 disp("MRF Simulation Finished")
+
+    function progressTick(~)
+        completedEntries = min(totalEntries, completedEntries + 1);
+        reportProgress(false);
+    end
+
+    function reportProgress(forceUpdate)
+        if totalEntries == 0
+            progress = struct('Completed', 0, 'Total', 0, 'Percent', 1, ...
+                'ElapsedSec', toc, 'RemainingSec', 0, 'Rate', 0, ...
+                'Message', 'No valid LUT entries to simulate.', ...
+                'Mode', ternary(useParallel, 'parallel', 'serial'));
+            progressFcn(progress);
+            return;
+        end
+
+        elapsedSec = toc;
+        if completedEntries <= 0
+            percent = 0;
+            remainingSec = inf;
+            rate = 0;
+        else
+            percent = completedEntries / totalEntries;
+            rate = completedEntries / max(elapsedSec, eps);
+            remainingSec = max(0, (totalEntries - completedEntries) / max(rate, eps));
+        end
+
+        progress = struct(...
+            'Completed', completedEntries, ...
+            'Total', totalEntries, ...
+            'Percent', percent, ...
+            'ElapsedSec', elapsedSec, ...
+            'RemainingSec', remainingSec, ...
+            'Rate', rate, ...
+            'Message', '', ...
+            'Mode', ternary(useParallel, 'parallel', 'serial'));
+
+        if completedEntries >= totalEntries
+            progress.Message = sprintf('Completed %d/%d entries.', completedEntries, totalEntries);
+        else
+            progress.Message = sprintf('Simulating entry %d/%d.', completedEntries, totalEntries);
+        end
+
+        if forceUpdate || completedEntries == totalEntries || toc(lastProgressUpdate) >= progressUpdatePeriodSec || completedEntries <= 1
+            lastProgressUpdate = tic;
+            progressFcn(progress);
+        end
+    end
+
+    function defaultProgressReporter(progress)
+        if progress.Total == 0
+            fprintf('DictionaryGeneration: %s\n', progress.Message);
+            return;
+        end
+
+        if isinf(progress.RemainingSec)
+            etaText = 'estimating...';
+        else
+            etaText = formatDuration(progress.RemainingSec);
+        end
+
+        fprintf('\rDictionaryGeneration: %d/%d (%.1f%%) | ETA %s', ...
+            progress.Completed, progress.Total, progress.Percent * 100, etaText);
+
+        if progress.Completed >= progress.Total
+            fprintf('\n');
+        end
+    end
+
+    function out = formatDuration(secondsValue)
+        secondsValue = max(0, secondsValue);
+        hoursValue = floor(secondsValue / 3600);
+        minutesValue = floor(mod(secondsValue, 3600) / 60);
+        secondsValue = round(mod(secondsValue, 60));
+
+        if hoursValue > 0
+            out = sprintf('%dh %02dm %02ds', hoursValue, minutesValue, secondsValue);
+        elseif minutesValue > 0
+            out = sprintf('%dm %02ds', minutesValue, secondsValue);
+        else
+            out = sprintf('%ds', secondsValue);
+        end
+    end
+
+    function out = ternary(condition, trueValue, falseValue)
+        if condition
+            out = trueValue;
+        else
+            out = falseValue;
+        end
+    end
 end

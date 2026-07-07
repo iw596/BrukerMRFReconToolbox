@@ -491,7 +491,8 @@ classdef DictionaryTab < handle
                     dlg = uiprogressdlg(fig, ...
                         'Title', 'Generating Dictionary', ...
                         'Message', 'Running Bloch simulation. Please wait...', ...
-                        'Indeterminate', 'on', ...
+                        'Indeterminate', 'off', ...
+                        'Value', 0, ...
                         'Cancelable', 'off');
                 catch
                 end
@@ -510,7 +511,8 @@ classdef DictionaryTab < handle
             try
                 %dictionary = DictionaryGeneration(params);
                 %dictionary.RunSimulation;
-                [dict, LUT] = SimulateFISPMRF(params,obj.PrepListMatrix,T1,T2,B1,simTimeStep_us,nIsochromats,useInstantInversion);
+                params.ProgressFcn = @(progress) obj.updateDictionaryGenerationProgress(dlg, progress);
+                [dict, LUT] = SimulateFISPMRF(params, obj.PrepListMatrix, T1, T2, B1, simTimeStep_us, nIsochromats, useInstantInversion, params.ProgressFcn);
             catch ME
                 obj.safeAlert(['Dictionary generation failed: ' ME.message], ...
                     'Simulation Error', 'error');
@@ -1011,6 +1013,48 @@ classdef DictionaryTab < handle
                 end
             end
         end
+
+            function updateDictionaryGenerationProgress(obj, dlg, progress)
+                if isempty(dlg) || ~isvalid(dlg) || ~isstruct(progress)
+                    return;
+                end
+
+                if progress.Total <= 0
+                    dlg.Value = 1;
+                    dlg.Message = progress.Message;
+                    drawnow limitrate;
+                    return;
+                end
+
+                dlg.Value = max(0, min(1, progress.Percent));
+
+                if isinf(progress.RemainingSec)
+                    etaText = 'estimating...';
+                else
+                    etaText = obj.formatDuration(progress.RemainingSec);
+                end
+
+                elapsedText = obj.formatDuration(progress.ElapsedSec);
+                dlg.Message = sprintf('%d/%d (%.1f%%) | elapsed %s | remaining %s', ...
+                    progress.Completed, progress.Total, progress.Percent * 100, ...
+                    elapsedText, etaText);
+                drawnow limitrate;
+            end
+
+            function text = formatDuration(~, secondsValue)
+                secondsValue = max(0, secondsValue);
+                hoursValue = floor(secondsValue / 3600);
+                minutesValue = floor(mod(secondsValue, 3600) / 60);
+                secondsValue = round(mod(secondsValue, 60));
+
+                if hoursValue > 0
+                    text = sprintf('%dh %02dm %02ds', hoursValue, minutesValue, secondsValue);
+                elseif minutesValue > 0
+                    text = sprintf('%dm %02ds', minutesValue, secondsValue);
+                else
+                    text = sprintf('%ds', secondsValue);
+                end
+            end
 
         function ensureToolboxOnPath(~)
             thisFile = mfilename('fullpath');
