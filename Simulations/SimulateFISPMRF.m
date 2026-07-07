@@ -1,6 +1,6 @@
 function [dict, LUT] = SimulateFISPMRF(MRFParams, prepList, T1Array, T2Array, B1Array, dt, NIso, instantInversionFlag, progressFcn)
 % SimulateFISPMRF Generate FISP-MRF dictionary for requested T1/T2/B1 ranges.
-arguments (Input)
+arguments
     MRFParams
     prepList
     T1Array
@@ -10,11 +10,6 @@ arguments (Input)
     NIso
     instantInversionFlag = true
     progressFcn = []
-end
-
-arguments (Output)
-    dict
-    LUT
 end
 
 gyro = 42.577e6; % Hz/T
