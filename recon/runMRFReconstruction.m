@@ -68,7 +68,11 @@ if strcmpi(reconTarget, 'MRF')
     matchOptions.B1Map = getfield_default(settings, 'B1Map', []);
     matchOptions.parallelFlag = logical(getfield_default(settings, 'ParallelMatching', false));
 
-    matchRes = MRFDictMatching(result.images, S.dict, S.LUT, matchOptions);
+    % Call with name-value pairs instead of struct to ensure compatibility
+    matchRes = MRFDictMatching(result.images, S.dict, S.LUT, ...
+        'EstimateB1Map', matchOptions.EstimateB1Map, ...
+        'B1Map', matchOptions.B1Map, ...
+        'parallelFlag', matchOptions.parallelFlag);
     result.Matching = matchRes;
     result.ParameterMaps = buildParameterMaps(matchRes);
     result.DictionaryPath = dictionaryPath;
@@ -85,7 +89,7 @@ if logical(getfield_default(settings, 'SaveOutputs', false))
         saveBasePath = fullfile(pwd, ['mrf_recon_' datestr(now, 'yyyymmdd_HHMMSS')]);
     end
     saveBundle = logical(getfield_default(settings, 'SaveResultBundle', false));
-    [imageFile, mapFile, bundleFile] = saveReconstructionOutputs(result, saveBasePath, settings, saveBundle);
+    [imageFile, mapFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle);
     result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'Bundle', bundleFile);
     result.Log{end+1} = sprintf('Saved images to %s', imageFile);
     if ~isempty(mapFile)
@@ -114,58 +118,6 @@ if isfield(matchRes, 'MRFB1Map')
 end
 if isfield(matchRes, 'indexMap')
     parameterMaps.Index = matchRes.indexMap;
-end
-end
-
-function [imageFile, mapFile, bundleFile] = saveReconstructionOutputs(result, saveBasePath, settings, saveBundle)
-[saveFolder, saveStem, ~] = fileparts(saveBasePath);
-if isempty(saveFolder)
-    saveFolder = pwd;
-end
-if isempty(saveStem)
-    saveStem = ['mrf_recon_' datestr(now, 'yyyymmdd_HHMMSS')];
-end
-
-imageFile = fullfile(saveFolder, [saveStem '_images.mat']);
-mapFile = '';
-bundleFile = '';
-
-images = [];
-samplingmask = [];
-if isfield(result, 'images')
-    images = result.images;
-end
-if isfield(result, 'samplingmask')
-    samplingmask = result.samplingmask;
-end
-save(imageFile, 'images', 'samplingmask', '-v7.3');
-
-if isfield(result, 'ParameterMaps') && ~isempty(result.ParameterMaps)
-    mapFile = fullfile(saveFolder, [saveStem '_maps.mat']);
-    maps = result.ParameterMaps;
-    matching = [];
-    if isfield(result, 'Matching')
-        matching = result.Matching;
-    end
-    save(mapFile, 'maps', 'matching', '-v7.3');
-end
-
-if saveBundle
-    bundleFile = fullfile(saveFolder, [saveStem '_recon_result.mat']);
-    bundle = struct();
-    bundle.Timestamp = datestr(now, 31);
-    bundle.Status = getfield_default(result, 'Status', 'Completed');
-    bundle.Log = getfield_default(result, 'Log', {});
-    bundle.DictionaryPath = getfield_default(result, 'DictionaryPath', '');
-    bundle.Settings = settings;
-    bundle.OutputFiles = struct('Images', imageFile, 'Maps', mapFile);
-    if isfield(result, 'Matching') && isstruct(result.Matching)
-        bundle.MatchingSummary = struct('HasB1Map', isfield(result.Matching, 'MRFB1Map'), ...
-            'HasIndexMap', isfield(result.Matching, 'indexMap'));
-    else
-        bundle.MatchingSummary = struct();
-    end
-    save(bundleFile, 'bundle', '-v7.3');
 end
 end
 

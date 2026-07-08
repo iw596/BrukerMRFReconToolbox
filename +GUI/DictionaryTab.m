@@ -1082,6 +1082,12 @@ classdef DictionaryTab < handle
             LUT = obj.GeneratedLUT;
             params = obj.GeneratedDictionaryParams;
 
+            % Remove function handles and GUI references before saving to prevent
+            % unwanted GUI instantiation when the file is loaded
+            if isstruct(params) && isfield(params, 'ProgressFcn')
+                params = rmfield(params, 'ProgressFcn');
+            end
+
             try
                 save(fullfile(fPath,fName), 'dict', 'LUT', 'params', '-v7.3');
             catch ME

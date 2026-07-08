@@ -42,6 +42,7 @@ classdef ReconstructionTab < handle
         SaveOutputsCheckbox
         SaveBundleCheckbox
         SaveOutputsButton
+        SaveLastResultButton
         SaveOutputsInfoLabel
 
         ReconSettings = struct()
@@ -159,6 +160,7 @@ classdef ReconstructionTab < handle
                 'Text', 'Save images + maps', ...
                 'Value', false, ...
                 'Position', [820 550 180 22], ...
+                'ValueChangedFcn', @(~,~) obj.updateSaveOptionsUI(), ...
                 'Tooltip', sprintf(['Save separate output files using one shared base name:\n' ...
                 '  <base>_images.mat : reconstructed images + sampling mask\n' ...
                 '  <base>_maps.mat   : parameter maps (T1/T2/B1/Index when available) + matching struct\n' ...
@@ -168,10 +170,18 @@ classdef ReconstructionTab < handle
                 'Text', 'Also save recon bundle', ...
                 'Value', false, ...
                 'Position', [1005 550 190 22], ...
-                'Tooltip', sprintf(['Optional third file:\n' ...
+                'Enable', 'off', ...
+                'ValueChangedFcn', @(~,~) obj.updateSaveOptionsUI(), ...
+                'Tooltip', sprintf(['Optional metadata file (saved only when "Save images + maps" is enabled):\n' ...
                 '  <base>_recon_result.mat\n' ...
-                'Contains lightweight reproducibility metadata (settings, status/log, dictionary path, output paths, matching summary),\n' ...
-                'without duplicating full image/map arrays.']));
+                'What it includes:\n' ...
+                '  - Reconstruction settings used for this run\n' ...
+                '  - Status and processing log\n' ...
+                '  - Dictionary path and matching summary\n' ...
+                '  - Paths of the generated output files\n' ...
+                'What it does NOT include:\n' ...
+                '  - Full reconstructed images or parameter maps\n' ...
+                '(those are saved in <base>_images.mat and <base>_maps.mat).']));
 
             obj.SaveOutputsButton = uibutton(obj.TabHandle, ...
                 'Text', 'Select Save Base Name', ...
@@ -183,6 +193,14 @@ classdef ReconstructionTab < handle
                 '  /path/session01_images.mat\n' ...
                 '  /path/session01_maps.mat\n' ...
                 '  /path/session01_recon_result.mat (if enabled)']));
+
+            obj.SaveLastResultButton = uibutton(obj.TabHandle, ...
+                'Text', 'Save Last Result', ...
+                'Position', [1010 520 180 26], ...
+                'Enable', 'off', ...
+                'ButtonPushedFcn', @(~,~) obj.saveLastResult(), ...
+                'Tooltip', sprintf(['Save the most recent reconstruction result without rerunning reconstruction.\n' ...
+                'You will be prompted for an output base name if none is set.']));
 
             obj.SaveOutputsInfoLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Save base: auto (timestamped in current folder)', ...
@@ -272,6 +290,7 @@ classdef ReconstructionTab < handle
             obj.updateReconTargetUI();
             obj.updateMRFReconModeUI();
             obj.updateB1CorrectionUI();
+            obj.updateSaveOptionsUI();
             obj.resizeUI([]);
         end
 
@@ -301,6 +320,18 @@ classdef ReconstructionTab < handle
                 obj.showAlert('Load a Bruker method file first (NDim is required).', ...
                     'Method File Required', 'warning');
                 return;
+            end
+
+            saveRequested = logical(obj.SaveOutputsCheckbox.Value) || logical(obj.SaveBundleCheckbox.Value);
+            hasSaveBasePath = isfield(obj.ReconSettings, 'SaveBasePath') && ~isempty(obj.ReconSettings.SaveBasePath);
+            if saveRequested && ~hasSaveBasePath
+                obj.selectSaveBasePath();
+                hasSaveBasePath = isfield(obj.ReconSettings, 'SaveBasePath') && ~isempty(obj.ReconSettings.SaveBasePath);
+                if ~hasSaveBasePath
+                    obj.showAlert('Select an output save location before running reconstruction when saving is enabled.', ...
+                        'Save Location Required', 'warning');
+                    return;
+                end
             end
 
             if usesIterativeParams
@@ -427,6 +458,7 @@ classdef ReconstructionTab < handle
             end
 
             obj.ReconSettings.LastResult = result;
+            obj.SaveLastResultButton.Enable = 'on';
             hasReconImages = isstruct(result) && isfield(result, 'images') && ~isempty(result.images);
             if hasReconImages
                 obj.OpenReconImagesButton.Enable = 'on';
@@ -447,23 +479,23 @@ classdef ReconstructionTab < handle
             end
 
             obj.DataInfoTextArea.Value = [ ...
-                {['Reconstruction mode: ' char(dimensionality)]}, ...
-                {['Target: ' char(reconTarget)]}, ...
-                {['Regularizer: ' char(regMode)]}, ...
-                {['Status: ' char(string(statusText))]}, ...
-                logLines'];
+                {['Reconstruction mode: ' char(dimensionality)]}; ...
+                {['Target: ' char(reconTarget)]}; ...
+                {['Regularizer: ' char(regMode)]}; ...
+                {['Status: ' char(string(statusText))]}; ...
+                logLines(:)];
 
             if isfield(result, 'OutputFiles') && isstruct(result.OutputFiles)
                 if isfield(result.OutputFiles, 'Images') && ~isempty(result.OutputFiles.Images)
-                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value, ...
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value(:); ...
                         {['Saved images: ' result.OutputFiles.Images]}];
                 end
                 if isfield(result.OutputFiles, 'Maps') && ~isempty(result.OutputFiles.Maps)
-                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value, ...
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value(:); ...
                         {['Saved maps: ' result.OutputFiles.Maps]}];
                 end
                 if isfield(result.OutputFiles, 'Bundle') && ~isempty(result.OutputFiles.Bundle)
-                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value, ...
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value(:); ...
                         {['Saved bundle: ' result.OutputFiles.Bundle]}];
                 end
             end
@@ -547,6 +579,8 @@ classdef ReconstructionTab < handle
 
         function loadDictionary(obj)
             % Load MRF dictionary MAT file and display summary.
+            % Simply load and store dictionary path without any side effects.
+            
             [file, folder] = uigetfile( ...
                 {'*.mat','MAT Files (*.mat)'}, ...
                 'Select MRF dictionary file');
@@ -700,7 +734,8 @@ classdef ReconstructionTab < handle
             obj.SaveOutputsCheckbox.Position = [rightX yTop-148 180 22];
             obj.SaveBundleCheckbox.Position = [rightX + 185 yTop-148 190 22];
             obj.SaveOutputsButton.Position = [rightX yTop-176 180 26];
-            obj.SaveOutputsInfoLabel.Position = [rightX + 190 yTop-174 max(140, tabW - (rightX + 190) - margin) 22];
+            obj.SaveLastResultButton.Position = [rightX + 190 yTop-176 180 26];
+            obj.SaveOutputsInfoLabel.Position = [rightX yTop-214 max(320, tabW - rightX - margin) 22];
 
 
             obj.LambdaLabel.Position = [margin y 130 22];
@@ -821,6 +856,17 @@ classdef ReconstructionTab < handle
             obj.resizeUI([]);
         end
 
+        function updateSaveOptionsUI(obj)
+            saveOutputsEnabled = logical(obj.SaveOutputsCheckbox.Value);
+
+            if saveOutputsEnabled
+                obj.SaveBundleCheckbox.Enable = 'on';
+            else
+                obj.SaveBundleCheckbox.Value = false;
+                obj.SaveBundleCheckbox.Enable = 'off';
+            end
+        end
+
         function loadB1Map(obj)
             [file, folder] = uigetfile({'*.mat;*.nii;*.nii.gz', 'B1 map files (*.mat, *.nii, *.nii.gz)'}, ...
                 'Select B1 map file');
@@ -859,6 +905,56 @@ classdef ReconstructionTab < handle
             obj.ReconSettings.SaveBasePath = basePath;
             obj.Parent.LastLoadDir = folder;
             obj.SaveOutputsInfoLabel.Text = ['Save base: ' basePath];
+        end
+
+        function saveLastResult(obj)
+            if ~isfield(obj.ReconSettings, 'LastResult') || isempty(obj.ReconSettings.LastResult)
+                obj.showAlert('No completed reconstruction result available. Run reconstruction first.', ...
+                    'No Result To Save', 'warning');
+                return;
+            end
+
+            if ~isfield(obj.ReconSettings, 'SaveBasePath') || isempty(obj.ReconSettings.SaveBasePath)
+                obj.selectSaveBasePath();
+                if ~isfield(obj.ReconSettings, 'SaveBasePath') || isempty(obj.ReconSettings.SaveBasePath)
+                    obj.showAlert('Select an output save location to save the last result.', ...
+                        'Save Location Required', 'warning');
+                    return;
+                end
+            end
+
+            saveBasePath = obj.ReconSettings.SaveBasePath;
+            result = obj.ReconSettings.LastResult;
+            settingsForBundle = obj.ReconSettings;
+
+            saveBundle = logical(obj.SaveBundleCheckbox.Value) && logical(obj.SaveOutputsCheckbox.Value);
+
+            try
+                [imageFile, mapFile, bundleFile] = saveResultOutputs(result, saveBasePath, settingsForBundle, saveBundle);
+            catch ME
+                obj.showAlert(['Could not save last result: ' ME.message], ...
+                    'Save Error', 'error');
+                return;
+            end
+
+            result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'Bundle', bundleFile);
+            obj.ReconSettings.LastResult = result;
+            if ~isempty(obj.Parent) && isvalid(obj.Parent)
+                obj.Parent.ReconResult = result;
+            end
+
+            currentLines = obj.DataInfoTextArea.Value;
+            if ~iscell(currentLines)
+                currentLines = {char(string(currentLines))};
+            end
+            currentLines = [currentLines(:); {['Saved images: ' imageFile]}];
+            if ~isempty(mapFile)
+                currentLines = [currentLines; {['Saved maps: ' mapFile]}];
+            end
+            if ~isempty(bundleFile)
+                currentLines = [currentLines; {['Saved bundle: ' bundleFile]}];
+            end
+            obj.DataInfoTextArea.Value = currentLines;
         end
 
         function B1Map = loadB1MapData(~, filePath)

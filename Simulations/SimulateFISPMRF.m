@@ -49,6 +49,10 @@ dp(:,3) = linspace(-thickness, thickness, nSpin) * 100; % m -> cm
 
 dt = dt / 1e6; % us -> s
 
+T1Array = T1Array./1000; %ms -> s
+T2Array = T2Array./1000; %ms -> s
+prepList(:,2) = prepList(:,2)./1000; %ms -> s
+
 disp("Starting MRF Simulation")
 
 % Prepare look-up table containing all physically valid T1/T2/B1 tuples.

@@ -648,7 +648,10 @@ classdef ViewerTab < handle
         function configureSliceSlider(obj)
 
             if isempty(obj.Parent.MRFData)
+                obj.SliceSlider.Limits = [1 2];
+                obj.SliceSlider.Value = 1;
                 obj.SliceSlider.Enable = 'off';
+                obj.SliceLabel.Text = 'Slice: 1';
                 return
             end
 
@@ -661,12 +664,21 @@ classdef ViewerTab < handle
             end
 
             % IMPORTANT: ensure valid range
-            nSlices = max(nSlices,1);
+            if ~isfinite(nSlices) || isempty(nSlices)
+                nSlices = 1;
+            end
+            nSlices = max(round(double(nSlices)),1);
 
-            obj.SliceSlider.Limits = [1 nSlices];
-            obj.SliceSlider.Value  = 1;
-
-            obj.SliceSlider.Enable = 'on';
+            if nSlices <= 1
+                obj.SliceSlider.Limits = [1 2];
+                obj.SliceSlider.Value = 1;
+                obj.SliceSlider.Enable = 'off';
+            else
+                obj.SliceSlider.Limits = [1 nSlices];
+                obj.SliceSlider.Value = 1;
+                obj.SliceSlider.Enable = 'on';
+            end
+            obj.SliceLabel.Text = 'Slice: 1';
 
             % Enable mask checkboxes if masks are present
             if ~isempty(obj.Parent.MRFMask)
