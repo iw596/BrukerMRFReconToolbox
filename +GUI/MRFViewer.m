@@ -50,6 +50,7 @@ classdef MRFViewer < handle
 
         function app = MRFViewer()
             addpath("recon\");
+            addpath("Plotting\\");
             % Initialize MRFViewer application
             app.createUI();
         end
@@ -212,6 +213,40 @@ classdef MRFViewer < handle
             app.ViewerTabObj.updateDisplay();
         end
 
+        function clearMRF(app)
+            % Clear all loaded MRF maps and masks.
+
+            if isempty(app.Fig) || ~isvalid(app.Fig)
+                return
+            end
+
+            choice = uiconfirm(app.Fig, ...
+                'Clear all loaded MRF data?', ...
+                'Confirm Clear MRF', ...
+                'Options', {'Clear', 'Cancel'}, ...
+                'DefaultOption', 'Cancel', ...
+                'CancelOption', 'Cancel');
+
+            if ~strcmp(choice, 'Clear')
+                return
+            end
+
+            app.MRFData = [];
+            app.MapNames = {};
+            app.MRFMask = [];
+            app.CurrentSlice = 1;
+            app.CurrentMap = 1;
+
+            if ~isempty(app.ViewerTabObj)
+                app.ViewerTabObj.ApplyMRFMaskCheckbox.Value = false;
+                app.ViewerTabObj.ApplyMRFMaskCheckbox.Enable = 'off';
+                app.ViewerTabObj.MapDropdown.Items = {'Map 1'};
+                app.ViewerTabObj.MapDropdown.Value = 'Map 1';
+                app.ViewerTabObj.configureSliceSlider();
+                app.ViewerTabObj.updateDisplay();
+            end
+        end
+
         function loadGT(app)
             % Load Ground Truth data from file
 
@@ -225,10 +260,46 @@ classdef MRFViewer < handle
 
             filename = fullfile(path,file);
 
-            [app.GTData,app.GTMapNames,app.GTMask] = app.readVolume(filename);
+            [data,mapNames,mask] = app.readVolume(filename);
+
+            if isempty(data)
+                return
+            end
+
+            if isempty(mapNames)
+                [~,fileStem,~] = fileparts(file);
+                mapNames = {fileStem};
+            end
 
             if isempty(app.GTData)
-                return
+                app.GTData = data;
+                app.GTMapNames = mapNames;
+                app.GTMask = mask;
+            else
+                existingSz = size(app.GTData);
+                newSz = size(data);
+                existingSz(end+1:3) = 1;
+                newSz(end+1:3) = 1;
+
+                if ~isequal(existingSz(1:3), newSz(1:3))
+                    objName = file;
+                    uialert(app.Fig, ...
+                        ['Ground truth map size mismatch while loading ' objName '. The spatial dimensions must match the existing GT volume.'], ...
+                        'Invalid Ground Truth Data', ...
+                        'Icon', 'error');
+                    return
+                end
+
+                app.GTData = cat(4, app.GTData, data);
+                app.GTMapNames = [app.GTMapNames(:); mapNames(:)].';
+
+                if ~isempty(mask)
+                    if isempty(app.GTMask)
+                        app.GTMask = mask;
+                    elseif isequal(size(app.GTMask), size(mask))
+                        app.GTMask = logical(app.GTMask) | logical(mask);
+                    end
+                end
             end
 
             % Enable GT mask checkbox if a mask was found
@@ -242,6 +313,35 @@ classdef MRFViewer < handle
             end
 
             app.ViewerTabObj.updateDisplay();
+        end
+
+        function clearGT(app)
+            % Clear all loaded ground truth maps and masks.
+
+            if isempty(app.Fig) || ~isvalid(app.Fig)
+                return
+            end
+
+            choice = uiconfirm(app.Fig, ...
+                'Clear all loaded ground truth data?', ...
+                'Confirm Clear GT', ...
+                'Options', {'Clear', 'Cancel'}, ...
+                'DefaultOption', 'Cancel', ...
+                'CancelOption', 'Cancel');
+
+            if ~strcmp(choice, 'Clear')
+                return
+            end
+
+            app.GTData = [];
+            app.GTMapNames = {};
+            app.GTMask = [];
+
+            if ~isempty(app.ViewerTabObj)
+                app.ViewerTabObj.ApplyGTMaskCheckbox.Value = false;
+                app.ViewerTabObj.ApplyGTMaskCheckbox.Enable = 'off';
+                app.ViewerTabObj.updateDisplay();
+            end
         end
 
         function [data,mapNames,mask] = readVolume(app,filename)
@@ -280,10 +380,38 @@ classdef MRFViewer < handle
             mask = [];
             fn = fieldnames(S);
 
-            % Extract mask from top-level fields (case-insensitive)
-            topMaskField = fn(strcmpi(fn,'mask'));
-            if ~isempty(topMaskField)
-                mask = logical(S.(topMaskField{1}));
+            % Extract mask from top-level fields (case-insensitive).
+            % Supports both generic `mask` and saved `samplingmask` names.
+            topMaskCandidates = {'mask', 'samplingmask'};
+            for k = 1:numel(topMaskCandidates)
+                topMaskField = fn(strcmpi(fn, topMaskCandidates{k}));
+                if ~isempty(topMaskField)
+                    mask = logical(S.(topMaskField{1}));
+                    break
+                end
+            end
+
+            % Reconstruction bundle files are metadata wrappers around the
+            % actual saved image MAT file, so follow the stored image path.
+            if isfield(S, 'bundle') && isstruct(S.bundle)
+                bundle = S.bundle;
+                if isfield(bundle, 'OutputFiles') && isstruct(bundle.OutputFiles) && ...
+                        isfield(bundle.OutputFiles, 'Images') && ~isempty(bundle.OutputFiles.Images) && ...
+                        isfile(bundle.OutputFiles.Images)
+                    [data,mapNames,mask] = app.readVolume(bundle.OutputFiles.Images);
+                    return
+                end
+            end
+
+            % Reconstruction map files save a top-level `maps` struct plus
+            % matching metadata. Unwrap the numeric maps before falling back.
+            if isfield(S, 'maps') && isstruct(S.maps)
+                [data,mapNames,mask] = app.extractMapsFromStruct(S.maps);
+                if ~isempty(data)
+                    return
+                end
+
+                error('Invalid reconstruction maps file. No displayable image maps were found.');
             end
 
             % If the MAT file contains top-level T1 and T2 variables,
@@ -307,11 +435,36 @@ classdef MRFViewer < handle
                 return
             end
 
+            % Single-map files may include an auxiliary mask field; pick the
+            % first numeric non-mask variable as the displayed GT map.
+            excludedNames = {'mask', 'samplingmask', 'indexMap', 'Index'};
+            for k = 1:numel(fn)
+                fieldName = fn{k};
+                if any(strcmpi(fieldName, excludedNames))
+                    continue
+                end
+
+                value = S.(fieldName);
+                if isnumeric(value) || islogical(value)
+                    data = value;
+                    mapNames = {fieldName};
+                    return
+                end
+            end
+
             % If the MAT file contains exactly one variable that is a struct,
             % look inside it for T1, T2, and mask fields.
             if numel(fn) == 1 && isstruct(S.(fn{1}))
 
                 st = S.(fn{1});
+
+                [data,mapNames,nestedMask] = app.extractMapsFromStruct(st);
+                if ~isempty(data)
+                    if isempty(mask) && ~isempty(nestedMask)
+                        mask = nestedMask;
+                    end
+                    return
+                end
 
                 % Extract mask from nested struct if not already found
                 if isempty(mask)
@@ -359,7 +512,96 @@ classdef MRFViewer < handle
                     'Unable to read MRF data from MAT file.', ...
                     'Invalid MRF file', ...
                     'Icon','error');
+            elseif ~isnumeric(data) && ~islogical(data)
+                uialert(app.Fig, ...
+                    'Selected MAT file does not contain numeric image data. Load the saved *_images.mat file.', ...
+                    'Invalid MRF file', ...
+                    'Icon','error');
+                data = [];
             end
+        end
+
+        function [data,mapNames,mask] = extractMapsFromStruct(~, st)
+            data = [];
+            mapNames = {};
+            mask = [];
+
+            if ~isstruct(st)
+                return
+            end
+
+            preferredNames = {'T1','T2','M0','B1','MRFT1Map','MRFT2Map','MRFM0Map','MRFB1Map'};
+            fieldList = fieldnames(st);
+            orderedFields = {};
+
+            maskField = fieldList(strcmpi(fieldList, 'mask'));
+            if isempty(maskField)
+                maskField = fieldList(strcmpi(fieldList, 'samplingmask'));
+            end
+            if ~isempty(maskField)
+                mask = logical(st.(maskField{1}));
+            end
+
+            for k = 1:numel(preferredNames)
+                idx = find(strcmpi(fieldList, preferredNames{k}), 1, 'first');
+                if ~isempty(idx)
+                    orderedFields{end+1} = fieldList{idx}; %#ok<AGROW>
+                end
+            end
+
+            if isempty(orderedFields)
+                orderedFields = fieldList;
+            end
+
+            referenceSize = [];
+            numericMaps = {};
+            numericNames = {};
+
+            for k = 1:numel(orderedFields)
+                fieldName = orderedFields{k};
+                if strcmpi(fieldName, 'mask') || strcmpi(fieldName, 'samplingmask') || ...
+                        strcmpi(fieldName, 'Index') || strcmpi(fieldName, 'indexMap')
+                    continue
+                end
+                value = st.(fieldName);
+                if isnumeric(value) || islogical(value)
+                    if isempty(referenceSize)
+                        referenceSize = size(value);
+                    end
+                    if isequal(size(value), referenceSize)
+                        numericMaps{end+1} = double(value); %#ok<AGROW>
+                        numericNames{end+1} = fieldName; %#ok<AGROW>
+                    end
+                end
+            end
+
+            if isempty(numericMaps)
+                for k = 1:numel(fieldList)
+                    fieldName = fieldList{k};
+                    if strcmpi(fieldName, 'mask') || strcmpi(fieldName, 'samplingmask') || ...
+                            strcmpi(fieldName, 'Index') || strcmpi(fieldName, 'indexMap')
+                        continue
+                    end
+
+                    value = st.(fieldName);
+                    if isnumeric(value) || islogical(value)
+                        if isempty(referenceSize)
+                            referenceSize = size(value);
+                        end
+                        if isequal(size(value), referenceSize)
+                            numericMaps{end+1} = double(value); %#ok<AGROW>
+                            numericNames{end+1} = fieldName; %#ok<AGROW>
+                        end
+                    end
+                end
+            end
+
+            if numel(numericMaps) == 1
+                data = numericMaps{1};
+            else
+                data = cat(4, numericMaps{:});
+            end
+            mapNames = numericNames;
         end
 
         %% ============================================================
@@ -422,7 +664,9 @@ classdef MRFViewer < handle
         end
 
         function exportROIsCSV(app)
-            % Export ROI definitions and basic statistics to CSV for all maps.
+            % Export ROI stats as one row per ROI with paired MRF/GT columns.
+            % This wide format is intended to be spreadsheet-friendly for
+            % Pearson correlation and Bland-Altman analysis.
 
             if isempty(app.ROIs)
                 uialert(app.Fig, ...
@@ -441,69 +685,124 @@ classdef MRFViewer < handle
             prevMap = app.CurrentMap;
             stateGuard = onCleanup(@()app.restoreSliceMap(prevSlice, prevMap));
 
-            csvRows = {'ROIIndex','Slice','Dataset','MapIndex','MapName','Type','Position','Mean','Std','AreaPx'};
+            mrfMaps = 0;
+            if ~isempty(app.MRFData)
+                mrfSize = size(app.MRFData);
+                if numel(mrfSize) < 4
+                    mrfMaps = 1;
+                else
+                    mrfMaps = mrfSize(4);
+                end
+            end
+
+            gtMaps = 0;
+            if ~isempty(app.GTData)
+                gtSize = size(app.GTData);
+                if numel(gtSize) < 4
+                    gtMaps = 1;
+                else
+                    gtMaps = gtSize(4);
+                end
+            end
+
+            if mrfMaps == 0 && gtMaps == 0
+                uialert(app.Fig, ...
+                    'Load MRF and/or GT data before exporting ROI CSV.', ...
+                    'Export ROIs', ...
+                    'Icon','warning');
+                return
+            end
+
+            mapPairs = struct('MRFIdx', {}, 'GTIdx', {}, 'MapName', {});
+            for mapIdx = 1:max(1,mrfMaps)
+                pair.MRFIdx = mapIdx;
+
+                if gtMaps > 0
+                    if ~isempty(app.ViewerTabObj) && ismethod(app.ViewerTabObj,'getEquivalentGTMapIndex')
+                        pair.GTIdx = app.ViewerTabObj.getEquivalentGTMapIndex(mapIdx);
+                    else
+                        pair.GTIdx = min(mapIdx, gtMaps);
+                    end
+                else
+                    pair.GTIdx = NaN;
+                end
+
+                if ~isempty(app.MapNames) && mapIdx <= numel(app.MapNames)
+                    pair.MapName = app.MapNames{mapIdx};
+                else
+                    pair.MapName = sprintf('Map%d', mapIdx);
+                end
+
+                mapPairs(end+1) = pair; %#ok<AGROW>
+            end
+
+            if mrfMaps == 0 && gtMaps > 0
+                % GT-only export fallback: still one row per ROI.
+                mapPairs = struct('MRFIdx', NaN, 'GTIdx', 1, 'MapName', 'GT');
+            end
+
+            baseHeader = {'ROIIndex','Slice','Type','Position'};
+            dynamicHeader = {};
+
+            for p = 1:numel(mapPairs)
+                key = app.makeCSVColumnKey(mapPairs(p).MapName, p);
+                dynamicHeader = [dynamicHeader, { ...
+                    [key '_MRF_MapIndex'], [key '_GT_MapIndex'], ...
+                    [key '_MRF_Mean'], [key '_MRF_Std'], [key '_MRF_AreaPx'], ...
+                    [key '_GT_Mean'], [key '_GT_Std'], [key '_GT_AreaPx'], ...
+                    [key '_BA_Diff_MRF_minus_GT'], [key '_BA_Avg_MRF_GT'] ...
+                }]; %#ok<AGROW>
+            end
+
+            header = [baseHeader, dynamicHeader];
+            csvRows = cell(numel(app.ROIs) + 1, numel(header));
+            csvRows(1,:) = header;
 
             for k = 1:numel(app.ROIs)
                 roi = app.ROIs(k);
                 posStr = app.roiPositionToString(roi.Position);
 
-                % --- MRF maps ---
-                if ~isempty(app.MRFData)
-                    mrfSize = size(app.MRFData);
-                    if numel(mrfSize) < 4
-                        nMaps = 1;
-                    else
-                        nMaps = mrfSize(4);
-                    end
+                row = cell(1, numel(header));
+                row(1:4) = {k, roi.Slice, roi.Type, posStr};
 
-                    if ~isempty(app.ViewerTabObj) && ~isempty(app.ViewerTabObj.MapDropdown)
-                        mapItems = app.ViewerTabObj.MapDropdown.Items;
-                    else
-                        mapItems = {};
-                    end
+                colOffset = 4;
+                for p = 1:numel(mapPairs)
+                    mrfIdx = mapPairs(p).MRFIdx;
+                    gtIdx = mapPairs(p).GTIdx;
 
-                    for mapIdx = 1:nMaps
+                    mrfMean = NaN; mrfStd = NaN; mrfArea = NaN;
+                    gtMean = NaN; gtStd = NaN; gtArea = NaN;
+
+                    if ~isnan(mrfIdx) && ~isempty(app.MRFData)
                         app.CurrentSlice = roi.Slice;
-                        app.CurrentMap = mapIdx;
-                        img = app.extractImage(app.MRFData);
-                        vals = app.extractROIMask(img, roi);
-                        [meanVal, stdVal, areaPx] = app.roiStatsFromValues(vals);
-
-                        if ~isempty(mapItems) && numel(mapItems) >= mapIdx
-                            mapName = mapItems{mapIdx};
-                        else
-                            mapName = sprintf('Map %d', mapIdx);
-                        end
-
-                        csvRows(end+1,:) = {k, roi.Slice, 'MRF', mapIdx, mapName, roi.Type, posStr, meanVal, stdVal, areaPx}; %#ok<AGROW>
+                        app.CurrentMap = mrfIdx;
+                        mrfImg = app.extractImage(app.MRFData);
+                        mrfVals = app.extractROIMask(mrfImg, roi);
+                        [mrfMean, mrfStd, mrfArea] = app.roiStatsFromValues(mrfVals);
                     end
+
+                    if ~isnan(gtIdx) && ~isempty(app.GTData)
+                        app.CurrentSlice = roi.Slice;
+                        app.CurrentMap = gtIdx;
+                        gtImg = app.extractImage(app.GTData);
+                        gtVals = app.extractROIMask(gtImg, roi);
+                        [gtMean, gtStd, gtArea] = app.roiStatsFromValues(gtVals);
+                    end
+
+                    baDiff = mrfMean - gtMean;
+                    baAvg = (mrfMean + gtMean) / 2;
+
+                    row(colOffset + (1:10)) = { ...
+                        mrfIdx, gtIdx, ...
+                        mrfMean, mrfStd, mrfArea, ...
+                        gtMean, gtStd, gtArea, ...
+                        baDiff, baAvg ...
+                    };
+
+                    colOffset = colOffset + 10;
                 end
 
-                % --- Ground truth maps ---
-                if ~isempty(app.GTData)
-                    gtSize = size(app.GTData);
-                    if numel(gtSize) < 4
-                        nGtMaps = 1;
-                    else
-                        nGtMaps = gtSize(4);
-                    end
-
-                    for mapIdx = 1:nGtMaps
-                        app.CurrentSlice = roi.Slice;
-                        app.CurrentMap = mapIdx;
-                        img = app.extractImage(app.GTData);
-                        vals = app.extractROIMask(img, roi);
-                        [meanVal, stdVal, areaPx] = app.roiStatsFromValues(vals);
-
-                        if nGtMaps == 1
-                            mapName = 'GT';
-                        else
-                            mapName = sprintf('GT %d', mapIdx);
-                        end
-
-                        csvRows(end+1,:) = {k, roi.Slice, 'GT', mapIdx, mapName, roi.Type, posStr, meanVal, stdVal, areaPx}; %#ok<AGROW>
-                    end
-                end
+                csvRows(k+1,:) = row;
             end
 
             try
@@ -514,6 +813,21 @@ classdef MRFViewer < handle
                     'Export ROIs', ...
                     'Icon','error');
             end
+        end
+
+        function key = makeCSVColumnKey(~, mapName, mapIdx)
+            if nargin < 2 || isempty(mapName)
+                mapName = sprintf('Map%d', mapIdx);
+            end
+
+            key = lower(string(mapName));
+            key = regexprep(key, '[^a-z0-9]+', '_');
+            key = regexprep(key, '^_+|_+$', '');
+            if strlength(key) == 0
+                key = "map" + string(mapIdx);
+            end
+
+            key = char(key);
         end
 
         %% ============================================================
@@ -623,15 +937,19 @@ classdef MRFViewer < handle
                     gtMapIdx = app.ViewerTabObj.getEquivalentGTMapIndex(app.CurrentMap);
                 end
 
-                if ~isempty(app.GTMapNames) && gtMapIdx <= numel(app.GTMapNames)
-                    gtName = app.GTMapNames{gtMapIdx};
-                elseif nGtMaps <= 1
-                    gtName = 'GT';
+                if isnan(gtMapIdx)
+                    infoStr = sprintf('%s | GT Pair: none', infoStr);
                 else
-                    gtName = sprintf('GT %d', gtMapIdx);
-                end
+                    if ~isempty(app.GTMapNames) && gtMapIdx <= numel(app.GTMapNames)
+                        gtName = app.GTMapNames{gtMapIdx};
+                    elseif nGtMaps <= 1
+                        gtName = 'GT';
+                    else
+                        gtName = sprintf('GT %d', gtMapIdx);
+                    end
 
-                infoStr = sprintf('%s | GT Pair: %d (%s)', infoStr, gtMapIdx, gtName);
+                    infoStr = sprintf('%s | GT Pair: %d (%s)', infoStr, gtMapIdx, gtName);
+                end
             end
 
             if ~isempty(app.MRFData)

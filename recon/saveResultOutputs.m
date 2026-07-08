@@ -13,22 +13,29 @@ bundleFile = '';
 
 images = [];
 samplingmask = [];
+mask = [];
 if isfield(result, 'images')
     images = result.images;
 end
 if isfield(result, 'samplingmask')
     samplingmask = result.samplingmask;
 end
-save(imageFile, 'images', 'samplingmask', '-v7.3');
+if isfield(result, 'mask') && ~isempty(result.mask)
+    mask = logical(result.mask);
+end
+save(imageFile, 'images', 'samplingmask', 'mask', '-v7.3');
 
 if isfield(result, 'ParameterMaps') && ~isempty(result.ParameterMaps)
     mapFile = fullfile(saveFolder, [saveStem '_maps.mat']);
     maps = result.ParameterMaps;
+    if ~isempty(mask)
+        maps.mask = mask;
+    end
     matching = [];
     if isfield(result, 'Matching')
         matching = result.Matching;
     end
-    save(mapFile, 'maps', 'matching', '-v7.3');
+    save(mapFile, 'maps', 'matching', 'mask', '-v7.3');
 end
 
 if saveBundle

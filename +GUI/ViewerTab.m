@@ -10,6 +10,8 @@ classdef ViewerTab < handle
         % Display Controls
         LoadMRFButton
         LoadGTButton
+        ClearGTButton
+        ClearMRFButton
         SliceSlider
         SliceLabel
 
@@ -47,6 +49,9 @@ classdef ViewerTab < handle
         ROIListBox
         ROIStatsMeanLabel
         ROIStatsStdLabel
+
+        % Per-map-type manual scaling memory
+        ManualScaleByMapType = struct('T1', [], 'T2', [], 'Default', [])
     end
 
     methods
@@ -80,48 +85,62 @@ classdef ViewerTab < handle
                 'ButtonPushedFcn',...
                 @(src,event)obj.Parent.loadGT());
 
+            obj.ClearGTButton = uibutton(obj.TabHandle,...
+                'Text','Clear GT',...
+                'Position',[320 620 100 30],...
+                'ButtonPushedFcn',...
+                @(src,event)obj.Parent.clearGT(),...
+                'Tooltip','Clear all loaded ground truth maps');
+
+            obj.ClearMRFButton = uibutton(obj.TabHandle,...
+                'Text','Clear MRF',...
+                'Position',[440 620 100 30],...
+                'ButtonPushedFcn',...
+                @(src,event)obj.Parent.clearMRF(),...
+                'Tooltip','Clear all loaded MRF maps');
+
             % ---------------------------------------------------------
             % Map selector
             % ---------------------------------------------------------
 
             obj.MapLabel = uilabel(obj.TabHandle,...
-                'Position',[340 620 40 25],...
+                'Position',[560 620 40 25],...
                 'Text','Map');
 
             obj.MapDropdown = uidropdown(obj.TabHandle,...
-                'Position',[380 620 150 30],...
+                'Position',[600 620 130 30],...
                 'Items',{'Map 1'},...
                 'ValueChangedFcn',...
                 @(src,event)obj.changeMap());
 
             obj.ColorScaleModeLabel = uilabel(obj.TabHandle,...
-                'Position',[560 620 80 25],...
+                'Position',[740 620 80 25],...
                 'Text','Scale mode');
 
             obj.ColorScaleModeDropdown = uidropdown(obj.TabHandle,...
-                'Position',[640 620 100 30],...
+                'Position',[820 620 90 30],...
                 'Items',{'Auto','Manual'},...
                 'Value','Auto',...
                 'ValueChangedFcn',...
                 @(src,event)obj.changeColorScaleMode());
 
             obj.ColorScaleMinLabel = uilabel(obj.TabHandle,...
-                'Position',[760 620 30 25],...
+                'Position',[920 620 30 25],...
                 'Text','Min');
 
             obj.ColorScaleMinField = uieditfield(obj.TabHandle,'numeric',...
-                'Position',[795 620 80 30],...
+                'Position',[955 620 70 30],...
                 'Value',0,...
                 'Enable','off',...
                 'ValueChangedFcn',...
                 @(src,event)obj.applyColorScale());
 
             obj.ColorScaleMaxLabel = uilabel(obj.TabHandle,...
-                'Position',[885 620 35 25],...
+                'Position',[1035 620 35 25],...
                 'Text','Max');
 
             obj.ColorScaleMaxField = uieditfield(obj.TabHandle,'numeric',...
-                'Position',[925 620 80 30],...
+                'Position',[1075 620 70 30],...
                 'Value',1,...
                 'Enable','off',...
                 'ValueChangedFcn',...
@@ -129,19 +148,19 @@ classdef ViewerTab < handle
 
             obj.ApplyMRFMaskCheckbox = uicheckbox(obj.TabHandle,...
                 'Text','Apply MRF Mask',...
-                'Position',[380 585 120 30],...
+                'Position',[380 588 120 22],...
                 'Value',false,...
                 'Enable','off',...
                 'ValueChangedFcn',...
                 @(src,event)obj.updateDisplay());
 
             obj.MaskSectionLabel = uilabel(obj.TabHandle,...
-                'Position',[340 590 35 25],...
+                'Position',[340 588 35 22],...
                 'Text','Mask');
 
             obj.ApplyGTMaskCheckbox = uicheckbox(obj.TabHandle,...
                 'Text','Apply GT Mask',...
-                'Position',[520 585 110 30],...
+                'Position',[520 588 110 22],...
                 'Value',false,...
                 'Enable','off',...
                 'ValueChangedFcn',...
@@ -264,26 +283,55 @@ classdef ViewerTab < handle
 
             topControlsY = height - 70;
             topControlsY = max(topControlsY, 520);
-            maskRowY = topControlsY - 35;
+
+            compactTopRow = width < 1320;
+
+            if compactTopRow
+                % On narrower windows, wrap top controls into two rows.
+                primaryRowY = topControlsY;
+                secondaryRowY = topControlsY - 35;
+                maskRowY = secondaryRowY - 35;
+
+                obj.LoadMRFButton.Position = [20 primaryRowY 120 30];
+                obj.LoadGTButton.Position = [150 primaryRowY 140 30];
+                obj.ClearGTButton.Position = [300 primaryRowY 95 30];
+                obj.ClearMRFButton.Position = [405 primaryRowY 95 30];
+
+                obj.MapLabel.Position = [520 secondaryRowY+5 40 25];
+                obj.MapDropdown.Position = [560 secondaryRowY 120 30];
+                obj.ColorScaleModeLabel.Position = [690 secondaryRowY+5 75 25];
+                obj.ColorScaleModeDropdown.Position = [765 secondaryRowY 85 30];
+                obj.ColorScaleMinLabel.Position = [860 secondaryRowY+5 30 25];
+                obj.ColorScaleMinField.Position = [895 secondaryRowY 70 30];
+                obj.ColorScaleMaxLabel.Position = [975 secondaryRowY+5 35 25];
+                obj.ColorScaleMaxField.Position = [1015 secondaryRowY 70 30];
+            else
+                primaryRowY = topControlsY;
+                maskRowY = primaryRowY - 35;
+
+                obj.LoadMRFButton.Position = [20 primaryRowY 120 30];
+                obj.LoadGTButton.Position = [160 primaryRowY 140 30];
+                obj.ClearGTButton.Position = [320 primaryRowY 100 30];
+                obj.ClearMRFButton.Position = [430 primaryRowY 100 30];
+
+                obj.MapLabel.Position = [540 primaryRowY+5 40 25];
+                obj.MapDropdown.Position = [580 primaryRowY 120 30];
+                obj.ColorScaleModeLabel.Position = [710 primaryRowY+5 75 25];
+                obj.ColorScaleModeDropdown.Position = [785 primaryRowY 85 30];
+                obj.ColorScaleMinLabel.Position = [880 primaryRowY+5 30 25];
+                obj.ColorScaleMinField.Position = [915 primaryRowY 70 30];
+                obj.ColorScaleMaxLabel.Position = [995 primaryRowY+5 35 25];
+                obj.ColorScaleMaxField.Position = [1035 primaryRowY 70 30];
+            end
 
             contentTopY = maskRowY - 10;
             contentBottomY = 90;
             contentHeight = max(contentTopY - contentBottomY, 180);
 
-            obj.LoadMRFButton.Position = [20 topControlsY 120 30];
-            obj.LoadGTButton.Position = [160 topControlsY 140 30];
-            obj.MapLabel.Position = [340 topControlsY+5 40 25];
-            obj.MapDropdown.Position = [380 topControlsY 150 30];
-            obj.ColorScaleModeLabel.Position = [560 topControlsY+5 80 25];
-            obj.ColorScaleModeDropdown.Position = [640 topControlsY 100 30];
-            obj.ColorScaleMinLabel.Position = [760 topControlsY+5 30 25];
-            obj.ColorScaleMinField.Position = [795 topControlsY 80 30];
-            obj.ColorScaleMaxLabel.Position = [885 topControlsY+5 35 25];
-            obj.ColorScaleMaxField.Position = [925 topControlsY 80 30];
-
-            obj.MaskSectionLabel.Position = [340 maskRowY+5 35 25];
-            obj.ApplyMRFMaskCheckbox.Position = [380 maskRowY 120 30];
-            obj.ApplyGTMaskCheckbox.Position = [520 maskRowY 110 30];
+            maskControlY = maskRowY + 3;
+            obj.MaskSectionLabel.Position = [340 maskControlY 35 22];
+            obj.ApplyMRFMaskCheckbox.Position = [380 maskControlY 120 22];
+            obj.ApplyGTMaskCheckbox.Position = [520 maskControlY 110 22];
 
             panelWidth = 220;
             mainWidth = max(width - panelWidth - 40, 420);
@@ -329,6 +377,10 @@ classdef ViewerTab < handle
 
             obj.Parent.CurrentMap = idx;
 
+            if strcmp(obj.ColorScaleModeDropdown.Value,'Manual')
+                obj.restoreManualScaleForCurrentMap();
+            end
+
             obj.updateDisplay();
         end
 
@@ -336,26 +388,16 @@ classdef ViewerTab < handle
 
             manual = strcmp(obj.ColorScaleModeDropdown.Value,'Manual');
             if manual
-                obj.ColorScaleMinField.Enable = 'on';
+                obj.ColorScaleMinField.Enable = 'off';
                 obj.ColorScaleMaxField.Enable = 'on';
+                obj.ColorScaleMinField.Value = 0;
             else
                 obj.ColorScaleMinField.Enable = 'off';
                 obj.ColorScaleMaxField.Enable = 'off';
             end
 
             if manual
-                if ~isempty(obj.Parent.MRFData)
-                    img = obj.Parent.extractImage(obj.Parent.MRFData);
-                elseif ~isempty(obj.Parent.GTData)
-                    img = obj.Parent.extractImage(obj.Parent.GTData);
-                else
-                    img = [];
-                end
-
-                if ~isempty(img)
-                    obj.ColorScaleMinField.Value = double(min(img(:)));
-                    obj.ColorScaleMaxField.Value = double(max(img(:)));
-                end
+                obj.restoreManualScaleForCurrentMap();
             end
 
             obj.updateDisplay();
@@ -363,14 +405,16 @@ classdef ViewerTab < handle
 
         function applyColorScale(obj)
 
-            if strcmp(obj.ColorScaleModeDropdown.Value,'Manual') && ...
-                    obj.ColorScaleMinField.Value >= obj.ColorScaleMaxField.Value
-
-                uialert(obj.Parent.Fig, ...
-                    'Colorbar minimum must be less than maximum.', ...
-                    'Invalid scale range', ...
-                    'Icon','warning');
-                return
+            if strcmp(obj.ColorScaleModeDropdown.Value,'Manual')
+                obj.ColorScaleMinField.Value = 0;
+                if ~isfinite(obj.ColorScaleMaxField.Value) || obj.ColorScaleMaxField.Value <= 0
+                    uialert(obj.Parent.Fig, ...
+                        'Colorbar maximum must be a positive finite value.', ...
+                        'Invalid scale range', ...
+                        'Icon','warning');
+                    return
+                end
+                obj.storeManualScaleForCurrentMap(obj.ColorScaleMaxField.Value);
             end
 
             obj.updateDisplay();
@@ -416,14 +460,18 @@ classdef ViewerTab < handle
             if ~isempty(obj.Parent.GTData)
                 prevMap = obj.Parent.CurrentMap;
                 gtMapIdx = obj.getEquivalentGTMapIndex(prevMap);
-                obj.Parent.CurrentMap = gtMapIdx;
-                gtImg = obj.Parent.extractImage(obj.Parent.GTData);
-                obj.Parent.CurrentMap = prevMap;
-                if obj.ApplyGTMaskCheckbox.Value && ~isempty(obj.Parent.GTMask)
-                    gtImg = obj.Parent.applyMaskToImage(gtImg, obj.getMaskSlice(obj.Parent.GTMask));
+                if ~isnan(gtMapIdx)
+                    obj.Parent.CurrentMap = gtMapIdx;
+                    gtImg = obj.Parent.extractImage(obj.Parent.GTData);
+                    obj.Parent.CurrentMap = prevMap;
+                    if obj.ApplyGTMaskCheckbox.Value && ~isempty(obj.Parent.GTMask)
+                        gtImg = obj.Parent.applyMaskToImage(gtImg, obj.getMaskSlice(obj.Parent.GTMask));
+                    end
+                else
+                    obj.Parent.CurrentMap = prevMap;
                 end
             else
-                gtMapIdx = 1;
+                gtMapIdx = NaN;
             end
 
             mrfMapName = obj.getMRFMapName(obj.Parent.CurrentMap);
@@ -435,17 +483,23 @@ classdef ViewerTab < handle
                 title(obj.MRFAxes,sprintf('MRF - %s (Map %d)', mrfMapName, obj.Parent.CurrentMap));
             end
 
-            if isempty(gtMapName)
+            if isnan(gtMapIdx)
+                title(obj.GTAxes, sprintf('Ground Truth - No matched map for %s', mrfMapName));
+            elseif isempty(gtMapName)
                 title(obj.GTAxes,'Ground Truth');
             else
                 title(obj.GTAxes,sprintf('Ground Truth - %s (Map %d)', gtMapName, gtMapIdx));
             end
 
             if strcmp(obj.ColorScaleModeDropdown.Value,'Manual')
-                cmin = obj.ColorScaleMinField.Value;
+                cmin = 0;
+                obj.ColorScaleMinField.Value = 0;
                 cmax = obj.ColorScaleMaxField.Value;
-                if ~(cmin < cmax)
-                    [cmin, cmax] = obj.computeSharedColorLimits(mrfImg, gtImg);
+                if ~isfinite(cmax) || cmax <= 0
+                    [~, cmax] = obj.computeSharedColorLimits(mrfImg, gtImg);
+                    cmin = 0;
+                    obj.ColorScaleMaxField.Value = cmax;
+                    obj.storeManualScaleForCurrentMap(cmax);
                 end
             else
                 [cmin, cmax] = obj.computeSharedColorLimits(mrfImg, gtImg);
@@ -455,7 +509,7 @@ classdef ViewerTab < handle
                 end
             end
 
-            sharedMap = turbo(256);
+            sharedMap = obj.selectRecommendedColormap(mrfMapName, gtMapName);
 
             % ---------------------------------------------------------
             % MRF
@@ -523,7 +577,7 @@ classdef ViewerTab < handle
 
         function gtMapIdx = getEquivalentGTMapIndex(obj, mrfMapIdx)
 
-            gtMapIdx = 1;
+            gtMapIdx = NaN;
 
             if isempty(obj.Parent.GTData)
                 return
@@ -541,15 +595,17 @@ classdef ViewerTab < handle
                 return
             end
 
-            gtMapIdx = min(max(round(mrfMapIdx),1),gtMaps);
+            fallbackIdx = min(max(round(mrfMapIdx),1),gtMaps);
 
             if isempty(obj.Parent.MapNames) || mrfMapIdx > numel(obj.Parent.MapNames)
+                gtMapIdx = fallbackIdx;
                 return
             end
 
             mrfName = obj.Parent.MapNames{mrfMapIdx};
 
             if ~isprop(obj.Parent,'GTMapNames') || isempty(obj.Parent.GTMapNames)
+                gtMapIdx = fallbackIdx;
                 return
             end
 
@@ -564,7 +620,12 @@ classdef ViewerTab < handle
 
             if ~isempty(matchIdx)
                 gtMapIdx = matchIdx;
+                return
             end
+
+            % Explicitly mark unmatched map names (e.g., M0 with no GT M0)
+            % so the GT panel can be blanked instead of showing wrong maps.
+            gtMapIdx = NaN;
         end
 
         function mapName = getMRFMapName(obj, mapIdx)
@@ -598,6 +659,10 @@ classdef ViewerTab < handle
                 return
             end
 
+            if isnan(mapIdx)
+                return
+            end
+
             idx = max(1,round(mapIdx));
 
             if isprop(obj.Parent,'GTMapNames') && ~isempty(obj.Parent.GTMapNames) && idx <= numel(obj.Parent.GTMapNames)
@@ -610,6 +675,48 @@ classdef ViewerTab < handle
                 mapName = 'GT';
             else
                 mapName = sprintf('GT %d', idx);
+            end
+        end
+
+        function cmap = selectRecommendedColormap(obj, mrfMapName, gtMapName)
+            % Use MRM-recommended colormaps for relaxometry map display.
+
+            mapName = '';
+            if ~isempty(mrfMapName)
+                mapName = mrfMapName;
+            elseif ~isempty(gtMapName)
+                mapName = gtMapName;
+            end
+
+            mapNameLower = lower(string(mapName));
+
+            if contains(mapNameLower, "t1")
+                cmap = obj.safeGetCmp('T1', 256, 1);
+                return
+            end
+
+            if contains(mapNameLower, "t2")
+                cmap = obj.safeGetCmp('T2', 256, 1);
+                return
+            end
+
+            if contains(mapNameLower, "b1")
+                cmap = obj.safeGetCmp('blue_red', 256, 0);
+                return
+            end
+
+            cmap = parula(256);
+        end
+
+        function cmap = safeGetCmp(~, cmpName, nColors, useLogRemap)
+            % Resolve custom colormap helper and fallback safely if missing.
+            try
+                if isempty(which('get_cmp'))
+                    error('get_cmp is not on MATLAB path.');
+                end
+                cmap = get_cmp(cmpName, nColors, useLogRemap);
+            catch
+                cmap = parula(nColors);
             end
         end
 
@@ -637,12 +744,93 @@ classdef ViewerTab < handle
                 return
             end
 
-            cmin = double(min(combinedVals));
+            cmin = 0;
             cmax = double(max(combinedVals));
+
+            if ~isfinite(cmax) || cmax <= 0
+                cmax = 1;
+            end
 
             if ~(cmin < cmax)
                 cmax = cmin + 1;
             end
+        end
+
+        function restoreManualScaleForCurrentMap(obj)
+            key = obj.getCurrentMapScaleKey();
+            if isfield(obj.ManualScaleByMapType, key)
+                storedMax = obj.ManualScaleByMapType.(key);
+            else
+                storedMax = [];
+            end
+
+            if isempty(storedMax) || ~isfinite(storedMax) || storedMax <= 0
+                [~, autoMax] = obj.computeAutoScaleFromCurrentSelection();
+                if ~isfinite(autoMax) || autoMax <= 0
+                    autoMax = 1;
+                end
+                storedMax = autoMax;
+                obj.ManualScaleByMapType.(key) = storedMax;
+            end
+
+            obj.ColorScaleMinField.Value = 0;
+            obj.ColorScaleMaxField.Value = storedMax;
+        end
+
+        function storeManualScaleForCurrentMap(obj, maxVal)
+            if ~isfinite(maxVal) || maxVal <= 0
+                return
+            end
+            key = obj.getCurrentMapScaleKey();
+            obj.ManualScaleByMapType.(key) = double(maxVal);
+        end
+
+        function key = getCurrentMapScaleKey(obj)
+            mapName = obj.getMRFMapName(obj.Parent.CurrentMap);
+            if isempty(mapName) && ~isempty(obj.Parent.GTData)
+                gtMapIdx = obj.getEquivalentGTMapIndex(obj.Parent.CurrentMap);
+                if ~isnan(gtMapIdx)
+                    mapName = obj.getGTMapName(gtMapIdx);
+                end
+            end
+
+            mapNameLower = lower(string(mapName));
+            if contains(mapNameLower, "t1")
+                key = 'T1';
+            elseif contains(mapNameLower, "t2")
+                key = 'T2';
+            else
+                key = 'Default';
+            end
+        end
+
+        function [cmin, cmax] = computeAutoScaleFromCurrentSelection(obj)
+            mrfImg = [];
+            gtImg = [];
+
+            if ~isempty(obj.Parent.MRFData)
+                mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
+                if obj.ApplyMRFMaskCheckbox.Value && ~isempty(obj.Parent.MRFMask)
+                    mrfImg = obj.Parent.applyMaskToImage(mrfImg, obj.getMaskSlice(obj.Parent.MRFMask));
+                end
+            end
+
+            if ~isempty(obj.Parent.GTData)
+                prevMap = obj.Parent.CurrentMap;
+                gtMapIdx = obj.getEquivalentGTMapIndex(prevMap);
+                if ~isnan(gtMapIdx)
+                    obj.Parent.CurrentMap = gtMapIdx;
+                    gtImg = obj.Parent.extractImage(obj.Parent.GTData);
+                    obj.Parent.CurrentMap = prevMap;
+                    if obj.ApplyGTMaskCheckbox.Value && ~isempty(obj.Parent.GTMask)
+                        gtImg = obj.Parent.applyMaskToImage(gtImg, obj.getMaskSlice(obj.Parent.GTMask));
+                    end
+                else
+                    obj.Parent.CurrentMap = prevMap;
+                end
+            end
+
+            [cmin, cmax] = obj.computeSharedColorLimits(mrfImg, gtImg);
         end
 
         function configureSliceSlider(obj)

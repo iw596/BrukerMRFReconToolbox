@@ -39,11 +39,14 @@ classdef ReconstructionTab < handle
         LoadB1MapButton
         B1MapInfoLabel
         OpenReconImagesButton
+        PostReconMaskButton
         SaveOutputsCheckbox
         SaveBundleCheckbox
         SaveOutputsButton
         SaveLastResultButton
         SaveOutputsInfoLabel
+        ParallelProcessingCheckbox
+        SaveComplexM0Checkbox
 
         ReconSettings = struct()
         LoadedMethodParams = struct() % Raw Bruker method parameters
@@ -156,6 +159,13 @@ classdef ReconstructionTab < handle
                 'ButtonPushedFcn', @(~,~) obj.Parent.openReconstructionImagesTab(), ...
                 'Tooltip', 'Open the reconstructed image browser');
 
+            obj.PostReconMaskButton = uibutton(obj.TabHandle, ...
+                'Text', 'Generate Recon Mask', ...
+                'Position', [1010 580 180 30], ...
+                'Enable', 'off', ...
+                'ButtonPushedFcn', @(~,~) obj.openPostReconMaskTool(), ...
+                'Tooltip', 'Open post-reconstruction mask generator with threshold controls');
+
             obj.SaveOutputsCheckbox = uicheckbox(obj.TabHandle, ...
                 'Text', 'Save images + maps', ...
                 'Value', false, ...
@@ -205,6 +215,18 @@ classdef ReconstructionTab < handle
             obj.SaveOutputsInfoLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Save base: auto (timestamped in current folder)', ...
                 'Position', [820 490 360 22]);
+
+            obj.ParallelProcessingCheckbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Parallel processing (matching)', ...
+                'Value', false, ...
+                'Position', [820 460 260 22], ...
+                'Tooltip', 'Use thread-based parfor for dictionary matching (falls back to serial on failure)');
+
+            obj.SaveComplexM0Checkbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Save complex M0 (matching)', ...
+                'Value', false, ...
+                'Position', [820 430 260 22], ...
+                'Tooltip', 'When enabled, matching stores complex M0 coefficients in addition to magnitude M0 map');
 
             obj.LambdaLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Lambda', ...
@@ -270,7 +292,7 @@ classdef ReconstructionTab < handle
                 'Text', 'Estimate mask', ...
                 'Value', false, ...
                 'Position', [20 318 180 22], ...
-                'Tooltip', 'Estimate mask automatically during reconstruction');
+                'Tooltip', 'Estimate mask from the mean over reconstructed image time series');
 
             obj.DataInfoLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Loaded method info', ...
@@ -418,6 +440,8 @@ classdef ReconstructionTab < handle
             end
             settings.SaveOutputs = logical(obj.SaveOutputsCheckbox.Value);
             settings.SaveResultBundle = logical(obj.SaveBundleCheckbox.Value);
+            settings.ParallelMatching = logical(obj.ParallelProcessingCheckbox.Value);
+            settings.SaveComplexM0 = logical(obj.SaveComplexM0Checkbox.Value);
             if isfield(obj.ReconSettings, 'SaveBasePath')
                 settings.SaveBasePath = obj.ReconSettings.SaveBasePath;
             end
@@ -441,7 +465,14 @@ classdef ReconstructionTab < handle
                     drawnow limitrate;
                 end
 
-                result = runMRFReconstruction(obj.LoadedMethodParams, settings);
+                runtimeOptions = struct();
+                if ~isempty(progressDlg) && isvalid(progressDlg)
+                    runtimeOptions.MatchingProgressCallback = ...
+                        @(completedRows, totalRows) obj.updateMatchingProgressDialog(progressDlg, completedRows, totalRows);
+                    runtimeOptions.MatchingProgressUpdateInterval = 1;
+                end
+
+                result = runMRFReconstruction(obj.LoadedMethodParams, settings, runtimeOptions);
             catch ME
                 if ~isempty(progressDlg) && isvalid(progressDlg)
                     close(progressDlg);
@@ -462,10 +493,12 @@ classdef ReconstructionTab < handle
             hasReconImages = isstruct(result) && isfield(result, 'images') && ~isempty(result.images);
             if hasReconImages
                 obj.OpenReconImagesButton.Enable = 'on';
+                obj.PostReconMaskButton.Enable = 'on';
                 obj.Parent.ReconResult = result;
                 obj.Parent.openReconstructionImagesTab();
             else
                 obj.OpenReconImagesButton.Enable = 'off';
+                obj.PostReconMaskButton.Enable = 'off';
             end
 
             statusText = 'Completed';
@@ -731,11 +764,14 @@ classdef ReconstructionTab < handle
             obj.LoadB1MapButton.Position = [rightX yTop-90 150 24];
             obj.B1MapInfoLabel.Position = [rightX + 155 yTop-92 max(140, tabW - (rightX + 155) - margin) 22];
             obj.OpenReconImagesButton.Position = [rightX yTop-120 180 30];
+            obj.PostReconMaskButton.Position = [rightX + 190 yTop-120 180 30];
             obj.SaveOutputsCheckbox.Position = [rightX yTop-148 180 22];
             obj.SaveBundleCheckbox.Position = [rightX + 185 yTop-148 190 22];
             obj.SaveOutputsButton.Position = [rightX yTop-176 180 26];
             obj.SaveLastResultButton.Position = [rightX + 190 yTop-176 180 26];
             obj.SaveOutputsInfoLabel.Position = [rightX yTop-214 max(320, tabW - rightX - margin) 22];
+            obj.ParallelProcessingCheckbox.Position = [rightX yTop-242 260 22];
+            obj.SaveComplexM0Checkbox.Position = [rightX yTop-270 260 22];
 
 
             obj.LambdaLabel.Position = [margin y 130 22];
@@ -802,6 +838,8 @@ classdef ReconstructionTab < handle
                 obj.MRFReconModeDropdown.Visible = 'on';
                 obj.B1CorrectionLabel.Visible = 'on';
                 obj.B1CorrectionDropdown.Visible = 'on';
+                obj.ParallelProcessingCheckbox.Visible = 'on';
+                obj.SaveComplexM0Checkbox.Visible = 'on';
             else
                 obj.LoadDictionaryButton.Visible = 'off';
                 obj.MRFReconModeLabel.Visible = 'off';
@@ -810,6 +848,8 @@ classdef ReconstructionTab < handle
                 obj.B1CorrectionDropdown.Visible = 'off';
                 obj.LoadB1MapButton.Visible = 'off';
                 obj.B1MapInfoLabel.Visible = 'off';
+                obj.ParallelProcessingCheckbox.Visible = 'off';
+                obj.SaveComplexM0Checkbox.Visible = 'off';
             end
 
             obj.updateMRFReconModeUI();
@@ -957,6 +997,21 @@ classdef ReconstructionTab < handle
             obj.DataInfoTextArea.Value = currentLines;
         end
 
+        function openPostReconMaskTool(obj)
+            if isempty(obj.Parent) || ~isvalid(obj.Parent)
+                return;
+            end
+
+            if isempty(obj.Parent.ReconResult) || ~isstruct(obj.Parent.ReconResult) || ...
+                    ~isfield(obj.Parent.ReconResult, 'images') || isempty(obj.Parent.ReconResult.images)
+                obj.showAlert('Run reconstruction first to generate images before creating a mask.', ...
+                    'No Reconstruction Images', 'warning');
+                return;
+            end
+
+            obj.Parent.openReconstructionImagesTab();
+        end
+
         function B1Map = loadB1MapData(~, filePath)
             [~,~,ext] = fileparts(filePath);
 
@@ -995,6 +1050,21 @@ classdef ReconstructionTab < handle
             else
                 errordlg(messageText, dialogTitle);
             end
+        end
+
+        function updateMatchingProgressDialog(~, progressDlg, completedRows, totalRows)
+            if isempty(progressDlg) || ~isvalid(progressDlg)
+                return;
+            end
+
+            total = max(1, round(double(totalRows)));
+            done = min(max(round(double(completedRows)), 0), total);
+
+            progressDlg.Indeterminate = 'off';
+            progressDlg.Value = done / total;
+            progressDlg.Message = sprintf('Dictionary matching... %d/%d (%.0f%%%%)', ...
+                done, total, 100 * (done / total));
+            drawnow limitrate;
         end
 
         function parentFig = resolveDialogParent(obj)

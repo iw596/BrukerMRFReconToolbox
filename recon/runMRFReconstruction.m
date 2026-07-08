@@ -1,4 +1,4 @@
-function result = runMRFReconstruction(MRFParams,settings)
+function result = runMRFReconstruction(MRFParams,settings,runtimeOptions)
 % runMRFReconstruction  Skeleton entry point for 2D/3D MRF reconstruction.
 %
 %   This function wires the reconstruction pipeline together:
@@ -15,19 +15,26 @@ geometry = buildMRFReconGeometry(context);
 regularizer = buildMRFReconRegularizer(context);
 reconTarget = string(getfield_default(settings, 'ReconstructionTarget', 'MRF'));
 
+if nargin < 3 || isempty(runtimeOptions)
+    runtimeOptions = struct();
+end
+
 disp("Preparing MRF data for reconstruction....")
 [data, samplingmask] = prepareMRFData(MRFParams);
 
 disp("Starting reconstruction...")
 
-
-if strcmp(settings.MRFReconMode, 'Direct')
-    %% Direct recon pathway
-    disp("Direct reconstruction of MRF data pathway")
-    result = runDirectMRFReconstruction(data,context, geometry);
+if strcmpi(reconTarget, 'T1')
+    result = runT1ReconstructionAndFitting(data, MRFParams, settings, context, geometry, regularizer, runtimeOptions);
 else
-    %% Sub-space recon pathway
-    result = runADMMReconstruction(context, geometry, regularizer);
+    if strcmp(settings.MRFReconMode, 'Direct')
+        %% Direct recon pathway
+        disp("Direct reconstruction of MRF data pathway")
+        result = runDirectMRFReconstruction(data,context, geometry);
+    else
+        %% Sub-space recon pathway
+        result = runADMMReconstruction(context, geometry, regularizer);
+    end
 end
 if isempty(result) || ~isstruct(result)
     result = struct();
@@ -39,6 +46,16 @@ if ~isfield(result, 'Log') || isempty(result.Log)
     result.Log = {'Reconstruction completed.'};
 end
 result.samplingmask = samplingmask;
+
+if logical(getfield_default(settings, 'EstimateMask', false)) && isfield(result, 'images') && ~isempty(result.images)
+    result.mask = buildThresholdMask(result.images);
+    if islogical(result.mask) && any(result.mask(:))
+        result.Log{end+1} = 'Binary mask estimated from mean reconstructed image magnitude time series.';
+    else
+        result.Log{end+1} = 'Binary mask estimation produced an empty mask.';
+    end
+end
+
 disp("Reconstruction finished...")
 
 
@@ -67,18 +84,33 @@ if strcmpi(reconTarget, 'MRF')
     matchOptions.EstimateB1Map = logical(getfield_default(settings, 'EstimateB1Map', false));
     matchOptions.B1Map = getfield_default(settings, 'B1Map', []);
     matchOptions.parallelFlag = logical(getfield_default(settings, 'ParallelMatching', false));
+    matchOptions.ExportComplexM0 = logical(getfield_default(settings, 'SaveComplexM0', false));
+    matchOptions.ProgressCallback = getfield_default(runtimeOptions, 'MatchingProgressCallback', []);
+    matchOptions.ProgressUpdateInterval = getfield_default(runtimeOptions, 'MatchingProgressUpdateInterval', []);
 
     % Call with name-value pairs instead of struct to ensure compatibility
     matchRes = MRFDictMatching(result.images, S.dict, S.LUT, ...
         'EstimateB1Map', matchOptions.EstimateB1Map, ...
         'B1Map', matchOptions.B1Map, ...
-        'parallelFlag', matchOptions.parallelFlag);
+        'parallelFlag', matchOptions.parallelFlag, ...
+        'ExportComplexM0', matchOptions.ExportComplexM0, ...
+        'ProgressCallback', matchOptions.ProgressCallback, ...
+        'ProgressUpdateInterval', matchOptions.ProgressUpdateInterval);
     result.Matching = matchRes;
     result.ParameterMaps = buildParameterMaps(matchRes);
+    if isfield(result, 'mask') && ~isempty(result.mask)
+        result.ParameterMaps.mask = logical(result.mask);
+    end
     result.DictionaryPath = dictionaryPath;
 
     result.Log{end+1} = sprintf('Dictionary matched using %s.', dictionaryPath);
     disp("Dictionary matching finished...")
+elseif strcmpi(reconTarget, 'T1')
+    if ~isfield(result, 'ParameterMaps') || ~isstruct(result.ParameterMaps) || ~isfield(result.ParameterMaps, 'T1')
+        result.Log{end+1} = 'T1 target selected: fitting pathway executed but no T1 map was generated.';
+    else
+        result.Log{end+1} = 'T1 target selected: reconstruction and T1 fitting pathway executed.';
+    end
 else
     result.Log{end+1} = 'Dictionary matching skipped (target is not MRF).';
 end
@@ -102,6 +134,35 @@ end
 
 end
 
+function mask = buildThresholdMask(images)
+mask = [];
+if isempty(images)
+    return;
+end
+
+imgAbs = abs(double(images));
+if ndims(imgAbs) >= 4
+    % Estimate mask from the mean signal across the MRF time-series dimension.
+    refImg = mean(imgAbs, 4);
+else
+    refImg = imgAbs;
+end
+
+finiteVals = refImg(isfinite(refImg));
+if isempty(finiteVals)
+    return;
+end
+
+threshold = 0.05 * max(finiteVals);
+if ~isfinite(threshold) || threshold <= 0
+    mask = false(size(refImg));
+    return;
+end
+
+mask = refImg > threshold;
+mask = logical(mask);
+end
+
 function parameterMaps = buildParameterMaps(matchRes)
 parameterMaps = struct();
 if isempty(matchRes) || ~isstruct(matchRes)
@@ -112,6 +173,9 @@ if isfield(matchRes, 'MRFT1Map')
 end
 if isfield(matchRes, 'MRFT2Map')
     parameterMaps.T2 = matchRes.MRFT2Map;
+end
+if isfield(matchRes, 'MRFM0Map')
+    parameterMaps.M0 = matchRes.MRFM0Map;
 end
 if isfield(matchRes, 'MRFB1Map')
     parameterMaps.B1 = matchRes.MRFB1Map;
