@@ -1,4 +1,4 @@
-function result = runReconstructionCLI(inputSource, options)
+function result = runReconstructionCLI(inputSource, varargin)
 % runReconstructionCLI  Non-GUI entry point for reconstruction workflows.
 %
 % Usage examples:
@@ -7,6 +7,7 @@ function result = runReconstructionCLI(inputSource, options)
 %
 %   params = LoadBrukerData("datasets/14", true);
 %   result = runReconstructionCLI(params, struct('ReconstructionTarget','T1'));
+%   result = runReconstructionCLI(scanDir, 'ReconstructionTarget', 'MRF', 'DictionaryPath', '...');
 %
 % inputSource:
 %   - struct returned by LoadBrukerData, or
@@ -21,33 +22,7 @@ function result = runReconstructionCLI(inputSource, options)
 %   ShowProgress, MatchingProgressUpdateInterval, T1FittingProgressUpdateInterval,
 %   LoadData
 
-arguments
-    inputSource
-    options.ReconstructionTarget (1,1) string {mustBeMember(options.ReconstructionTarget,["MRF","T1","T2"])} = "MRF"
-    options.MRFReconMode (1,1) string {mustBeMember(options.MRFReconMode,["Direct","Iterative"])} = "Direct"
-    options.RegularizationMode (1,1) string = "Locally-low rank"
-    options.EstimateMask (1,1) logical = false
-    options.DictionaryPath (1,1) string = ""
-    options.ParallelMatching (1,1) logical = false
-    options.SaveComplexM0 (1,1) logical = false
-    options.B1CorrectionMode (1,1) string = "None"
-    options.EstimateB1Map (1,1) logical = false
-    options.B1Map = []
-    options.Dimensionality (1,1) string = ""
-    options.Lambda (1,1) double = 0.01
-    options.BlockSize (1,1) double = 8
-    options.Stride (1,1) double = 4
-    options.OuterIterations (1,1) double = 10
-    options.InnerIterations (1,1) double = 5
-    options.Rho (1,1) double = 1
-    options.SaveOutputs (1,1) logical = false
-    options.SaveResultBundle (1,1) logical = false
-    options.SaveBasePath (1,1) string = ""
-    options.ShowProgress (1,1) logical = true
-    options.MatchingProgressUpdateInterval (1,1) double = 1
-    options.T1FittingProgressUpdateInterval (1,1) double = 1
-    options.LoadData (1,1) logical = true
-end
+options = parseOptions(varargin{:});
 
 MRFParams = resolveMRFParams(inputSource, options.LoadData);
 
@@ -95,6 +70,93 @@ if strcmpi(settings.ReconstructionTarget, 'MRF') && isempty(settings.DictionaryP
 end
 
 result = runMRFReconstruction(MRFParams, settings, runtimeOptions);
+end
+
+function options = parseOptions(varargin)
+defaults = struct();
+defaults.ReconstructionTarget = "MRF";
+defaults.MRFReconMode = "Direct";
+defaults.RegularizationMode = "Locally-low rank";
+defaults.EstimateMask = false;
+defaults.DictionaryPath = "";
+defaults.ParallelMatching = false;
+defaults.SaveComplexM0 = false;
+defaults.B1CorrectionMode = "None";
+defaults.EstimateB1Map = false;
+defaults.B1Map = [];
+defaults.Dimensionality = "";
+defaults.Lambda = 0.01;
+defaults.BlockSize = 8;
+defaults.Stride = 4;
+defaults.OuterIterations = 10;
+defaults.InnerIterations = 5;
+defaults.Rho = 1;
+defaults.SaveOutputs = false;
+defaults.SaveResultBundle = false;
+defaults.SaveBasePath = "";
+defaults.ShowProgress = true;
+defaults.MatchingProgressUpdateInterval = 1;
+defaults.T1FittingProgressUpdateInterval = 1;
+defaults.LoadData = true;
+
+options = defaults;
+
+if isempty(varargin)
+    return;
+end
+
+if numel(varargin) == 1 && isstruct(varargin{1})
+    userOptions = varargin{1};
+    fieldNames = fieldnames(userOptions);
+    for iField = 1:numel(fieldNames)
+        fieldName = fieldNames{iField};
+        if ~isfield(defaults, fieldName)
+            error('runReconstructionCLI:UnknownOption', 'Unknown option ''%s''.', fieldName);
+        end
+        options.(fieldName) = userOptions.(fieldName);
+    end
+elseif mod(numel(varargin), 2) == 0
+    for iArg = 1:2:numel(varargin)
+        rawName = varargin{iArg};
+        if ~(ischar(rawName) || (isstring(rawName) && isscalar(rawName)))
+            error('runReconstructionCLI:InvalidNameValue', ...
+                'Name-value options must use text option names.');
+        end
+        fieldName = char(string(rawName));
+        if ~isfield(defaults, fieldName)
+            error('runReconstructionCLI:UnknownOption', 'Unknown option ''%s''.', fieldName);
+        end
+        options.(fieldName) = varargin{iArg + 1};
+    end
+else
+    error('runReconstructionCLI:InvalidOptionsInput', ...
+        ['Options must be provided either as a single struct or as ' ...
+         'name-value pairs.']);
+end
+
+options.ReconstructionTarget = string(options.ReconstructionTarget);
+options.MRFReconMode = string(options.MRFReconMode);
+options.RegularizationMode = string(options.RegularizationMode);
+options.DictionaryPath = string(options.DictionaryPath);
+options.B1CorrectionMode = string(options.B1CorrectionMode);
+options.Dimensionality = string(options.Dimensionality);
+options.SaveBasePath = string(options.SaveBasePath);
+options.ShowProgress = logical(options.ShowProgress);
+options.EstimateMask = logical(options.EstimateMask);
+options.ParallelMatching = logical(options.ParallelMatching);
+options.SaveComplexM0 = logical(options.SaveComplexM0);
+options.EstimateB1Map = logical(options.EstimateB1Map);
+options.Lambda = double(options.Lambda);
+options.BlockSize = double(options.BlockSize);
+options.Stride = double(options.Stride);
+options.OuterIterations = double(options.OuterIterations);
+options.InnerIterations = double(options.InnerIterations);
+options.Rho = double(options.Rho);
+options.SaveOutputs = logical(options.SaveOutputs);
+options.SaveResultBundle = logical(options.SaveResultBundle);
+options.MatchingProgressUpdateInterval = double(options.MatchingProgressUpdateInterval);
+options.T1FittingProgressUpdateInterval = double(options.T1FittingProgressUpdateInterval);
+options.LoadData = logical(options.LoadData);
 end
 
 function params = resolveMRFParams(inputSource, loadDataFlag)

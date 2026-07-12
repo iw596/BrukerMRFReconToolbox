@@ -354,7 +354,7 @@ classdef ViewerTab < handle
 
         function changeSlice(obj)
 
-            if isempty(obj.Parent.MRFData)
+            if isempty(obj.Parent.MRFData) && isempty(obj.Parent.GTData)
                 return
             end
 
@@ -422,7 +422,7 @@ classdef ViewerTab < handle
 
         function scrollSlices(obj, event)
 
-            if isempty(obj.Parent.MRFData)
+            if isempty(obj.Parent.MRFData) && isempty(obj.Parent.GTData)
                 return
             end
 
@@ -835,7 +835,14 @@ classdef ViewerTab < handle
 
         function configureSliceSlider(obj)
 
-            if isempty(obj.Parent.MRFData)
+            activeData = [];
+            if ~isempty(obj.Parent.MRFData)
+                activeData = obj.Parent.MRFData;
+            elseif ~isempty(obj.Parent.GTData)
+                activeData = obj.Parent.GTData;
+            end
+
+            if isempty(activeData)
                 obj.SliceSlider.Limits = [1 2];
                 obj.SliceSlider.Value = 1;
                 obj.SliceSlider.Enable = 'off';
@@ -843,7 +850,7 @@ classdef ViewerTab < handle
                 return
             end
 
-            sz = size(obj.Parent.MRFData);
+            sz = size(activeData);
 
             if numel(sz) < 3
                 nSlices = 1;
@@ -880,24 +887,30 @@ classdef ViewerTab < handle
 
         function configureMapDropdown(obj)
 
-            if isempty(obj.Parent.MRFData)
+            useMRFNames = ~isempty(obj.Parent.MRFData);
+
+            if useMRFNames
+                dataForMaps = obj.Parent.MRFData;
+                preferredNames = obj.Parent.MapNames;
+            elseif ~isempty(obj.Parent.GTData)
+                dataForMaps = obj.Parent.GTData;
+                preferredNames = obj.Parent.GTMapNames;
+            else
+                obj.MapDropdown.Items = {'Map 1'};
+                obj.MapDropdown.Value = 'Map 1';
+                obj.Parent.CurrentMap = 1;
                 return
             end
 
-            sz = size(obj.Parent.MRFData);
-
+            sz = size(dataForMaps);
             if numel(sz) < 4
-
                 nMaps = 1;
-
             else
-
                 nMaps = sz(4);
-
             end
 
-            if ~isempty(obj.Parent.MapNames) && numel(obj.Parent.MapNames) == nMaps
-                items = obj.Parent.MapNames;
+            if ~isempty(preferredNames) && numel(preferredNames) >= nMaps
+                items = preferredNames(1:nMaps);
             else
                 items = cell(1,nMaps);
                 for k = 1:nMaps
@@ -906,7 +919,10 @@ classdef ViewerTab < handle
             end
 
             obj.MapDropdown.Items = items;
-            obj.MapDropdown.Value = items{1};
+
+            currentIdx = min(max(round(obj.Parent.CurrentMap),1), nMaps);
+            obj.Parent.CurrentMap = currentIdx;
+            obj.MapDropdown.Value = items{currentIdx};
 
         end
 

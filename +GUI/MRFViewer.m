@@ -240,9 +240,8 @@ classdef MRFViewer < handle
             if ~isempty(app.ViewerTabObj)
                 app.ViewerTabObj.ApplyMRFMaskCheckbox.Value = false;
                 app.ViewerTabObj.ApplyMRFMaskCheckbox.Enable = 'off';
-                app.ViewerTabObj.MapDropdown.Items = {'Map 1'};
-                app.ViewerTabObj.MapDropdown.Value = 'Map 1';
                 app.ViewerTabObj.configureSliceSlider();
+                app.ViewerTabObj.configureMapDropdown();
                 app.ViewerTabObj.updateDisplay();
             end
         end
@@ -260,7 +259,7 @@ classdef MRFViewer < handle
 
             filename = fullfile(path,file);
 
-            [data,mapNames,mask] = app.readVolume(filename);
+            [data,mapNames,mask] = app.readVolume(filename, false);
 
             if isempty(data)
                 return
@@ -275,6 +274,10 @@ classdef MRFViewer < handle
                 app.GTData = data;
                 app.GTMapNames = mapNames;
                 app.GTMask = mask;
+                if isempty(app.MRFData)
+                    app.CurrentSlice = 1;
+                    app.CurrentMap = 1;
+                end
             else
                 existingSz = size(app.GTData);
                 newSz = size(data);
@@ -304,6 +307,8 @@ classdef MRFViewer < handle
 
             % Enable GT mask checkbox if a mask was found
             if ~isempty(app.ViewerTabObj)
+                app.ViewerTabObj.configureSliceSlider();
+                app.ViewerTabObj.configureMapDropdown();
                 if ~isempty(app.GTMask)
                     app.ViewerTabObj.ApplyGTMaskCheckbox.Enable = 'on';
                 else
@@ -344,9 +349,13 @@ classdef MRFViewer < handle
             end
         end
 
-        function [data,mapNames,mask] = readVolume(app,filename)
+        function [data,mapNames,mask] = readVolume(app,filename,followBundle)
             % Read volume data from file
             %   Supports .mat and .nii files
+
+            if nargin < 3 || isempty(followBundle)
+                followBundle = true;
+            end
 
             [~,~,ext] = fileparts(filename);
 
@@ -358,7 +367,7 @@ classdef MRFViewer < handle
                 case '.mat'
 
                     S = load(filename);
-                    [data,mapNames,mask] = app.parseMRFMat(S);
+                    [data,mapNames,mask] = app.parseMRFMat(S, followBundle);
 
                 case '.nii'
 
@@ -371,10 +380,14 @@ classdef MRFViewer < handle
             end
         end
 
-        function [data,mapNames,mask] = parseMRFMat(app,S)
+        function [data,mapNames,mask] = parseMRFMat(app,S,followBundle)
             % Parse MAT file to extract MRF data and optional binary mask
             %   Looks for T1, T2 fields; combines into 4D array
             %   Extracts 'mask' field if present (case-insensitive)
+
+            if nargin < 3 || isempty(followBundle)
+                followBundle = true;
+            end
 
             mapNames = {};
             mask = [];
@@ -393,12 +406,12 @@ classdef MRFViewer < handle
 
             % Reconstruction bundle files are metadata wrappers around the
             % actual saved image MAT file, so follow the stored image path.
-            if isfield(S, 'bundle') && isstruct(S.bundle)
+            if followBundle && isfield(S, 'bundle') && isstruct(S.bundle)
                 bundle = S.bundle;
                 if isfield(bundle, 'OutputFiles') && isstruct(bundle.OutputFiles) && ...
                         isfield(bundle.OutputFiles, 'Images') && ~isempty(bundle.OutputFiles.Images) && ...
                         isfile(bundle.OutputFiles.Images)
-                    [data,mapNames,mask] = app.readVolume(bundle.OutputFiles.Images);
+                    [data,mapNames,mask] = app.readVolume(bundle.OutputFiles.Images, true);
                     return
                 end
             end
