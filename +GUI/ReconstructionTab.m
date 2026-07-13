@@ -12,6 +12,10 @@ classdef ReconstructionTab < handle
         LoadDictionaryButton
         RegModeLabel
         RegModeDropdown
+        WaveletSettingsButton
+        WaveletSettingsInfoLabel
+        SubspaceRetentionLabel
+        SubspaceRetentionEdit
         DimensionalityLabel
         DimensionalityDropdown
         ReconTargetLabel
@@ -89,12 +93,25 @@ classdef ReconstructionTab < handle
             obj.RegModeLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Regularization mode', ...
                 'Position', [20 540 130 22]);
-            obj.RegModeDropdown = uidropdown(obj.TabHandle, ...
+            obj.RegModeDropdown = uilistbox(obj.TabHandle, ...
                 'Items', {'Locally-low rank', 'Wavelet', 'Total variation'}, ...
-                'Value', 'Locally-low rank', ...
-                'Position', [160 540 180 22], ...
+                'Value', {'Locally-low rank'}, ...
+                'Multiselect', 'on', ...
+                'Position', [160 500 180 62], ...
                 'ValueChangedFcn', @(~,~) obj.updateRegularizationModeUI(), ...
-                'Tooltip', 'Select regularization method for reconstruction');
+                'Tooltip', 'Select one or more regularization methods for iterative reconstruction');
+
+            obj.WaveletSettingsButton = uibutton(obj.TabHandle, ...
+                'Text', 'Wavelet Settings...', ...
+                'Position', [350 540 140 24], ...
+                'Visible', 'off', ...
+                'ButtonPushedFcn', @(~,~) obj.openWaveletSettingsDialog(), ...
+                'Tooltip', 'Open advanced wavelet settings dialog');
+
+            obj.WaveletSettingsInfoLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Wavelet: db2, levels: auto', ...
+                'Position', [350 514 260 22], ...
+                'Visible', 'off');
 
             obj.DimensionalityLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Dimensionality', ...
@@ -288,10 +305,19 @@ classdef ReconstructionTab < handle
                 'Position', [160 350 180 22], ...
                 'Tooltip', 'ADMM penalty parameter (must be > 0)');
 
+            obj.SubspaceRetentionLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Subspace retain (%)', ...
+                'Position', [20 318 130 22]);
+            obj.SubspaceRetentionEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 100, ...
+                'Limits', [1 100], ...
+                'Position', [160 318 180 22], ...
+                'Tooltip', 'Percentage of temporal subspace components to retain during iterative reconstruction');
+
             obj.EstimateMaskCheckbox = uicheckbox(obj.TabHandle, ...
                 'Text', 'Estimate mask', ...
                 'Value', false, ...
-                'Position', [20 318 180 22], ...
+                'Position', [20 286 180 22], ...
                 'Tooltip', 'Estimate mask from the mean over reconstructed image time series');
 
             obj.DataInfoLabel = uilabel(obj.TabHandle, ...
@@ -320,7 +346,8 @@ classdef ReconstructionTab < handle
             % Placeholder for the reconstruction action.
             % Collects current UI parameters for downstream reconstruction.
 
-            regMode = obj.RegModeDropdown.Value;
+            regModes = obj.getSelectedRegularizationModes();
+            regMode = regModes{1};
             if isfield(obj.LoadedMethodParams, 'NDim')
                 dimensionality = obj.inferDimensionalityFromNDim(obj.LoadedMethodParams.NDim);
             else
@@ -332,6 +359,7 @@ classdef ReconstructionTab < handle
             outerIterations = obj.OuterIterationsEdit.Value;
             innerIterations = obj.InnerIterationsEdit.Value;
             rho = obj.RhoEdit.Value;
+            subspaceRetentionPct = obj.SubspaceRetentionEdit.Value;
             MRFReconMode = obj.MRFReconModeDropdown.Value;
             usesIterativeParams = strcmp(reconTarget, 'MRF') && strcmp(MRFReconMode, 'Iterative');
             b1CorrectionMode = obj.B1CorrectionDropdown.Value;
@@ -357,6 +385,12 @@ classdef ReconstructionTab < handle
             end
 
             if usesIterativeParams
+                if isempty(regModes)
+                    obj.showAlert('Select at least one regularization mode for iterative reconstruction.', ...
+                        'Regularization Mode Required', 'warning');
+                    return;
+                end
+
                 if isempty(lambda) || ~isfinite(lambda) || lambda <= 0
                     obj.showAlert('Lambda must be a positive number.', ...
                         'Invalid Lambda', 'warning');
@@ -380,11 +414,19 @@ classdef ReconstructionTab < handle
                         'Invalid Rho', 'warning');
                     return;
                 end
+
+                if isempty(subspaceRetentionPct) || ~isfinite(subspaceRetentionPct) || ...
+                        subspaceRetentionPct <= 0 || subspaceRetentionPct > 100
+                    obj.showAlert('Subspace retain percentage must be in the range (0, 100].', ...
+                        'Invalid Subspace Retention', 'warning');
+                    return;
+                end
             end
 
             settings = struct();
             settings.Dimensionality = dimensionality;
             settings.RegularizationMode = regMode;
+            settings.RegularizationModes = regModes;
             settings.Lambda = lambda;
             settings.ReconstructionTarget = reconTarget;
             settings.EstimateMask = estimateMask;
@@ -392,10 +434,18 @@ classdef ReconstructionTab < handle
             settings.InnerIterations = innerIterations;
             settings.MRFReconMode = MRFReconMode;
             settings.Rho = rho;
+            settings.SubspaceComponentRetentionPct = subspaceRetentionPct;
             settings.B1CorrectionMode = b1CorrectionMode;
             settings.EstimateB1Map = estimateB1Map;
             settings.B1Map = [];
-            if usesIterativeParams && strcmp(regMode, 'Locally-low rank')
+            if usesIterativeParams && any(strcmp(regModes, 'Wavelet'))
+                [waveletName, waveletLevels] = obj.getWaveletSettingsForRun();
+                settings.WaveletName = waveletName;
+                if ~isempty(waveletLevels)
+                    settings.WaveletLevels = waveletLevels;
+                end
+            end
+            if usesIterativeParams && any(strcmp(regModes, 'Locally-low rank'))
                 blockSize = obj.BlockSizeEdit.Value;
                 stride = obj.StrideEdit.Value;
                 if isempty(blockSize) || ~isfinite(blockSize) || blockSize <= 0 || mod(blockSize,1) ~= 0
@@ -514,7 +564,7 @@ classdef ReconstructionTab < handle
             obj.DataInfoTextArea.Value = [ ...
                 {['Reconstruction mode: ' char(dimensionality)]}; ...
                 {['Target: ' char(reconTarget)]}; ...
-                {['Regularizer: ' char(regMode)]}; ...
+                {['Regularizer(s): ' strjoin(regModes, ', ')]}; ...
                 {['Status: ' char(string(statusText))]}; ...
                 logLines(:)];
 
@@ -522,6 +572,10 @@ classdef ReconstructionTab < handle
                 if isfield(result.OutputFiles, 'Images') && ~isempty(result.OutputFiles.Images)
                     obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value(:); ...
                         {['Saved images: ' result.OutputFiles.Images]}];
+                end
+                if isfield(result.OutputFiles, 'SamplingMask') && ~isempty(result.OutputFiles.SamplingMask)
+                    obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value(:); ...
+                        {['Saved sampling mask: ' result.OutputFiles.SamplingMask]}];
                 end
                 if isfield(result.OutputFiles, 'Maps') && ~isempty(result.OutputFiles.Maps)
                     obj.DataInfoTextArea.Value = [obj.DataInfoTextArea.Value(:); ...
@@ -743,9 +797,22 @@ classdef ReconstructionTab < handle
             obj.LoadDictionaryButton.Position = [margin + 190 y 180 ctrlH];
             y = y - rowGap - 22;
 
+            isIterativeMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF') && strcmp(obj.MRFReconModeDropdown.Value, 'Iterative');
+            selectedRegModes = obj.getSelectedRegularizationModes();
+            isWavelet = isIterativeMRF && any(strcmp(selectedRegModes, 'Wavelet'));
+
             obj.RegModeLabel.Position = [margin y 130 22];
-            obj.RegModeDropdown.Position = [margin + 140 y fieldW 22];
-            y = y - rowGap - 22;
+            obj.RegModeDropdown.Position = [margin + 140 y - 40 fieldW 62];
+            y = y - rowGap - 62;
+
+            if isWavelet
+                obj.WaveletSettingsButton.Position = [margin + 140 y fieldW 24];
+                obj.WaveletSettingsInfoLabel.Position = [margin + 140 y - 24 fieldW 22];
+                y = y - rowGap - 50;
+            else
+                obj.WaveletSettingsButton.Position = [margin + 140 y fieldW 24];
+                obj.WaveletSettingsInfoLabel.Position = [margin + 140 y - 24 fieldW 22];
+            end
 
             obj.DimensionalityLabel.Position = [margin y 130 22];
             obj.DimensionalityDropdown.Position = [margin + 140 y fieldW 22];
@@ -778,7 +845,7 @@ classdef ReconstructionTab < handle
             obj.LambdaEdit.Position = [margin + 140 y fieldW 22];
             y = y - rowGap - 22;
 
-            isLLR = strcmp(obj.RegModeDropdown.Value, 'Locally-low rank');
+            isLLR = any(strcmp(selectedRegModes, 'Locally-low rank'));
             if isLLR
                 obj.BlockSizeLabel.Position = [margin y 130 22];
                 obj.BlockSizeEdit.Position = [margin + 140 y fieldW 22];
@@ -801,6 +868,10 @@ classdef ReconstructionTab < handle
             obj.RhoEdit.Position = [margin + 140 y fieldW 22];
             y = y - rowGap - 22;
 
+            obj.SubspaceRetentionLabel.Position = [margin y 130 22];
+            obj.SubspaceRetentionEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
             obj.EstimateMaskCheckbox.Position = [margin y 180 22];
 
             y = y - rowGap - 24;
@@ -814,7 +885,9 @@ classdef ReconstructionTab < handle
 
         function updateRegularizationModeUI(obj)
             isIterativeMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF') && strcmp(obj.MRFReconModeDropdown.Value, 'Iterative');
-            isLLR = strcmp(obj.RegModeDropdown.Value, 'Locally-low rank') && isIterativeMRF;
+            selectedRegModes = obj.getSelectedRegularizationModes();
+            isLLR = any(strcmp(selectedRegModes, 'Locally-low rank')) && isIterativeMRF;
+            isWavelet = any(strcmp(selectedRegModes, 'Wavelet')) && isIterativeMRF;
 
             vis = 'off';
             if isLLR
@@ -825,6 +898,14 @@ classdef ReconstructionTab < handle
             obj.BlockSizeEdit.Visible = vis;
             obj.StrideLabel.Visible = vis;
             obj.StrideEdit.Visible = vis;
+
+            waveletVis = 'off';
+            if isWavelet
+                waveletVis = 'on';
+            end
+            obj.WaveletSettingsButton.Visible = waveletVis;
+            obj.WaveletSettingsInfoLabel.Visible = waveletVis;
+            obj.refreshWaveletInfoLabel();
 
             obj.resizeUI([]);
         end
@@ -875,6 +956,12 @@ classdef ReconstructionTab < handle
             obj.InnerIterationsEdit.Visible = vis;
             obj.RhoLabel.Visible = vis;
             obj.RhoEdit.Visible = vis;
+            obj.SubspaceRetentionLabel.Visible = vis;
+            obj.SubspaceRetentionEdit.Visible = vis;
+            if strcmp(vis, 'off')
+                obj.WaveletSettingsButton.Visible = 'off';
+                obj.WaveletSettingsInfoLabel.Visible = 'off';
+            end
 
             obj.updateRegularizationModeUI();
 
@@ -970,14 +1057,14 @@ classdef ReconstructionTab < handle
             saveBundle = logical(obj.SaveBundleCheckbox.Value) && logical(obj.SaveOutputsCheckbox.Value);
 
             try
-                [imageFile, mapFile, bundleFile] = saveResultOutputs(result, saveBasePath, settingsForBundle, saveBundle);
+                [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settingsForBundle, saveBundle);
             catch ME
                 obj.showAlert(['Could not save last result: ' ME.message], ...
                     'Save Error', 'error');
                 return;
             end
 
-            result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'Bundle', bundleFile);
+            result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'SamplingMask', samplingMaskFile, 'Bundle', bundleFile);
             obj.ReconSettings.LastResult = result;
             if ~isempty(obj.Parent) && isvalid(obj.Parent)
                 obj.Parent.ReconResult = result;
@@ -988,6 +1075,9 @@ classdef ReconstructionTab < handle
                 currentLines = {char(string(currentLines))};
             end
             currentLines = [currentLines(:); {['Saved images: ' imageFile]}];
+            if ~isempty(samplingMaskFile)
+                currentLines = [currentLines; {['Saved sampling mask: ' samplingMaskFile]}];
+            end
             if ~isempty(mapFile)
                 currentLines = [currentLines; {['Saved maps: ' mapFile]}];
             end
@@ -1107,6 +1197,99 @@ classdef ReconstructionTab < handle
             if ~isnan(n) && n >= 3
                 dimensionality = '3D';
             end
+        end
+
+        function regModes = getSelectedRegularizationModes(obj)
+            regModes = {};
+            if isempty(obj.RegModeDropdown) || ~isvalid(obj.RegModeDropdown)
+                return;
+            end
+
+            selected = obj.RegModeDropdown.Value;
+            if ischar(selected)
+                regModes = {selected};
+            elseif isstring(selected)
+                regModes = cellstr(selected(:));
+            elseif iscell(selected)
+                regModes = selected(:)';
+            end
+
+            regModes = regModes(~cellfun(@isempty, regModes));
+            if isempty(regModes)
+                regModes = {'Locally-low rank'};
+            end
+        end
+
+        function openWaveletSettingsDialog(obj)
+            [currentName, currentLevels] = obj.getWaveletSettingsForRun();
+
+            levelText = '';
+            if ~isempty(currentLevels)
+                levelText = num2str(currentLevels);
+            end
+
+            answers = inputdlg( ...
+                {'Wavelet name (e.g. db2, haar, sym4):', 'Wavelet levels (leave empty for auto):'}, ...
+                'Wavelet Settings', [1 55; 1 55], {currentName, levelText});
+
+            if isempty(answers)
+                return;
+            end
+
+            waveletName = strtrim(answers{1});
+            if isempty(waveletName)
+                obj.showAlert('Wavelet name cannot be empty.', 'Invalid Wavelet Name', 'warning');
+                return;
+            end
+
+            levelRaw = strtrim(answers{2});
+            waveletLevels = [];
+            if ~isempty(levelRaw)
+                parsedLevel = str2double(levelRaw);
+                if ~isfinite(parsedLevel) || parsedLevel <= 0 || mod(parsedLevel, 1) ~= 0
+                    obj.showAlert('Wavelet levels must be a positive integer or left empty for auto.', ...
+                        'Invalid Wavelet Levels', 'warning');
+                    return;
+                end
+                waveletLevels = round(parsedLevel);
+            end
+
+            obj.ReconSettings.WaveletName = waveletName;
+            if isempty(waveletLevels)
+                if isfield(obj.ReconSettings, 'WaveletLevels')
+                    obj.ReconSettings = rmfield(obj.ReconSettings, 'WaveletLevels');
+                end
+            else
+                obj.ReconSettings.WaveletLevels = waveletLevels;
+            end
+
+            obj.refreshWaveletInfoLabel();
+        end
+
+        function [waveletName, waveletLevels] = getWaveletSettingsForRun(obj)
+            waveletName = 'db2';
+            waveletLevels = [];
+
+            if isfield(obj.ReconSettings, 'WaveletName') && ~isempty(obj.ReconSettings.WaveletName)
+                waveletName = char(string(obj.ReconSettings.WaveletName));
+            end
+
+            if isfield(obj.ReconSettings, 'WaveletLevels') && ~isempty(obj.ReconSettings.WaveletLevels)
+                candidate = double(obj.ReconSettings.WaveletLevels);
+                if isfinite(candidate) && candidate > 0
+                    waveletLevels = round(candidate(1));
+                end
+            end
+        end
+
+        function refreshWaveletInfoLabel(obj)
+            [waveletName, waveletLevels] = obj.getWaveletSettingsForRun();
+            if isempty(waveletLevels)
+                levelText = 'auto';
+            else
+                levelText = num2str(waveletLevels);
+            end
+            obj.WaveletSettingsInfoLabel.Text = ['Wavelet: ' waveletName ', levels: ' levelText];
         end
 
         

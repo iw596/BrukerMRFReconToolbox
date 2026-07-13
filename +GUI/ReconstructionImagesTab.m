@@ -29,6 +29,7 @@ classdef ReconstructionImagesTab < handle
         SliceCount = 1
         TimeCount = 1
         ReferenceImage = []
+        ExternalReferenceImage = []
         GeneratedMask = []
         CurrentThreshold = 0.05
     end
@@ -127,7 +128,7 @@ classdef ReconstructionImagesTab < handle
                 'Text', 'No reconstruction images loaded.');
         end
 
-        function loadImages(obj, images, dimensionality)
+        function loadImages(obj, images, dimensionality, maskReferenceImage)
             if isempty(images)
                 return
             end
@@ -141,6 +142,11 @@ classdef ReconstructionImagesTab < handle
             obj.CurrentSlice = 1;
             obj.CurrentTime = 1;
             obj.CurrentThreshold = 0.05;
+
+            obj.ExternalReferenceImage = [];
+            if nargin >= 4 && ~isempty(maskReferenceImage)
+                obj.ExternalReferenceImage = obj.prepareReferenceImage(maskReferenceImage);
+            end
 
             sz = size(obj.Images);
             if numel(sz) < 3
@@ -456,7 +462,11 @@ classdef ReconstructionImagesTab < handle
         end
 
         function initializeMaskState(obj)
-            obj.ReferenceImage = obj.computeReferenceImage();
+            if ~isempty(obj.ExternalReferenceImage)
+                obj.ReferenceImage = obj.ExternalReferenceImage;
+            else
+                obj.ReferenceImage = obj.computeReferenceImage();
+            end
             if isempty(obj.ReferenceImage)
                 obj.GeneratedMask = [];
                 return
@@ -466,6 +476,8 @@ classdef ReconstructionImagesTab < handle
             if isfinite(maxVal) && maxVal > 0
                 obj.ReferenceImage = obj.ReferenceImage ./ maxVal;
             end
+
+            obj.CurrentThreshold = obj.computeOtsuThreshold(obj.ReferenceImage);
 
             obj.ThresholdSlider.Value = obj.CurrentThreshold;
             obj.ThresholdValueLabel.Text = sprintf('%.3f', obj.CurrentThreshold);
@@ -505,6 +517,21 @@ classdef ReconstructionImagesTab < handle
                     refImg = refImg(:, :, 1);
                 end
             end
+
+            refImg = obj.prepareReferenceImage(refImg);
+        end
+
+        function refImg = prepareReferenceImage(~, refImg)
+            if isempty(refImg)
+                return
+            end
+
+            refImg = abs(double(refImg));
+            refImg(~isfinite(refImg)) = 0;
+
+            if ndims(refImg) > 3
+                refImg = squeeze(refImg);
+            end
         end
 
         function changeThreshold(obj)
@@ -525,19 +552,31 @@ classdef ReconstructionImagesTab < handle
                 return
             end
 
-            values = obj.ReferenceImage(:);
-            values = values(isfinite(values));
-            if isempty(values)
-                return
-            end
-
-            threshold = graythresh(values);
-            obj.CurrentThreshold = max(0, min(1, double(threshold)));
+            obj.CurrentThreshold = obj.computeOtsuThreshold(obj.ReferenceImage);
             obj.ThresholdSlider.Value = obj.CurrentThreshold;
             obj.ThresholdValueLabel.Text = sprintf('%.3f', obj.CurrentThreshold);
             obj.GeneratedMask = obj.ReferenceImage > obj.CurrentThreshold;
             obj.GeneratedMask = logical(obj.GeneratedMask);
             obj.updateDisplay();
+        end
+
+        function threshold = computeOtsuThreshold(~, refImg)
+            threshold = 0.05;
+            if isempty(refImg)
+                return
+            end
+
+            values = refImg(:);
+            values = values(isfinite(values));
+            if isempty(values)
+                return
+            end
+
+            if exist('graythresh', 'file') == 2
+                threshold = double(graythresh(values));
+            end
+
+            threshold = max(0, min(1, threshold));
         end
 
         function maskSlice = getCurrentMaskSlice(obj)

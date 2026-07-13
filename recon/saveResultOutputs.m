@@ -1,4 +1,4 @@
-function [imageFile, mapFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle)
+function [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle)
 [saveFolder, saveStem, ~] = fileparts(saveBasePath);
 if isempty(saveFolder)
     saveFolder = pwd;
@@ -9,6 +9,7 @@ end
 
 imageFile = fullfile(saveFolder, [saveStem '_images.mat']);
 mapFile = '';
+samplingMaskFile = '';
 bundleFile = '';
 
 images = [];
@@ -24,6 +25,11 @@ if isfield(result, 'mask') && ~isempty(result.mask)
     mask = logical(result.mask);
 end
 save(imageFile, 'images', 'samplingmask', 'mask', '-v7.3');
+
+if ~isempty(samplingmask)
+    samplingMaskFile = fullfile(saveFolder, [saveStem '_samplingmask.mat']);
+    save(samplingMaskFile, 'samplingmask', '-v7.3');
+end
 
 if isfield(result, 'ParameterMaps') && ~isempty(result.ParameterMaps)
     mapFile = fullfile(saveFolder, [saveStem '_maps.mat']);
@@ -46,7 +52,7 @@ if saveBundle
     bundle.Log = getfield_default_local(result, 'Log', {});
     bundle.DictionaryPath = getfield_default_local(result, 'DictionaryPath', '');
     bundle.Settings = settings;
-    bundle.OutputFiles = struct('Images', imageFile, 'Maps', mapFile);
+    bundle.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'SamplingMask', samplingMaskFile);
     if isfield(result, 'Matching') && isstruct(result.Matching)
         bundle.MatchingSummary = struct('HasB1Map', isfield(result.Matching, 'MRFB1Map'), ...
             'HasIndexMap', isfield(result.Matching, 'indexMap'));

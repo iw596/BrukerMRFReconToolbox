@@ -15,10 +15,10 @@ function result = runReconstructionCLI(inputSource, varargin)
 %   - full path to the method file.
 %
 % options fields:
-%   ReconstructionTarget, MRFReconMode, RegularizationMode, EstimateMask,
+%   ReconstructionTarget, MRFReconMode, RegularizationMode, RegularizationModes, EstimateMask,
 %   DictionaryPath, ParallelMatching, SaveComplexM0, EstimateB1Map, B1Map,
 %   Dimensionality, Lambda, BlockSize, Stride, OuterIterations,
-%   InnerIterations, Rho, SaveOutputs, SaveResultBundle, SaveBasePath,
+%   InnerIterations, Rho, SubspaceComponentRetentionPct, SaveOutputs, SaveResultBundle, SaveBasePath,
 %   ShowProgress, MatchingProgressUpdateInterval, T1FittingProgressUpdateInterval,
 %   LoadData
 
@@ -29,7 +29,8 @@ MRFParams = resolveMRFParams(inputSource, options.LoadData);
 settings = struct();
 settings.ReconstructionTarget = char(options.ReconstructionTarget);
 settings.MRFReconMode = char(options.MRFReconMode);
-settings.RegularizationMode = char(options.RegularizationMode);
+settings.RegularizationMode = options.RegularizationMode;
+settings.RegularizationModes = options.RegularizationModes;
 settings.EstimateMask = logical(options.EstimateMask);
 settings.DictionaryPath = char(options.DictionaryPath);
 settings.ParallelMatching = logical(options.ParallelMatching);
@@ -43,6 +44,7 @@ settings.Stride = round(options.Stride);
 settings.OuterIterations = round(options.OuterIterations);
 settings.InnerIterations = round(options.InnerIterations);
 settings.Rho = options.Rho;
+settings.SubspaceComponentRetentionPct = options.SubspaceComponentRetentionPct;
 settings.SaveOutputs = logical(options.SaveOutputs);
 settings.SaveResultBundle = logical(options.SaveResultBundle);
 settings.SaveBasePath = char(options.SaveBasePath);
@@ -77,6 +79,7 @@ defaults = struct();
 defaults.ReconstructionTarget = "MRF";
 defaults.MRFReconMode = "Direct";
 defaults.RegularizationMode = "Locally-low rank";
+defaults.RegularizationModes = [];
 defaults.EstimateMask = false;
 defaults.DictionaryPath = "";
 defaults.ParallelMatching = false;
@@ -91,6 +94,7 @@ defaults.Stride = 4;
 defaults.OuterIterations = 10;
 defaults.InnerIterations = 5;
 defaults.Rho = 1;
+defaults.SubspaceComponentRetentionPct = 100;
 defaults.SaveOutputs = false;
 defaults.SaveResultBundle = false;
 defaults.SaveBasePath = "";
@@ -136,7 +140,12 @@ end
 
 options.ReconstructionTarget = string(options.ReconstructionTarget);
 options.MRFReconMode = string(options.MRFReconMode);
-options.RegularizationMode = string(options.RegularizationMode);
+if isempty(options.RegularizationModes)
+    options.RegularizationModes = normalizeRegularizationModes(options.RegularizationMode);
+else
+    options.RegularizationModes = normalizeRegularizationModes(options.RegularizationModes);
+end
+options.RegularizationMode = options.RegularizationModes(1);
 options.DictionaryPath = string(options.DictionaryPath);
 options.B1CorrectionMode = string(options.B1CorrectionMode);
 options.Dimensionality = string(options.Dimensionality);
@@ -152,11 +161,31 @@ options.Stride = double(options.Stride);
 options.OuterIterations = double(options.OuterIterations);
 options.InnerIterations = double(options.InnerIterations);
 options.Rho = double(options.Rho);
+options.SubspaceComponentRetentionPct = double(options.SubspaceComponentRetentionPct);
 options.SaveOutputs = logical(options.SaveOutputs);
 options.SaveResultBundle = logical(options.SaveResultBundle);
 options.MatchingProgressUpdateInterval = double(options.MatchingProgressUpdateInterval);
 options.T1FittingProgressUpdateInterval = double(options.T1FittingProgressUpdateInterval);
 options.LoadData = logical(options.LoadData);
+end
+
+function regModes = normalizeRegularizationModes(rawModes)
+if ischar(rawModes)
+    regModes = string({rawModes});
+elseif isstring(rawModes)
+    regModes = string(rawModes(:));
+elseif iscell(rawModes)
+    regModes = string(rawModes(:));
+else
+    regModes = "Locally-low rank";
+end
+
+regModes = strtrim(regModes);
+regModes(regModes == "") = [];
+if isempty(regModes)
+    regModes = "Locally-low rank";
+end
+regModes = unique(regModes, 'stable');
 end
 
 function params = resolveMRFParams(inputSource, loadDataFlag)

@@ -177,7 +177,12 @@ classdef MRFViewer < handle
                 reconDimensionality = app.ReconTabObj.ReconSettings.Dimensionality;
             end
 
-            app.ReconImagesTabObj.loadImages(app.ReconResult.images, reconDimensionality);
+            maskRefImage = [];
+            if isfield(app.ReconResult, 'MaskReferenceImage') && ~isempty(app.ReconResult.MaskReferenceImage)
+                maskRefImage = app.ReconResult.MaskReferenceImage;
+            end
+
+            app.ReconImagesTabObj.loadImages(app.ReconResult.images, reconDimensionality, maskRefImage);
             app.TabGroup.SelectedTab = app.ReconImagesTabObj.TabHandle;
         end
 

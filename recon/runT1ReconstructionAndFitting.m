@@ -17,7 +17,7 @@ if strcmp(settings.MRFReconMode, 'Direct')
     result = runDirectMRFReconstruction(data, context, geometry);
 else
     disp("Iterative reconstruction skeleton for T1 target")
-    result = runADMMReconstruction(context, geometry, regularizer);
+    result = runADMMReconstruction(context, geometry, regularizer, data);
 end
 
 if isempty(result) || ~isstruct(result)

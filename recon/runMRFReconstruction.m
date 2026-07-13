@@ -21,6 +21,7 @@ end
 
 disp("Preparing MRF data for reconstruction....")
 [data, samplingmask] = prepareMRFData(MRFParams);
+maskReferenceImage = buildMaskReferenceImageFromKspace(data);
 
 disp("Starting reconstruction...")
 
@@ -33,7 +34,17 @@ else
         result = runDirectMRFReconstruction(data,context, geometry);
     else
         %% Sub-space recon pathway
-        result = runADMMReconstruction(context, geometry, regularizer);
+        result = runADMMReconstruction(context, geometry, regularizer, data);
+
+        nTemporalFrames = size(data, 4);
+        retentionPct = context.SubspaceComponentRetentionPct;
+        nRetainedComponents = max(1, min(nTemporalFrames, ceil((retentionPct / 100) * nTemporalFrames)));
+        result.SubspaceTotalComponents = nTemporalFrames;
+        result.SubspaceRetainedComponents = nRetainedComponents;
+        result.SubspaceComponentRetentionPct = retentionPct;
+        result.Log{end+1} = sprintf('Selected regularizer(s): %s.', char(strjoin(context.RegularizationModes, ', ')));
+        result.Log{end+1} = sprintf('Subspace retention set to %.2f%%%% (%d/%d components).', ...
+            retentionPct, nRetainedComponents, nTemporalFrames);
     end
 end
 if isempty(result) || ~isstruct(result)
@@ -46,11 +57,14 @@ if ~isfield(result, 'Log') || isempty(result.Log)
     result.Log = {'Reconstruction completed.'};
 end
 result.samplingmask = samplingmask;
+if ~isempty(maskReferenceImage)
+    result.MaskReferenceImage = maskReferenceImage;
+end
 
 if logical(getfield_default(settings, 'EstimateMask', false)) && isfield(result, 'images') && ~isempty(result.images)
-    result.mask = buildThresholdMask(result.images);
+    result.mask = buildThresholdMask(maskReferenceImage, result.images);
     if islogical(result.mask) && any(result.mask(:))
-        result.Log{end+1} = 'Binary mask estimated from mean reconstructed image magnitude time series.';
+        result.Log{end+1} = 'Binary mask estimated from Otsu threshold on image derived from mean k-space data.';
     else
         result.Log{end+1} = 'Binary mask estimation produced an empty mask.';
     end
@@ -68,7 +82,7 @@ if strcmpi(reconTarget, 'MRF')
             'No reconstructed images available for dictionary matching.');
     end
 
-    dictionaryPath = getfield_default(settings, 'DictionaryPath', '');
+    dictionaryPath = resolveDictionaryPath(getfield_default(settings, 'DictionaryPath', ''));
     if isempty(dictionaryPath) || ~isfile(dictionaryPath)
         error('runMRFReconstruction:DictionaryRequired', ...
             'A valid dictionary file must be loaded before MRF matching.');
@@ -115,15 +129,58 @@ else
     result.Log{end+1} = 'Dictionary matching skipped (target is not MRF).';
 end
 
+function dictionaryPath = resolveDictionaryPath(inputPath)
+dictionaryPath = char(string(inputPath));
+
+if isempty(dictionaryPath)
+    return;
+end
+
+if isfile(dictionaryPath)
+    return;
+end
+
+toolboxRoot = fileparts(fileparts(mfilename('fullpath')));
+
+candidateRoots = {pwd, toolboxRoot};
+for iRoot = 1:numel(candidateRoots)
+    candidateRoot = candidateRoots{iRoot};
+
+    candidatePath = fullfile(candidateRoot, dictionaryPath);
+    if isfile(candidatePath)
+        dictionaryPath = candidatePath;
+        return;
+    end
+
+    matches = dir(fullfile(candidateRoot, '**', dictionaryPath));
+    if ~isempty(matches)
+        dictionaryPath = fullfile(matches(1).folder, matches(1).name);
+        return;
+    end
+
+    [~,baseName,baseExt] = fileparts(dictionaryPath);
+    if ~isempty(baseName)
+        matches = dir(fullfile(candidateRoot, '**', [baseName baseExt]));
+        if ~isempty(matches)
+            dictionaryPath = fullfile(matches(1).folder, matches(1).name);
+            return;
+        end
+    end
+end
+end
+
 if logical(getfield_default(settings, 'SaveOutputs', false))
     saveBasePath = getfield_default(settings, 'SaveBasePath', '');
     if isempty(saveBasePath)
         saveBasePath = fullfile(pwd, ['mrf_recon_' datestr(now, 'yyyymmdd_HHMMSS')]);
     end
     saveBundle = logical(getfield_default(settings, 'SaveResultBundle', false));
-    [imageFile, mapFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle);
-    result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'Bundle', bundleFile);
+    [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle);
+    result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'SamplingMask', samplingMaskFile, 'Bundle', bundleFile);
     result.Log{end+1} = sprintf('Saved images to %s', imageFile);
+    if ~isempty(samplingMaskFile)
+        result.Log{end+1} = sprintf('Saved sampling mask to %s', samplingMaskFile);
+    end
     if ~isempty(mapFile)
         result.Log{end+1} = sprintf('Saved maps to %s', mapFile);
     end
@@ -134,18 +191,32 @@ end
 
 end
 
-function mask = buildThresholdMask(images)
-mask = [];
-if isempty(images)
+function refImg = buildMaskReferenceImageFromKspace(data)
+refImg = [];
+if isempty(data)
     return;
 end
 
-imgAbs = abs(double(images));
-if ndims(imgAbs) >= 4
-    % Estimate mask from the mean signal across the MRF time-series dimension.
-    refImg = mean(imgAbs, 4);
-else
-    refImg = imgAbs;
+kspaceMean = mean(double(data), 4);
+imgRef = ifftcn(kspaceMean, [1 2 3]);
+refImg = abs(imgRef);
+refImg(~isfinite(refImg)) = 0;
+end
+
+function mask = buildThresholdMask(referenceImage, images)
+mask = [];
+refImg = referenceImage;
+if isempty(refImg)
+    if isempty(images)
+        return;
+    end
+
+    imgAbs = abs(double(images));
+    if ndims(imgAbs) >= 4
+        refImg = mean(imgAbs, 4);
+    else
+        refImg = imgAbs;
+    end
 end
 
 finiteVals = refImg(isfinite(refImg));
@@ -153,7 +224,7 @@ if isempty(finiteVals)
     return;
 end
 
-threshold = 0.05 * max(finiteVals);
+threshold = computeOtsuThreshold(refImg);
 if ~isfinite(threshold) || threshold <= 0
     mask = false(size(refImg));
     return;
@@ -161,6 +232,32 @@ end
 
 mask = refImg > threshold;
 mask = logical(mask);
+end
+
+function threshold = computeOtsuThreshold(refImg)
+threshold = NaN;
+
+finiteVals = refImg(isfinite(refImg));
+if isempty(finiteVals)
+    return;
+end
+
+maxVal = max(finiteVals);
+if ~isfinite(maxVal) || maxVal <= 0
+    return;
+end
+
+imgNorm = refImg ./ maxVal;
+imgNorm(~isfinite(imgNorm)) = 0;
+imgNorm = max(0, min(1, imgNorm));
+
+if exist('graythresh', 'file') == 2
+    otsuNorm = graythresh(imgNorm(:));
+    threshold = otsuNorm * maxVal;
+else
+    % Conservative fallback if Image Processing Toolbox is unavailable.
+    threshold = 0.05 * maxVal;
+end
 end
 
 function parameterMaps = buildParameterMaps(matchRes)
