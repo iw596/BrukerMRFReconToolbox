@@ -28,6 +28,10 @@ classdef MRFViewer < handle
         GTMapNames = {}
         MRFMask = []
         GTMask = []
+        NativeMRFMask = []
+        NativeGTMask = []
+        ReferenceMask = []
+        ReferenceMaskPath = ''
         FlipAngles = []
         LastLoadDir = ''
         ReconResult = struct()
@@ -203,13 +207,16 @@ classdef MRFViewer < handle
 
             filename = fullfile(path,file);
 
-            [app.MRFData,app.MapNames,app.MRFMask] = app.readVolume(filename);
+            [app.MRFData,app.MapNames,loadedMask] = app.readVolume(filename);
 
             if isempty(app.MRFData)
                 return
             end
 
-            app.CurrentSlice = 1;
+            app.NativeMRFMask = loadedMask;
+            app.MRFMask = app.applyReferenceMaskToMask(app.NativeMRFMask, app.MRFData, 'MRF');
+
+            app.CurrentSlice = app.defaultSliceForData(app.MRFData);
             app.CurrentMap = 1;
 
             app.ViewerTabObj.configureSliceSlider();
@@ -278,9 +285,9 @@ classdef MRFViewer < handle
             if isempty(app.GTData)
                 app.GTData = data;
                 app.GTMapNames = mapNames;
-                app.GTMask = mask;
+                app.GTMask = app.applyReferenceMaskToMask(mask, app.GTData, 'Ground Truth');
                 if isempty(app.MRFData)
-                    app.CurrentSlice = 1;
+                    app.CurrentSlice = app.defaultSliceForData(app.GTData);
                     app.CurrentMap = 1;
                 end
             else
@@ -303,10 +310,13 @@ classdef MRFViewer < handle
 
                 if ~isempty(mask)
                     if isempty(app.GTMask)
-                        app.GTMask = mask;
+                        app.GTMask = app.applyReferenceMaskToMask(mask, app.GTData, 'Ground Truth');
                     elseif isequal(size(app.GTMask), size(mask))
-                        app.GTMask = logical(app.GTMask) | logical(mask);
+                        combinedMask = logical(app.GTMask) | logical(mask);
+                        app.GTMask = app.applyReferenceMaskToMask(combinedMask, app.GTData, 'Ground Truth');
                     end
+                elseif ~isempty(app.ReferenceMask)
+                    app.GTMask = app.applyReferenceMaskToMask(app.GTMask, app.GTData, 'Ground Truth');
                 end
             end
 
@@ -634,6 +644,194 @@ classdef MRFViewer < handle
             end
 
             app.ViewerTabObj.scrollSlices(event);
+        end
+
+        function loadReferenceMask(app)
+            % Load a reference mask and apply it to both MRF and GT masks.
+
+            [file,path] = uigetfile( ...
+                {'*.mat;*.nii;*.nii.gz', 'Mask files (*.mat, *.nii, *.nii.gz)'}, ...
+                'Select Reference Mask');
+
+            if isequal(file,0)
+                return
+            end
+
+            fullPath = fullfile(path, file);
+            try
+                mask = app.readMaskFile(fullPath);
+            catch ME
+                uialert(app.Fig, ['Could not load reference mask: ' ME.message], ...
+                    'Reference Mask Load Error', 'Icon', 'error');
+                return
+            end
+
+            app.ReferenceMask = logical(mask);
+            app.ReferenceMaskPath = fullPath;
+            app.LastLoadDir = path;
+
+            if ~isempty(app.MRFData)
+                app.MRFMask = app.applyReferenceMaskToMask(app.MRFMask, app.MRFData, 'MRF');
+            end
+            if ~isempty(app.GTData)
+                app.GTMask = app.applyReferenceMaskToMask(app.GTMask, app.GTData, 'Ground Truth');
+            end
+
+            if ~isempty(app.ViewerTabObj)
+                app.ViewerTabObj.refreshReferenceMaskStatus();
+                if ~isempty(app.MRFMask)
+                    app.ViewerTabObj.ApplyMRFMaskCheckbox.Enable = 'on';
+                end
+                if ~isempty(app.GTMask)
+                    app.ViewerTabObj.ApplyGTMaskCheckbox.Enable = 'on';
+                end
+                app.ViewerTabObj.updateDisplay();
+            end
+        end
+
+        function mask = readMaskFile(~, filePath)
+            [~,~,ext] = fileparts(filePath);
+            switch lower(ext)
+                case '.mat'
+                    S = load(filePath);
+                    names = fieldnames(S);
+                    if isempty(names)
+                        error('MAT file is empty.');
+                    end
+
+                    preferred = {'mask','samplingmask','ReferenceMask'};
+                    mask = [];
+                    for i = 1:numel(preferred)
+                        idx = find(strcmpi(names, preferred{i}), 1, 'first');
+                        if ~isempty(idx)
+                            candidate = S.(names{idx});
+                            if isnumeric(candidate) || islogical(candidate)
+                                mask = candidate;
+                                break
+                            end
+                        end
+                    end
+
+                    if isempty(mask)
+                        for i = 1:numel(names)
+                            candidate = S.(names{i});
+                            if isnumeric(candidate) || islogical(candidate)
+                                mask = candidate;
+                                break
+                            end
+                        end
+                    end
+
+                    if isempty(mask)
+                        error('No numeric mask variable found in MAT file.');
+                    end
+
+                case {'.nii', '.gz'}
+                    info = niftiinfo(filePath);
+                    mask = niftiread(info);
+
+                otherwise
+                    error('Unsupported mask format. Use MAT or NIfTI.');
+            end
+
+            if isempty(mask)
+                error('Loaded mask is empty.');
+            end
+            mask = logical(mask ~= 0);
+        end
+
+        function outMask = applyReferenceMaskToMask(app, baseMask, data, dataLabel)
+            outMask = baseMask;
+
+            if isempty(data)
+                return
+            end
+
+            dataSize3D = app.getSpatialSize3D(data);
+            if isempty(dataSize3D)
+                return
+            end
+
+            refMaskAligned = [];
+            if ~isempty(app.ReferenceMask)
+                refMaskAligned = app.alignMaskToData(app.ReferenceMask, dataSize3D, 'Reference mask');
+            end
+
+            if isempty(baseMask)
+                if ~isempty(refMaskAligned)
+                    outMask = refMaskAligned;
+                else
+                    outMask = [];
+                end
+                return
+            end
+
+            baseAligned = app.alignMaskToData(baseMask, dataSize3D, [dataLabel ' mask']);
+            if isempty(baseAligned)
+                outMask = refMaskAligned;
+                return
+            end
+
+            if isempty(refMaskAligned)
+                outMask = baseAligned;
+            else
+                outMask = logical(baseAligned) & logical(refMaskAligned);
+            end
+        end
+
+        function maskAligned = alignMaskToData(app, mask, dataSize3D, maskLabel)
+            maskAligned = [];
+            if isempty(mask)
+                return
+            end
+
+            sz = size(mask);
+            sz(end+1:3) = 1;
+            target = dataSize3D;
+
+            if ~isequal(sz(1:2), target(1:2))
+                uialert(app.Fig, sprintf('%s size mismatch: mask is %dx%d but data is %dx%d.', ...
+                    maskLabel, sz(1), sz(2), target(1), target(2)), ...
+                    'Mask Size Mismatch', 'Icon', 'error');
+                return
+            end
+
+            if sz(3) == target(3)
+                maskAligned = logical(mask(:,:,1:target(3)));
+            elseif sz(3) == 1 && target(3) > 1
+                maskAligned = repmat(logical(mask(:,:,1)), 1, 1, target(3));
+            elseif target(3) == 1 && sz(3) > 1
+                maskAligned = logical(any(mask, 3));
+            else
+                uialert(app.Fig, sprintf('%s slice mismatch: mask has %d slices but data has %d slices.', ...
+                    maskLabel, sz(3), target(3)), ...
+                    'Mask Slice Mismatch', 'Icon', 'error');
+                return
+            end
+        end
+
+        function sz3 = getSpatialSize3D(~, data)
+            sz = size(data);
+            if isempty(sz)
+                sz3 = [];
+                return
+            end
+            sz(end+1:3) = 1;
+            sz3 = double(sz(1:3));
+        end
+
+        function sliceIdx = defaultSliceForData(~, data)
+            sz = size(data);
+            if numel(sz) < 3
+                sliceIdx = 1;
+                return
+            end
+            nSlices = max(1, round(double(sz(3))));
+            if nSlices > 1
+                sliceIdx = ceil(nSlices / 2);
+            else
+                sliceIdx = 1;
+            end
         end
 
         %% ============================================================

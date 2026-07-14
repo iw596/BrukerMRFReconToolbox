@@ -12,6 +12,8 @@ classdef ViewerTab < handle
         LoadGTButton
         ClearGTButton
         ClearMRFButton
+        LoadReferenceMaskButton
+        ReferenceMaskInfoLabel
         SliceSlider
         SliceLabel
 
@@ -98,6 +100,17 @@ classdef ViewerTab < handle
                 'ButtonPushedFcn',...
                 @(src,event)obj.Parent.clearMRF(),...
                 'Tooltip','Clear all loaded MRF maps');
+
+            obj.LoadReferenceMaskButton = uibutton(obj.TabHandle,...
+                'Text','Load Ref Mask',...
+                'Position',[560 620 120 30],...
+                'ButtonPushedFcn',...
+                @(src,event)obj.Parent.loadReferenceMask(),...
+                'Tooltip','Load a reference mask to apply to both MRF and GT');
+
+            obj.ReferenceMaskInfoLabel = uilabel(obj.TabHandle,...
+                'Position',[20 588 300 22],...
+                'Text','Ref mask: none');
 
             % ---------------------------------------------------------
             % Map selector
@@ -272,6 +285,8 @@ classdef ViewerTab < handle
             obj.InfoLabel = uilabel(obj.TabHandle,...
                 'Position',[50 40 1200 40],...
                 'Text','No data loaded');
+
+            obj.refreshReferenceMaskStatus();
         end
 
         function resizeUI(obj, figPos)
@@ -296,6 +311,8 @@ classdef ViewerTab < handle
                 obj.LoadGTButton.Position = [150 primaryRowY 140 30];
                 obj.ClearGTButton.Position = [300 primaryRowY 95 30];
                 obj.ClearMRFButton.Position = [405 primaryRowY 95 30];
+                obj.LoadReferenceMaskButton.Position = [510 primaryRowY 120 30];
+                obj.ReferenceMaskInfoLabel.Position = [20 secondaryRowY+5 300 22];
 
                 obj.MapLabel.Position = [520 secondaryRowY+5 40 25];
                 obj.MapDropdown.Position = [560 secondaryRowY 120 30];
@@ -313,15 +330,17 @@ classdef ViewerTab < handle
                 obj.LoadGTButton.Position = [160 primaryRowY 140 30];
                 obj.ClearGTButton.Position = [320 primaryRowY 100 30];
                 obj.ClearMRFButton.Position = [430 primaryRowY 100 30];
+                obj.LoadReferenceMaskButton.Position = [540 primaryRowY 120 30];
+                obj.ReferenceMaskInfoLabel.Position = [20 maskRowY+3 300 22];
 
-                obj.MapLabel.Position = [540 primaryRowY+5 40 25];
-                obj.MapDropdown.Position = [580 primaryRowY 120 30];
-                obj.ColorScaleModeLabel.Position = [710 primaryRowY+5 75 25];
-                obj.ColorScaleModeDropdown.Position = [785 primaryRowY 85 30];
-                obj.ColorScaleMinLabel.Position = [880 primaryRowY+5 30 25];
-                obj.ColorScaleMinField.Position = [915 primaryRowY 70 30];
-                obj.ColorScaleMaxLabel.Position = [995 primaryRowY+5 35 25];
-                obj.ColorScaleMaxField.Position = [1035 primaryRowY 70 30];
+                obj.MapLabel.Position = [680 primaryRowY+5 40 25];
+                obj.MapDropdown.Position = [720 primaryRowY 120 30];
+                obj.ColorScaleModeLabel.Position = [850 primaryRowY+5 75 25];
+                obj.ColorScaleModeDropdown.Position = [925 primaryRowY 85 30];
+                obj.ColorScaleMinLabel.Position = [1020 primaryRowY+5 30 25];
+                obj.ColorScaleMinField.Position = [1055 primaryRowY 70 30];
+                obj.ColorScaleMaxLabel.Position = [1135 primaryRowY+5 35 25];
+                obj.ColorScaleMaxField.Position = [1175 primaryRowY 70 30];
             end
 
             contentTopY = maskRowY - 10;
@@ -868,12 +887,15 @@ classdef ViewerTab < handle
                 obj.SliceSlider.Limits = [1 2];
                 obj.SliceSlider.Value = 1;
                 obj.SliceSlider.Enable = 'off';
+                obj.Parent.CurrentSlice = 1;
             else
                 obj.SliceSlider.Limits = [1 nSlices];
-                obj.SliceSlider.Value = 1;
+                centerSlice = ceil(nSlices / 2);
+                obj.Parent.CurrentSlice = centerSlice;
+                obj.SliceSlider.Value = centerSlice;
                 obj.SliceSlider.Enable = 'on';
             end
-            obj.SliceLabel.Text = 'Slice: 1';
+            obj.SliceLabel.Text = sprintf('Slice: %d', obj.Parent.CurrentSlice);
 
             % Enable mask checkboxes if masks are present
             if ~isempty(obj.Parent.MRFMask)
@@ -881,6 +903,13 @@ classdef ViewerTab < handle
             else
                 obj.ApplyMRFMaskCheckbox.Enable = 'off';
                 obj.ApplyMRFMaskCheckbox.Value = false;
+            end
+
+            if ~isempty(obj.Parent.GTMask)
+                obj.ApplyGTMaskCheckbox.Enable = 'on';
+            else
+                obj.ApplyGTMaskCheckbox.Enable = 'off';
+                obj.ApplyGTMaskCheckbox.Value = false;
             end
 
         end
@@ -924,6 +953,27 @@ classdef ViewerTab < handle
             obj.Parent.CurrentMap = currentIdx;
             obj.MapDropdown.Value = items{currentIdx};
 
+        end
+
+        function refreshReferenceMaskStatus(obj)
+            if isempty(obj.Parent) || ~isvalid(obj.Parent)
+                return
+            end
+
+            if isempty(obj.Parent.ReferenceMask)
+                obj.ReferenceMaskInfoLabel.Text = 'Ref mask: none';
+                return
+            end
+
+            sz = size(obj.Parent.ReferenceMask);
+            szText = strjoin(arrayfun(@num2str, sz, 'UniformOutput', false), ' x ');
+
+            labelText = ['Ref mask: loaded (' szText ')'];
+            if isprop(obj.Parent, 'ReferenceMaskPath') && ~isempty(obj.Parent.ReferenceMaskPath)
+                [~,name,ext] = fileparts(obj.Parent.ReferenceMaskPath);
+                labelText = ['Ref mask: ' name ext ' (' szText ')'];
+            end
+            obj.ReferenceMaskInfoLabel.Text = labelText;
         end
 
         % ============================================================
