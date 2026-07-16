@@ -3,7 +3,18 @@
 % theta (radians) and dw0 (FM waveform scaling radian/s)
 
 % This code is a matlab conversion from https://sigpy.readthedocs.io/en/latest/_modules/sigpy/mri/rf/adiabatic.html#bir4
+
+
+
 function [a,om] = GenBIR4(n,beta,kappa,theta,dw0)
+
+
+% n number of time points
+% beta AM waveform parameter
+% kappa FM waveform parameter
+% alpha flip angle [radians]
+% dphi phase tuning [rad]
+
 
 dphi = pi + theta / 2;
 
