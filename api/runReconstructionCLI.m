@@ -71,7 +71,14 @@ if strcmpi(settings.ReconstructionTarget, 'MRF') && isempty(settings.DictionaryP
         'DictionaryPath is required when ReconstructionTarget is MRF.');
 end
 
-result = runMRFReconstruction(MRFParams, settings, runtimeOptions);
+if strcmpi(settings.ReconstructionTarget, 'MRF')
+    result = runMRFReconstruction(MRFParams, settings, runtimeOptions);
+
+elseif strcmpi(settings.ReconstructionTarget, 'T1')
+    disp("Running T1 reconstruction....")
+    result = runT1FittingReconstruction();
+
+end
 end
 
 function options = parseOptions(varargin)
