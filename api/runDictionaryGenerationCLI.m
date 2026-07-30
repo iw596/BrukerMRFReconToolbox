@@ -44,7 +44,7 @@ fprintf('DictionaryGenerationCLI: starting with %d T1, %d T2, %d B1 values.\n', 
 tic;
 [dict, LUT] = SimulateFISPMRF( ...
     params, prepList, T1Values, T2Values, B1Values, ...
-    options.RasterTime_us, options.NIsochromats, options.InstantInversion, progressFcn);
+    options.RasterTime_us, options.NIsochromats, options.InstantInversion, progressFcn);  % Simulation runs here
 elapsedSec = toc;
 
 result = struct();
