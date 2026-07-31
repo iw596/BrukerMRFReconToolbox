@@ -753,6 +753,38 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.CartPE2 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
     end
 
+    % Find the PVM_EncSteps1 entry
+    idx = find(contains(TextAsCells,'$PVM_EncSteps1='),1);
+
+    if isempty(idx)
+        error('PVM_EncSteps1 not found in method file.');
+    end
+
+    entry = TextAsCells{idx};
+
+    % Extract the number of encoding steps
+    nSteps = sscanf(entry,'$PVM_EncSteps1=( %d )',1);
+
+    % Extract everything after the closing parenthesis
+    tokens = regexp(entry,'\)\s*(.*)','tokens','once');
+
+    if isempty(tokens)
+        error('Could not parse PVM_EncSteps1 values.');
+    end
+
+    % Convert all numbers to a vector
+    EncSteps1 = sscanf(tokens{1},'%f');
+
+    % Check that the correct number of values was read
+    if numel(EncSteps1) ~= nSteps
+        error('Expected %d encoding steps, but read %d.', ...
+            nSteps, numel(EncSteps1));
+    end
+
+    % Convert to row vector (optional)
+    params.EncSteps1 = EncSteps1.';
+
+
     %% Load imaging data if required
     if (loadDataFlag == true)
         fileName = strcat(path,'/','rawdata.job0');
