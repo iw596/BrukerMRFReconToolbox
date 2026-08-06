@@ -1,4 +1,12 @@
-function [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle)
+function [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle, saveImages, saveMaps)
+% saveImages and saveMaps are optional booleans (default true each).
+if nargin < 5 || isempty(saveImages)
+    saveImages = true;
+end
+if nargin < 6 || isempty(saveMaps)
+    saveMaps = true;
+end
+
 [saveFolder, saveStem, ~] = fileparts(saveBasePath);
 if isempty(saveFolder)
     saveFolder = pwd;
@@ -7,31 +15,35 @@ if isempty(saveStem)
     saveStem = ['mrf_recon_' datestr(now, 'yyyymmdd_HHMMSS')];
 end
 
-imageFile = fullfile(saveFolder, [saveStem '_images.mat']);
+imageFile = '';
 mapFile = '';
 samplingMaskFile = '';
 bundleFile = '';
 
-images = [];
-samplingmask = [];
 mask = [];
-if isfield(result, 'images')
-    images = result.images;
-end
-if isfield(result, 'samplingmask')
-    samplingmask = result.samplingmask;
-end
 if isfield(result, 'mask') && ~isempty(result.mask)
     mask = logical(result.mask);
 end
-save(imageFile, 'images', 'samplingmask', 'mask', '-v7.3');
 
-if ~isempty(samplingmask)
-    samplingMaskFile = fullfile(saveFolder, [saveStem '_samplingmask.mat']);
-    save(samplingMaskFile, 'samplingmask', '-v7.3');
+if saveImages
+    imageFile = fullfile(saveFolder, [saveStem '_images.mat']);
+    images = [];
+    samplingmask = [];
+    if isfield(result, 'images')
+        images = result.images;
+    end
+    if isfield(result, 'samplingmask')
+        samplingmask = result.samplingmask;
+    end
+    save(imageFile, 'images', 'samplingmask', 'mask', '-v7.3');
+
+    if ~isempty(samplingmask)
+        samplingMaskFile = fullfile(saveFolder, [saveStem '_samplingmask.mat']);
+        save(samplingMaskFile, 'samplingmask', '-v7.3');
+    end
 end
 
-if isfield(result, 'ParameterMaps') && ~isempty(result.ParameterMaps)
+if saveMaps && isfield(result, 'ParameterMaps') && ~isempty(result.ParameterMaps)
     mapFile = fullfile(saveFolder, [saveStem '_maps.mat']);
     maps = result.ParameterMaps;
     if ~isempty(mask)

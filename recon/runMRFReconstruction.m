@@ -175,9 +175,13 @@ if logical(getfield_default(settings, 'SaveOutputs', false))
         saveBasePath = fullfile(pwd, ['mrf_recon_' datestr(now, 'yyyymmdd_HHMMSS')]);
     end
     saveBundle = logical(getfield_default(settings, 'SaveResultBundle', false));
-    [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle);
+    saveImages = logical(getfield_default(settings, 'SaveImages', true));
+    saveMaps = logical(getfield_default(settings, 'SaveMaps', true));
+    [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settings, saveBundle, saveImages, saveMaps);
     result.OutputFiles = struct('Images', imageFile, 'Maps', mapFile, 'SamplingMask', samplingMaskFile, 'Bundle', bundleFile);
-    result.Log{end+1} = sprintf('Saved images to %s', imageFile);
+    if ~isempty(imageFile)
+        result.Log{end+1} = sprintf('Saved images to %s', imageFile);
+    end
     if ~isempty(samplingMaskFile)
         result.Log{end+1} = sprintf('Saved sampling mask to %s', samplingMaskFile);
     end

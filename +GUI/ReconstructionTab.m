@@ -44,7 +44,8 @@ classdef ReconstructionTab < handle
         B1MapInfoLabel
         OpenReconImagesButton
         PostReconMaskButton
-        SaveOutputsCheckbox
+        SaveImagesCheckbox
+        SaveMapsCheckbox
         SaveBundleCheckbox
         SaveOutputsButton
         SaveLastResultButton
@@ -183,23 +184,29 @@ classdef ReconstructionTab < handle
                 'ButtonPushedFcn', @(~,~) obj.openPostReconMaskTool(), ...
                 'Tooltip', 'Open post-reconstruction mask generator with threshold controls');
 
-            obj.SaveOutputsCheckbox = uicheckbox(obj.TabHandle, ...
-                'Text', 'Save images + maps', ...
+            obj.SaveImagesCheckbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Save images', ...
                 'Value', false, ...
-                'Position', [820 550 180 22], ...
+                'Position', [820 550 140 22], ...
                 'ValueChangedFcn', @(~,~) obj.updateSaveOptionsUI(), ...
-                'Tooltip', sprintf(['Save separate output files using one shared base name:\n' ...
-                '  <base>_images.mat : reconstructed images + sampling mask\n' ...
-                '  <base>_maps.mat   : parameter maps (T1/T2/B1/Index when available) + matching struct\n' ...
-                'Use "Select Save Base Name" to choose <base>.']));
+                'Tooltip', sprintf(['Save reconstructed image series to:\n' ...
+                '  <base>_images.mat  (images + sampling mask)']));
+
+            obj.SaveMapsCheckbox = uicheckbox(obj.TabHandle, ...
+                'Text', 'Save maps', ...
+                'Value', false, ...
+                'Position', [965 550 130 22], ...
+                'ValueChangedFcn', @(~,~) obj.updateSaveOptionsUI(), ...
+                'Tooltip', sprintf(['Save parameter maps to:\n' ...
+                '  <base>_maps.mat  (T1/T2/B1/Index + matching struct)']));
 
             obj.SaveBundleCheckbox = uicheckbox(obj.TabHandle, ...
                 'Text', 'Also save recon bundle', ...
                 'Value', false, ...
-                'Position', [1005 550 190 22], ...
+                'Position', [1100 550 190 22], ...
                 'Enable', 'off', ...
                 'ValueChangedFcn', @(~,~) obj.updateSaveOptionsUI(), ...
-                'Tooltip', sprintf(['Optional metadata file (saved only when "Save images + maps" is enabled):\n' ...
+                'Tooltip', sprintf(['Optional metadata file (saved only when saving is enabled):\n' ...
                 '  <base>_recon_result.mat\n' ...
                 'What it includes:\n' ...
                 '  - Reconstruction settings used for this run\n' ...
@@ -372,7 +379,7 @@ classdef ReconstructionTab < handle
                 return;
             end
 
-            saveRequested = logical(obj.SaveOutputsCheckbox.Value) || logical(obj.SaveBundleCheckbox.Value);
+            saveRequested = logical(obj.SaveImagesCheckbox.Value) || logical(obj.SaveMapsCheckbox.Value) || logical(obj.SaveBundleCheckbox.Value);
             hasSaveBasePath = isfield(obj.ReconSettings, 'SaveBasePath') && ~isempty(obj.ReconSettings.SaveBasePath);
             if saveRequested && ~hasSaveBasePath
                 obj.selectSaveBasePath();
@@ -488,7 +495,9 @@ classdef ReconstructionTab < handle
             if isfield(obj.ReconSettings, 'DictionaryPath')
                 settings.DictionaryPath = obj.ReconSettings.DictionaryPath;
             end
-            settings.SaveOutputs = logical(obj.SaveOutputsCheckbox.Value);
+            settings.SaveImages = logical(obj.SaveImagesCheckbox.Value);
+            settings.SaveMaps = logical(obj.SaveMapsCheckbox.Value);
+            settings.SaveOutputs = settings.SaveImages || settings.SaveMaps;
             settings.SaveResultBundle = logical(obj.SaveBundleCheckbox.Value);
             settings.ParallelMatching = logical(obj.ParallelProcessingCheckbox.Value);
             settings.SaveComplexM0 = logical(obj.SaveComplexM0Checkbox.Value);
@@ -832,8 +841,9 @@ classdef ReconstructionTab < handle
             obj.B1MapInfoLabel.Position = [rightX + 155 yTop-92 max(140, tabW - (rightX + 155) - margin) 22];
             obj.OpenReconImagesButton.Position = [rightX yTop-120 180 30];
             obj.PostReconMaskButton.Position = [rightX + 190 yTop-120 180 30];
-            obj.SaveOutputsCheckbox.Position = [rightX yTop-148 180 22];
-            obj.SaveBundleCheckbox.Position = [rightX + 185 yTop-148 190 22];
+            obj.SaveImagesCheckbox.Position = [rightX yTop-148 140 22];
+            obj.SaveMapsCheckbox.Position = [rightX + 145 yTop-148 120 22];
+            obj.SaveBundleCheckbox.Position = [rightX + 270 yTop-148 190 22];
             obj.SaveOutputsButton.Position = [rightX yTop-176 180 26];
             obj.SaveLastResultButton.Position = [rightX + 190 yTop-176 180 26];
             obj.SaveOutputsInfoLabel.Position = [rightX yTop-214 max(320, tabW - rightX - margin) 22];
@@ -984,9 +994,9 @@ classdef ReconstructionTab < handle
         end
 
         function updateSaveOptionsUI(obj)
-            saveOutputsEnabled = logical(obj.SaveOutputsCheckbox.Value);
+            anySaveEnabled = logical(obj.SaveImagesCheckbox.Value) || logical(obj.SaveMapsCheckbox.Value);
 
-            if saveOutputsEnabled
+            if anySaveEnabled
                 obj.SaveBundleCheckbox.Enable = 'on';
             else
                 obj.SaveBundleCheckbox.Value = false;
@@ -1054,10 +1064,12 @@ classdef ReconstructionTab < handle
             result = obj.ReconSettings.LastResult;
             settingsForBundle = obj.ReconSettings;
 
-            saveBundle = logical(obj.SaveBundleCheckbox.Value) && logical(obj.SaveOutputsCheckbox.Value);
+            saveImages = logical(obj.SaveImagesCheckbox.Value);
+            saveMaps = logical(obj.SaveMapsCheckbox.Value);
+            saveBundle = logical(obj.SaveBundleCheckbox.Value) && (saveImages || saveMaps);
 
             try
-                [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settingsForBundle, saveBundle);
+                [imageFile, mapFile, samplingMaskFile, bundleFile] = saveResultOutputs(result, saveBasePath, settingsForBundle, saveBundle, saveImages, saveMaps);
             catch ME
                 obj.showAlert(['Could not save last result: ' ME.message], ...
                     'Save Error', 'error');

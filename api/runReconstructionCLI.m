@@ -18,7 +18,7 @@ function result = runReconstructionCLI(inputSource, varargin)
 %   ReconstructionTarget, MRFReconMode, RegularizationMode, RegularizationModes, EstimateMask,
 %   DictionaryPath, ParallelMatching, SaveComplexM0, EstimateB1Map, B1Map,
 %   Dimensionality, Lambda, BlockSize, Stride, OuterIterations,
-%   InnerIterations, Rho, SubspaceComponentRetentionPct, SaveOutputs, SaveResultBundle, SaveBasePath,
+%   InnerIterations, Rho, SubspaceComponentRetentionPct, SaveOutputs, SaveImages, SaveMaps, SaveResultBundle, SaveBasePath,
 %   ShowProgress, MatchingProgressUpdateInterval, T1FittingProgressUpdateInterval,
 %   LoadData
 
@@ -46,6 +46,8 @@ settings.InnerIterations = round(options.InnerIterations);
 settings.Rho = options.Rho;
 settings.SubspaceComponentRetentionPct = options.SubspaceComponentRetentionPct;
 settings.SaveOutputs = logical(options.SaveOutputs);
+settings.SaveImages = logical(options.SaveImages);
+settings.SaveMaps = logical(options.SaveMaps);
 settings.SaveResultBundle = logical(options.SaveResultBundle);
 settings.SaveBasePath = char(options.SaveBasePath);
 settings.MethodParams = MRFParams;
@@ -103,6 +105,8 @@ defaults.InnerIterations = 5;
 defaults.Rho = 1;
 defaults.SubspaceComponentRetentionPct = 100;
 defaults.SaveOutputs = false;
+defaults.SaveImages = true;
+defaults.SaveMaps = true;
 defaults.SaveResultBundle = false;
 defaults.SaveBasePath = "";
 defaults.ShowProgress = true;
@@ -170,6 +174,8 @@ options.InnerIterations = double(options.InnerIterations);
 options.Rho = double(options.Rho);
 options.SubspaceComponentRetentionPct = double(options.SubspaceComponentRetentionPct);
 options.SaveOutputs = logical(options.SaveOutputs);
+options.SaveImages = logical(options.SaveImages);
+options.SaveMaps = logical(options.SaveMaps);
 options.SaveResultBundle = logical(options.SaveResultBundle);
 options.MatchingProgressUpdateInterval = double(options.MatchingProgressUpdateInterval);
 options.T1FittingProgressUpdateInterval = double(options.T1FittingProgressUpdateInterval);
