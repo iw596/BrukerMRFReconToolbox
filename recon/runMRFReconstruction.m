@@ -34,17 +34,30 @@ else
         result = runDirectMRFReconstruction(data,context, geometry);
     else
         %% Sub-space recon pathway
-        result = runADMMReconstruction(context, geometry, regularizer, data);
+        [iterData, scalingInfo] = scaleMRFReconData(data, context);
+        result = runADMMReconstruction(context, geometry, regularizer, iterData);
+
+        if isfield(result, 'images') && ~isempty(result.images)
+            result.images = unscaleMRFReconImages(result.images, scalingInfo);
+            result.Image = result.images;
+        end
+
+        result.Scaling = scalingInfo;
+        if isfield(scalingInfo, 'Message') && ~isempty(scalingInfo.Message)
+            result.Log{end+1} = char(scalingInfo.Message);
+        end
 
         nTemporalFrames = size(data, 4);
         retentionPct = context.SubspaceComponentRetentionPct;
         nRetainedComponents = max(1, min(nTemporalFrames, ceil((retentionPct / 100) * nTemporalFrames)));
         result.SubspaceTotalComponents = nTemporalFrames;
         result.SubspaceRetainedComponents = nRetainedComponents;
+        result.SubspaceImageCount = nRetainedComponents;
         result.SubspaceComponentRetentionPct = retentionPct;
         result.Log{end+1} = sprintf('Selected regularizer(s): %s.', char(strjoin(context.RegularizationModes, ', ')));
         result.Log{end+1} = sprintf('Subspace retention set to %.2f%%%% (%d/%d components).', ...
             retentionPct, nRetainedComponents, nTemporalFrames);
+        result.Log{end+1} = sprintf('Sub-space images retained: %d.', nRetainedComponents);
     end
 end
 if isempty(result) || ~isstruct(result)
