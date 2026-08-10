@@ -1,5 +1,5 @@
 %% Matlabclone of the python based SIGPY bir4 function
-function [outputArg1,outputArg2] = bir4_clone(n,beta,kappa,theta,dw0)
+function [a, om] = bir4_clone(n,beta,kappa,theta,dw0)
 % Design a BIR-4 adiabatic pulse.
 %
 % BIR-4 is equivalent to two BIR-1 pulses back-to-back.
@@ -23,9 +23,25 @@ function [outputArg1,outputArg2] = bir4_clone(n,beta,kappa,theta,dw0)
 
 
 dphi = pi+theta/2;
+dphi = pi + theta / 2;
+t = (0:n-1).' / n;
 
-outputArg1 = inputArg1;
-outputArg2 = inputArg2;
+q = n/4;
+a1 = tanh(beta * (1 - 4 * t(1:q)));
+a2 = tanh(beta * (4 * t(q+1:2*q) - 1));
+a3 = tanh(beta * (3 - 4 * t(2*q+1:3*q)));
+a4 = tanh(beta * (4 * t(3*q+1:n) - 3));
+
+a = [a1; a2; a3; a4];
+a = complex(a, 0);
+a(q+1:3*q) = a(q+1:3*q) .* exp(1i * dphi);
+
+om1 = dw0 * tan(kappa * 4 * t(1:q)) / tan(kappa);
+om2 = dw0 * tan(kappa * (4 * t(q+1:2*q) - 2)) / tan(kappa);
+om3 = dw0 * tan(kappa * (4 * t(2*q+1:3*q) - 2)) / tan(kappa);
+om4 = dw0 * tan(kappa * (4 * t(3*q+1:n) - 4)) / tan(kappa);
+
+om = [om1; om2; om3; om4];
 
 
 end
