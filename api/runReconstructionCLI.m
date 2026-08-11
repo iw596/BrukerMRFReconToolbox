@@ -17,8 +17,9 @@ function result = runReconstructionCLI(inputSource, varargin)
 % options fields:
 %   ReconstructionTarget, MRFReconMode, RegularizationMode, RegularizationModes, EstimateMask,
 %   DictionaryPath, ParallelMatching, SaveComplexM0, EstimateB1Map, B1Map,
-%   Dimensionality, Lambda, BlockSize, Stride, OuterIterations,
+%   Dimensionality, Lambda, RegularizationWeights, BlockSize, Stride, OuterIterations,
 %   InnerIterations, Rho, SubspaceComponentRetentionPct, SaveOutputs, SaveImages, SaveMaps, SaveResultBundle, SaveBasePath,
+%   DataScalingMode, DataScalingPercentile, DataScalingFactor,
 %   ShowProgress, MatchingProgressUpdateInterval, T1FittingProgressUpdateInterval,
 %   LoadData
 
@@ -31,6 +32,7 @@ settings.ReconstructionTarget = char(options.ReconstructionTarget);
 settings.MRFReconMode = char(options.MRFReconMode);
 settings.RegularizationMode = options.RegularizationMode;
 settings.RegularizationModes = options.RegularizationModes;
+settings.RegularizationWeights = options.RegularizationWeights;
 settings.EstimateMask = logical(options.EstimateMask);
 settings.DictionaryPath = char(options.DictionaryPath);
 settings.ParallelMatching = logical(options.ParallelMatching);
@@ -44,6 +46,9 @@ settings.Stride = round(options.Stride);
 settings.OuterIterations = round(options.OuterIterations);
 settings.InnerIterations = round(options.InnerIterations);
 settings.Rho = options.Rho;
+settings.DataScalingMode = char(options.DataScalingMode);
+settings.DataScalingPercentile = options.DataScalingPercentile;
+settings.DataScalingFactor = options.DataScalingFactor;
 settings.SubspaceComponentRetentionPct = options.SubspaceComponentRetentionPct;
 settings.SaveOutputs = logical(options.SaveOutputs);
 settings.SaveImages = logical(options.SaveImages);
@@ -76,6 +81,14 @@ end
 if strcmpi(settings.ReconstructionTarget, 'MRF')
     result = runMRFReconstruction(MRFParams, settings, runtimeOptions);
 
+    if isfield(result, 'SubspaceRetainedComponents') && isfield(result, 'SubspaceTotalComponents') && ...
+            ~isempty(result.SubspaceRetainedComponents) && ~isempty(result.SubspaceTotalComponents)
+        fprintf('Sub-space images retained: %d/%d\n', ...
+            result.SubspaceRetainedComponents, result.SubspaceTotalComponents);
+    elseif isfield(result, 'SubspaceImageCount') && ~isempty(result.SubspaceImageCount)
+        fprintf('Sub-space images retained: %d\n', result.SubspaceImageCount);
+    end
+
 elseif strcmpi(settings.ReconstructionTarget, 'T1')
     disp("Running T1 reconstruction....")
     result = runT1FittingReconstruction();
@@ -89,6 +102,7 @@ defaults.ReconstructionTarget = "MRF";
 defaults.MRFReconMode = "Direct";
 defaults.RegularizationMode = "Locally-low rank";
 defaults.RegularizationModes = [];
+defaults.RegularizationWeights = [];
 defaults.EstimateMask = false;
 defaults.DictionaryPath = "";
 defaults.ParallelMatching = false;
@@ -103,6 +117,9 @@ defaults.Stride = 4;
 defaults.OuterIterations = 10;
 defaults.InnerIterations = 5;
 defaults.Rho = 1;
+defaults.DataScalingMode = "off";
+defaults.DataScalingPercentile = 99;
+defaults.DataScalingFactor = NaN;
 defaults.SubspaceComponentRetentionPct = 100;
 defaults.SaveOutputs = false;
 defaults.SaveImages = true;
@@ -160,6 +177,7 @@ options.RegularizationMode = options.RegularizationModes(1);
 options.DictionaryPath = string(options.DictionaryPath);
 options.B1CorrectionMode = string(options.B1CorrectionMode);
 options.Dimensionality = string(options.Dimensionality);
+options.DataScalingMode = string(options.DataScalingMode);
 options.SaveBasePath = string(options.SaveBasePath);
 options.ShowProgress = logical(options.ShowProgress);
 options.EstimateMask = logical(options.EstimateMask);
@@ -172,6 +190,8 @@ options.Stride = double(options.Stride);
 options.OuterIterations = double(options.OuterIterations);
 options.InnerIterations = double(options.InnerIterations);
 options.Rho = double(options.Rho);
+options.DataScalingPercentile = double(options.DataScalingPercentile);
+options.DataScalingFactor = double(options.DataScalingFactor);
 options.SubspaceComponentRetentionPct = double(options.SubspaceComponentRetentionPct);
 options.SaveOutputs = logical(options.SaveOutputs);
 options.SaveImages = logical(options.SaveImages);
@@ -180,6 +200,12 @@ options.SaveResultBundle = logical(options.SaveResultBundle);
 options.MatchingProgressUpdateInterval = double(options.MatchingProgressUpdateInterval);
 options.T1FittingProgressUpdateInterval = double(options.T1FittingProgressUpdateInterval);
 options.LoadData = logical(options.LoadData);
+
+if isempty(options.RegularizationWeights)
+    options.RegularizationWeights = [];
+else
+    options.RegularizationWeights = double(options.RegularizationWeights(:));
+end
 end
 
 function regModes = normalizeRegularizationModes(rawModes)

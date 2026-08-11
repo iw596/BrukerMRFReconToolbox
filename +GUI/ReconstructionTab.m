@@ -22,6 +22,8 @@ classdef ReconstructionTab < handle
         ReconTargetDropdown
         LambdaLabel
         LambdaEdit
+        RegularizationWeightsLabel
+        RegularizationWeightsEdit
         BlockSizeLabel
         BlockSizeEdit
         StrideLabel
@@ -32,6 +34,12 @@ classdef ReconstructionTab < handle
         InnerIterationsEdit
         RhoLabel
         RhoEdit
+        DataScalingModeLabel
+        DataScalingModeDropdown
+        DataScalingPercentileLabel
+        DataScalingPercentileEdit
+        DataScalingFactorLabel
+        DataScalingFactorEdit
         EstimateMaskCheckbox
         DataInfoLabel
         DataInfoTextArea
@@ -262,6 +270,14 @@ classdef ReconstructionTab < handle
                 'Position', [160 510 180 22], ...
                 'Tooltip', 'Regularization strength (must be > 0)');
 
+            obj.RegularizationWeightsLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Reg weights', ...
+                'Position', [20 488 130 22]);
+            obj.RegularizationWeightsEdit = uieditfield(obj.TabHandle, 'text', ...
+                'Value', '1', ...
+                'Position', [160 488 180 22], ...
+                'Tooltip', 'Regularization weights. Use one value or one per selected mode, e.g. 1 or 1,0.5,0.3');
+
             obj.BlockSizeLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Block size', ...
                 'Position', [20 478 130 22]);
@@ -312,6 +328,37 @@ classdef ReconstructionTab < handle
                 'Position', [160 350 180 22], ...
                 'Tooltip', 'ADMM penalty parameter (must be > 0)');
 
+            obj.DataScalingModeLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Data scaling', ...
+                'Position', [20 328 130 22]);
+            obj.DataScalingModeDropdown = uidropdown(obj.TabHandle, ...
+                'Items', {'off', 'global', 'per-frame', 'manual'}, ...
+                'Value', 'off', ...
+                'Position', [160 328 180 22], ...
+                'ValueChangedFcn', @(~,~) obj.updateScalingModeUI(), ...
+                'Tooltip', 'Scale reconstruction data before iterative solve');
+
+            obj.DataScalingPercentileLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Scale percentile', ...
+                'Position', [20 296 130 22]);
+            obj.DataScalingPercentileEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 99, ...
+                'Limits', [50 100], ...
+                'Position', [160 296 180 22], ...
+                'Tooltip', 'Percentile used for robust scaling in global/per-frame modes');
+
+            obj.DataScalingFactorLabel = uilabel(obj.TabHandle, ...
+                'Text', 'Manual scale', ...
+                'Position', [20 264 130 22], ...
+                'Visible', 'off');
+            obj.DataScalingFactorEdit = uieditfield(obj.TabHandle, 'numeric', ...
+                'Value', 1, ...
+                'Limits', [0 Inf], ...
+                'LowerLimitInclusive', false, ...
+                'Position', [160 264 180 22], ...
+                'Visible', 'off', ...
+                'Tooltip', 'Manual scaling factor for Data scaling = manual');
+
             obj.SubspaceRetentionLabel = uilabel(obj.TabHandle, ...
                 'Text', 'Subspace retain (%)', ...
                 'Position', [20 318 130 22]);
@@ -344,6 +391,7 @@ classdef ReconstructionTab < handle
             obj.updateRegularizationModeUI();
             obj.updateReconTargetUI();
             obj.updateMRFReconModeUI();
+            obj.updateScalingModeUI();
             obj.updateB1CorrectionUI();
             obj.updateSaveOptionsUI();
             obj.resizeUI([]);
@@ -366,6 +414,10 @@ classdef ReconstructionTab < handle
             outerIterations = obj.OuterIterationsEdit.Value;
             innerIterations = obj.InnerIterationsEdit.Value;
             rho = obj.RhoEdit.Value;
+            regularizationWeightsRaw = obj.RegularizationWeightsEdit.Value;
+            dataScalingMode = char(string(obj.DataScalingModeDropdown.Value));
+            dataScalingPercentile = obj.DataScalingPercentileEdit.Value;
+            dataScalingFactor = obj.DataScalingFactorEdit.Value;
             subspaceRetentionPct = obj.SubspaceRetentionEdit.Value;
             MRFReconMode = obj.MRFReconModeDropdown.Value;
             usesIterativeParams = strcmp(reconTarget, 'MRF') && strcmp(MRFReconMode, 'Iterative');
@@ -392,6 +444,12 @@ classdef ReconstructionTab < handle
             end
 
             if usesIterativeParams
+                [regularizationWeights, weightErr] = obj.parseRegularizationWeights(regularizationWeightsRaw, numel(regModes));
+                if ~isempty(weightErr)
+                    obj.showAlert(weightErr, 'Invalid Regularization Weights', 'warning');
+                    return;
+                end
+
                 if isempty(regModes)
                     obj.showAlert('Select at least one regularization mode for iterative reconstruction.', ...
                         'Regularization Mode Required', 'warning');
@@ -428,12 +486,30 @@ classdef ReconstructionTab < handle
                         'Invalid Subspace Retention', 'warning');
                     return;
                 end
+
+                if isempty(dataScalingPercentile) || ~isfinite(dataScalingPercentile) || ...
+                        dataScalingPercentile < 50 || dataScalingPercentile > 100
+                    obj.showAlert('Scale percentile must be in the range [50, 100].', ...
+                        'Invalid Scale Percentile', 'warning');
+                    return;
+                end
+
+                if strcmpi(dataScalingMode, 'manual')
+                    if isempty(dataScalingFactor) || ~isfinite(dataScalingFactor) || dataScalingFactor <= 0
+                        obj.showAlert('Manual scale factor must be a positive number.', ...
+                            'Invalid Manual Scale', 'warning');
+                        return;
+                    end
+                end
+            else
+                regularizationWeights = [];
             end
 
             settings = struct();
             settings.Dimensionality = dimensionality;
             settings.RegularizationMode = regMode;
             settings.RegularizationModes = regModes;
+            settings.RegularizationWeights = regularizationWeights;
             settings.Lambda = lambda;
             settings.ReconstructionTarget = reconTarget;
             settings.EstimateMask = estimateMask;
@@ -441,6 +517,9 @@ classdef ReconstructionTab < handle
             settings.InnerIterations = innerIterations;
             settings.MRFReconMode = MRFReconMode;
             settings.Rho = rho;
+            settings.DataScalingMode = dataScalingMode;
+            settings.DataScalingPercentile = dataScalingPercentile;
+            settings.DataScalingFactor = dataScalingFactor;
             settings.SubspaceComponentRetentionPct = subspaceRetentionPct;
             settings.B1CorrectionMode = b1CorrectionMode;
             settings.EstimateB1Map = estimateB1Map;
@@ -570,11 +649,21 @@ classdef ReconstructionTab < handle
                 logLines = result.Log(:)';
             end
 
+            subspaceSummary = {};
+            if isstruct(result) && isfield(result, 'SubspaceRetainedComponents') && isfield(result, 'SubspaceTotalComponents') && ...
+                    ~isempty(result.SubspaceRetainedComponents) && ~isempty(result.SubspaceTotalComponents)
+                subspaceSummary = {sprintf('Sub-space images: %d/%d retained', ...
+                    result.SubspaceRetainedComponents, result.SubspaceTotalComponents)};
+            elseif isstruct(result) && isfield(result, 'SubspaceImageCount') && ~isempty(result.SubspaceImageCount)
+                subspaceSummary = {sprintf('Sub-space images retained: %d', result.SubspaceImageCount)};
+            end
+
             obj.DataInfoTextArea.Value = [ ...
                 {['Reconstruction mode: ' char(dimensionality)]}; ...
                 {['Target: ' char(reconTarget)]}; ...
                 {['Regularizer(s): ' strjoin(regModes, ', ')]}; ...
                 {['Status: ' char(string(statusText))]}; ...
+                subspaceSummary(:); ...
                 logLines(:)];
 
             if isfield(result, 'OutputFiles') && isstruct(result.OutputFiles)
@@ -855,6 +944,10 @@ classdef ReconstructionTab < handle
             obj.LambdaEdit.Position = [margin + 140 y fieldW 22];
             y = y - rowGap - 22;
 
+            obj.RegularizationWeightsLabel.Position = [margin y 130 22];
+            obj.RegularizationWeightsEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
             isLLR = any(strcmp(selectedRegModes, 'Locally-low rank'));
             if isLLR
                 obj.BlockSizeLabel.Position = [margin y 130 22];
@@ -877,6 +970,21 @@ classdef ReconstructionTab < handle
             obj.RhoLabel.Position = [margin y 130 22];
             obj.RhoEdit.Position = [margin + 140 y fieldW 22];
             y = y - rowGap - 22;
+
+            obj.DataScalingModeLabel.Position = [margin y 130 22];
+            obj.DataScalingModeDropdown.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            obj.DataScalingPercentileLabel.Position = [margin y 130 22];
+            obj.DataScalingPercentileEdit.Position = [margin + 140 y fieldW 22];
+            y = y - rowGap - 22;
+
+            isManualScaling = isIterativeMRF && strcmpi(obj.DataScalingModeDropdown.Value, 'manual');
+            if isManualScaling
+                obj.DataScalingFactorLabel.Position = [margin y 130 22];
+                obj.DataScalingFactorEdit.Position = [margin + 140 y fieldW 22];
+                y = y - rowGap - 22;
+            end
 
             obj.SubspaceRetentionLabel.Position = [margin y 130 22];
             obj.SubspaceRetentionEdit.Position = [margin + 140 y fieldW 22];
@@ -960,20 +1068,43 @@ classdef ReconstructionTab < handle
             obj.RegModeDropdown.Visible = vis;
             obj.LambdaLabel.Visible = vis;
             obj.LambdaEdit.Visible = vis;
+            obj.RegularizationWeightsLabel.Visible = vis;
+            obj.RegularizationWeightsEdit.Visible = vis;
             obj.OuterIterationsLabel.Visible = vis;
             obj.OuterIterationsEdit.Visible = vis;
             obj.InnerIterationsLabel.Visible = vis;
             obj.InnerIterationsEdit.Visible = vis;
             obj.RhoLabel.Visible = vis;
             obj.RhoEdit.Visible = vis;
+            obj.DataScalingModeLabel.Visible = vis;
+            obj.DataScalingModeDropdown.Visible = vis;
+            obj.DataScalingPercentileLabel.Visible = vis;
+            obj.DataScalingPercentileEdit.Visible = vis;
             obj.SubspaceRetentionLabel.Visible = vis;
             obj.SubspaceRetentionEdit.Visible = vis;
             if strcmp(vis, 'off')
                 obj.WaveletSettingsButton.Visible = 'off';
                 obj.WaveletSettingsInfoLabel.Visible = 'off';
+                obj.DataScalingFactorLabel.Visible = 'off';
+                obj.DataScalingFactorEdit.Visible = 'off';
             end
 
             obj.updateRegularizationModeUI();
+            obj.updateScalingModeUI();
+
+            obj.resizeUI([]);
+        end
+
+        function updateScalingModeUI(obj)
+            isIterativeMRF = strcmp(obj.ReconTargetDropdown.Value, 'MRF') && strcmp(obj.MRFReconModeDropdown.Value, 'Iterative');
+            showManual = isIterativeMRF && strcmpi(obj.DataScalingModeDropdown.Value, 'manual');
+
+            vis = 'off';
+            if showManual
+                vis = 'on';
+            end
+            obj.DataScalingFactorLabel.Visible = vis;
+            obj.DataScalingFactorEdit.Visible = vis;
 
             obj.resizeUI([]);
         end
@@ -1302,6 +1433,36 @@ classdef ReconstructionTab < handle
                 levelText = num2str(waveletLevels);
             end
             obj.WaveletSettingsInfoLabel.Text = ['Wavelet: ' waveletName ', levels: ' levelText];
+        end
+
+        function [weights, errMsg] = parseRegularizationWeights(~, rawValue, nModes)
+            errMsg = '';
+            weights = ones(1, nModes);
+
+            textValue = strtrim(char(string(rawValue)));
+            if isempty(textValue)
+                return;
+            end
+
+            tokenText = regexprep(textValue, '[,;]+', ' ');
+            parsed = sscanf(tokenText, '%f').';
+            if isempty(parsed)
+                errMsg = 'Provide numeric regularization weights, e.g. 1 or 1,0.5,0.3.';
+                return;
+            end
+
+            if any(~isfinite(parsed)) || any(parsed <= 0)
+                errMsg = 'Regularization weights must be finite positive numbers.';
+                return;
+            end
+
+            if numel(parsed) == 1
+                weights = repmat(parsed, 1, nModes);
+            elseif numel(parsed) == nModes
+                weights = parsed;
+            else
+                errMsg = sprintf('Provide either 1 weight or exactly %d weights for selected modes.', nModes);
+            end
         end
 
         
