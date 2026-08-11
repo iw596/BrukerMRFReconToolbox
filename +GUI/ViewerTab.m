@@ -45,12 +45,22 @@ classdef ViewerTab < handle
         DeleteROIButton
         SaveROIButton
         LoadROIButton
-        ExportROIButton
-        ShowAllROIStatsButton
-        CorrelationPlotButton
+        AdvancedAnalysisButton
         ROIListBox
         ROIStatsMeanLabel
         ROIStatsStdLabel
+
+        % Advanced analysis popup
+        AdvancedAnalysisFig
+        AdvancedTabGroup
+        AdvancedStatsTab
+        AdvancedCorrelationTab
+        AdvancedBlandAltmanTab
+        AdvancedExportTab
+        AdvancedStatsButton
+        AdvancedCorrelationButton
+        AdvancedBlandAltmanButton
+        AdvancedExportButton
 
         % Per-map-type manual scaling memory
         ManualScaleByMapType = struct('T1', [], 'T2', [], 'Default', [])
@@ -220,34 +230,22 @@ classdef ViewerTab < handle
                 'ButtonPushedFcn',...
                 @(src,event)obj.Parent.loadROIs());
 
-            obj.ExportROIButton = uibutton(obj.ROIPanel,...
-                'Text','Export CSV',...
+            obj.AdvancedAnalysisButton = uibutton(obj.ROIPanel,...
+                'Text','Advanced Analysis...',...
                 'Position',[10 180 160 30],...
                 'ButtonPushedFcn',...
-                @(src,event)obj.Parent.exportROIsCSV());
-
-            obj.ShowAllROIStatsButton = uibutton(obj.ROIPanel,...
-                'Text','All map stats',...
-                'Position',[10 145 160 30],...
-                'ButtonPushedFcn',...
-                @(src,event)obj.showAllMapStats());
-
-            obj.CorrelationPlotButton = uibutton(obj.ROIPanel,...
-                'Text','Correlation plot',...
-                'Position',[10 110 160 30],...
-                'ButtonPushedFcn',...
-                @(src,event)obj.plotCorrelation());
+                @(src,event)obj.openAdvancedAnalysisWindow());
 
             obj.ROIStatsMeanLabel = uilabel(obj.ROIPanel,...
-                'Position',[10 75 160 22],...
+                'Position',[10 142 160 22],...
                 'Text','Mean: -');
 
             obj.ROIStatsStdLabel = uilabel(obj.ROIPanel,...
-                'Position',[10 50 160 22],...
+                'Position',[10 122 160 22],...
                 'Text','Std: -');
 
             obj.ROIListBox = uilistbox(obj.ROIPanel,...
-                'Position',[10 10 160 35],...
+                'Position',[10 10 160 108],...
                 'Items',{},...
                 'Multiselect','on',...
                 'ValueChangedFcn',@(src,event)obj.updateROIStats());
@@ -299,48 +297,71 @@ classdef ViewerTab < handle
             topControlsY = height - 70;
             topControlsY = max(topControlsY, 520);
 
-            compactTopRow = width < 1320;
+            isWideTop = width >= 1420;
+            isMediumTop = width >= 1240 && width < 1420;
 
-            if compactTopRow
-                % On narrower windows, wrap top controls into two rows.
-                primaryRowY = topControlsY;
-                secondaryRowY = topControlsY - 35;
-                maskRowY = secondaryRowY - 35;
+            primaryRowY = topControlsY;
+            secondaryRowY = primaryRowY - 35;
+            tertiaryRowY = secondaryRowY - 35;
+
+            if isWideTop
+                % Single-row map/scale controls with dedicated mask row.
+                maskRowY = secondaryRowY;
 
                 obj.LoadMRFButton.Position = [20 primaryRowY 120 30];
                 obj.LoadGTButton.Position = [150 primaryRowY 140 30];
                 obj.ClearGTButton.Position = [300 primaryRowY 95 30];
                 obj.ClearMRFButton.Position = [405 primaryRowY 95 30];
-                obj.LoadReferenceMaskButton.Position = [510 primaryRowY 120 30];
-                obj.ReferenceMaskInfoLabel.Position = [20 secondaryRowY+5 300 22];
+                obj.LoadReferenceMaskButton.Position = [510 primaryRowY 130 30];
+                obj.ReferenceMaskInfoLabel.Position = [20 maskRowY+3 300 22];
+
+                obj.MapLabel.Position = [665 primaryRowY+5 40 25];
+                obj.MapDropdown.Position = [705 primaryRowY 130 30];
+                obj.ColorScaleModeLabel.Position = [845 primaryRowY+5 75 25];
+                obj.ColorScaleModeDropdown.Position = [920 primaryRowY 90 30];
+                obj.ColorScaleMinLabel.Position = [1020 primaryRowY+5 30 25];
+                obj.ColorScaleMinField.Position = [1055 primaryRowY 75 30];
+                obj.ColorScaleMaxLabel.Position = [1140 primaryRowY+5 35 25];
+                obj.ColorScaleMaxField.Position = [1178 primaryRowY 75 30];
+            elseif isMediumTop
+                % Two-row controls: data actions on row 1, map/scale on row 2.
+                maskRowY = tertiaryRowY;
+
+                obj.LoadMRFButton.Position = [20 primaryRowY 120 30];
+                obj.LoadGTButton.Position = [150 primaryRowY 140 30];
+                obj.ClearGTButton.Position = [300 primaryRowY 95 30];
+                obj.ClearMRFButton.Position = [405 primaryRowY 95 30];
+                obj.LoadReferenceMaskButton.Position = [510 primaryRowY 130 30];
+                obj.ReferenceMaskInfoLabel.Position = [20 maskRowY+3 300 22];
 
                 obj.MapLabel.Position = [520 secondaryRowY+5 40 25];
                 obj.MapDropdown.Position = [560 secondaryRowY 120 30];
                 obj.ColorScaleModeLabel.Position = [690 secondaryRowY+5 75 25];
-                obj.ColorScaleModeDropdown.Position = [765 secondaryRowY 85 30];
-                obj.ColorScaleMinLabel.Position = [860 secondaryRowY+5 30 25];
-                obj.ColorScaleMinField.Position = [895 secondaryRowY 70 30];
-                obj.ColorScaleMaxLabel.Position = [975 secondaryRowY+5 35 25];
-                obj.ColorScaleMaxField.Position = [1015 secondaryRowY 70 30];
+                obj.ColorScaleModeDropdown.Position = [765 secondaryRowY 90 30];
+                obj.ColorScaleMinLabel.Position = [865 secondaryRowY+5 30 25];
+                obj.ColorScaleMinField.Position = [900 secondaryRowY 75 30];
+                obj.ColorScaleMaxLabel.Position = [985 secondaryRowY+5 35 25];
+                obj.ColorScaleMaxField.Position = [1025 secondaryRowY 75 30];
             else
-                primaryRowY = topControlsY;
-                maskRowY = primaryRowY - 35;
+                % Narrow windows: stack into three rows to avoid overlap.
+                maskRowY = tertiaryRowY - 35;
 
-                obj.LoadMRFButton.Position = [20 primaryRowY 120 30];
-                obj.LoadGTButton.Position = [160 primaryRowY 140 30];
-                obj.ClearGTButton.Position = [320 primaryRowY 100 30];
-                obj.ClearMRFButton.Position = [430 primaryRowY 100 30];
-                obj.LoadReferenceMaskButton.Position = [540 primaryRowY 120 30];
+                obj.LoadMRFButton.Position = [20 primaryRowY 110 30];
+                obj.LoadGTButton.Position = [140 primaryRowY 130 30];
+                obj.ClearGTButton.Position = [280 primaryRowY 90 30];
+
+                obj.ClearMRFButton.Position = [20 secondaryRowY 110 30];
+                obj.LoadReferenceMaskButton.Position = [140 secondaryRowY 130 30];
                 obj.ReferenceMaskInfoLabel.Position = [20 maskRowY+3 300 22];
 
-                obj.MapLabel.Position = [680 primaryRowY+5 40 25];
-                obj.MapDropdown.Position = [720 primaryRowY 120 30];
-                obj.ColorScaleModeLabel.Position = [850 primaryRowY+5 75 25];
-                obj.ColorScaleModeDropdown.Position = [925 primaryRowY 85 30];
-                obj.ColorScaleMinLabel.Position = [1020 primaryRowY+5 30 25];
-                obj.ColorScaleMinField.Position = [1055 primaryRowY 70 30];
-                obj.ColorScaleMaxLabel.Position = [1135 primaryRowY+5 35 25];
-                obj.ColorScaleMaxField.Position = [1175 primaryRowY 70 30];
+                obj.MapLabel.Position = [300 secondaryRowY+5 35 25];
+                obj.MapDropdown.Position = [335 secondaryRowY 115 30];
+                obj.ColorScaleModeLabel.Position = [460 tertiaryRowY+5 75 25];
+                obj.ColorScaleModeDropdown.Position = [535 tertiaryRowY 90 30];
+                obj.ColorScaleMinLabel.Position = [635 tertiaryRowY+5 30 25];
+                obj.ColorScaleMinField.Position = [670 tertiaryRowY 70 30];
+                obj.ColorScaleMaxLabel.Position = [750 tertiaryRowY+5 35 25];
+                obj.ColorScaleMaxField.Position = [790 tertiaryRowY 70 30];
             end
 
             contentTopY = maskRowY - 10;
@@ -353,6 +374,9 @@ classdef ViewerTab < handle
             obj.ApplyGTMaskCheckbox.Position = [520 maskControlY 110 22];
 
             panelWidth = 220;
+            if width < 1180
+                panelWidth = 200;
+            end
             mainWidth = max(width - panelWidth - 40, 420);
             axisWidth = max((mainWidth - 80) / 2, 200);
             axisHeight = max(contentHeight - 20, 200);
@@ -362,9 +386,10 @@ classdef ViewerTab < handle
             obj.MRFAxes.Position = [50 90 axisWidth axisHeight];
             obj.GTAxes.Position = [60 + axisWidth 90 axisWidth axisHeight];
 
+            mainContentRight = obj.GTAxes.Position(1) + obj.GTAxes.Position(3);
             obj.SliceLabel.Position = [50 40 120 25];
-            obj.SliceSlider.Position = [180 65 max(width - 240, 200) 3];
-            obj.InfoLabel.Position = [50 10 max(width - 100, 200) 25];
+            obj.SliceSlider.Position = [180 65 max(mainContentRight - 180, 220) 3];
+            obj.InfoLabel.Position = [50 10 max(mainContentRight - 50, 220) 25];
         end
 
         % ============================================================
@@ -1122,6 +1147,128 @@ classdef ViewerTab < handle
             obj.ROIStatsStdLabel.Text  = sprintf('Std (map %d): %.4g', obj.Parent.CurrentMap, std(values(:),'omitnan'));
         end
 
+        function openAdvancedAnalysisWindow(obj, targetTab)
+            if nargin < 2 || isempty(targetTab)
+                targetTab = 'ROI Stats';
+            end
+
+            createNew = isempty(obj.AdvancedAnalysisFig) || ~isvalid(obj.AdvancedAnalysisFig);
+
+            if createNew
+                obj.AdvancedAnalysisFig = uifigure( ...
+                    'Name', 'Advanced ROI Analysis', ...
+                    'Position', [220 180 540 360]);
+
+                obj.AdvancedAnalysisFig.CloseRequestFcn = ...
+                    @(src,event)obj.closeAdvancedAnalysisWindow(src);
+
+                obj.AdvancedAnalysisFig.SizeChangedFcn = ...
+                    @(src,event)obj.layoutAdvancedAnalysisWindow();
+
+                obj.AdvancedTabGroup = uitabgroup(obj.AdvancedAnalysisFig, ...
+                    'Position', [10 10 520 340]);
+
+                obj.AdvancedStatsTab = uitab(obj.AdvancedTabGroup, 'Title', 'ROI Stats');
+                obj.AdvancedCorrelationTab = uitab(obj.AdvancedTabGroup, 'Title', 'Correlation');
+                obj.AdvancedBlandAltmanTab = uitab(obj.AdvancedTabGroup, 'Title', 'Bland-Altman');
+                obj.AdvancedExportTab = uitab(obj.AdvancedTabGroup, 'Title', 'Export');
+
+                obj.AdvancedStatsButton = uibutton(obj.AdvancedStatsTab, ...
+                    'Text', 'Show All Map Stats', ...
+                    'ButtonPushedFcn', @(src,event)obj.showAllMapStats());
+
+                obj.AdvancedCorrelationButton = uibutton(obj.AdvancedCorrelationTab, ...
+                    'Text', 'Open Correlation Plot', ...
+                    'ButtonPushedFcn', @(src,event)obj.plotCorrelation());
+
+                obj.AdvancedBlandAltmanButton = uibutton(obj.AdvancedBlandAltmanTab, ...
+                    'Text', 'Open Bland-Altman Plot', ...
+                    'ButtonPushedFcn', @(src,event)obj.plotBlandAltman());
+
+                obj.AdvancedExportButton = uibutton(obj.AdvancedExportTab, ...
+                    'Text', 'Export ROI CSV', ...
+                    'ButtonPushedFcn', @(src,event)obj.Parent.exportROIsCSV());
+
+                obj.layoutAdvancedAnalysisWindow();
+            end
+
+            tabTitles = { ...
+                obj.AdvancedStatsTab.Title, ...
+                obj.AdvancedCorrelationTab.Title, ...
+                obj.AdvancedBlandAltmanTab.Title, ...
+                obj.AdvancedExportTab.Title};
+            tabHandles = { ...
+                obj.AdvancedStatsTab, ...
+                obj.AdvancedCorrelationTab, ...
+                obj.AdvancedBlandAltmanTab, ...
+                obj.AdvancedExportTab};
+
+            tabIdx = find(strcmpi(tabTitles, targetTab), 1);
+            if isempty(tabIdx)
+                tabIdx = 1;
+            end
+            obj.AdvancedTabGroup.SelectedTab = tabHandles{tabIdx};
+
+            obj.Parent.restoreFigureFocus();
+            try
+                figure(obj.AdvancedAnalysisFig);
+            catch
+            end
+        end
+
+        function layoutAdvancedAnalysisWindow(obj)
+            if isempty(obj.AdvancedAnalysisFig) || ~isvalid(obj.AdvancedAnalysisFig)
+                return
+            end
+
+            figPos = obj.AdvancedAnalysisFig.Position;
+            panelW = max(figPos(3) - 20, 280);
+            panelH = max(figPos(4) - 20, 180);
+            obj.AdvancedTabGroup.Position = [10 10 panelW panelH];
+
+            btnW = 220;
+            btnH = 34;
+            btnX = max((panelW - btnW) / 2, 20);
+            btnY = max((panelH - btnH) / 2, 40);
+
+            if ~isempty(obj.AdvancedStatsButton) && isvalid(obj.AdvancedStatsButton)
+                obj.AdvancedStatsButton.Position = [btnX btnY btnW btnH];
+            end
+
+            if ~isempty(obj.AdvancedCorrelationButton) && isvalid(obj.AdvancedCorrelationButton)
+                obj.AdvancedCorrelationButton.Position = [btnX btnY btnW btnH];
+            end
+
+            if ~isempty(obj.AdvancedBlandAltmanButton) && isvalid(obj.AdvancedBlandAltmanButton)
+                obj.AdvancedBlandAltmanButton.Position = [btnX btnY btnW btnH];
+            end
+
+            if ~isempty(obj.AdvancedExportButton) && isvalid(obj.AdvancedExportButton)
+                obj.AdvancedExportButton.Position = [btnX btnY btnW btnH];
+            end
+        end
+
+        function closeAdvancedAnalysisWindow(obj, figHandle)
+            if nargin < 2 || isempty(figHandle)
+                figHandle = obj.AdvancedAnalysisFig;
+            end
+
+            if ~isempty(figHandle) && isvalid(figHandle)
+                delete(figHandle);
+            end
+
+            obj.AdvancedAnalysisFig = [];
+            obj.AdvancedTabGroup = [];
+            obj.AdvancedStatsTab = [];
+            obj.AdvancedCorrelationTab = [];
+            obj.AdvancedBlandAltmanTab = [];
+            obj.AdvancedExportTab = [];
+            obj.AdvancedStatsButton = [];
+            obj.AdvancedCorrelationButton = [];
+            obj.AdvancedBlandAltmanButton = [];
+            obj.AdvancedExportButton = [];
+        end
+
         function showAllMapStats(obj)
 
             if isempty(obj.Parent.ROIs) || isempty(obj.ROIListBox.Value)
@@ -1216,10 +1363,9 @@ classdef ViewerTab < handle
         end
 
         function plotCorrelation(obj)
-
-            if isempty(obj.Parent.ROIs) || isempty(obj.ROIListBox.Value)
+            if isempty(obj.Parent.ROIs)
                 uialert(obj.Parent.Fig, ...
-                    'Select an ROI first.', ...
+                    'Draw at least one ROI before running correlation.', ...
                     'Correlation plot', ...
                     'Icon','warning');
                 return
@@ -1233,145 +1379,444 @@ classdef ViewerTab < handle
                 return
             end
 
-            sel = obj.ROIListBox.Value;
-            if iscell(sel)
-                sel = sel{1};
-            end
+            modeChoice = questdlg( ...
+                ['Choose correlation mode:' newline ...
+                 '• ROI means: one point per ROI, with MRF std error bars' newline ...
+                 '• Pooled pixels: all pixels from all ROIs'], ...
+                'Correlation mode', ...
+                'ROI means', 'Pooled pixels', 'Cancel', ...
+                'ROI means');
 
-            items = obj.ROIListBox.Items;
-            idx = find(strcmp(items,sel),1);
-            if isempty(idx) || idx > numel(obj.Parent.ROIs)
+            if isempty(modeChoice) || strcmpi(modeChoice, 'Cancel')
                 return
             end
 
-            roi = obj.Parent.ROIs(idx);
+            useROIMeans = strcmpi(modeChoice, 'ROI means');
 
-            % Get the dimensions
-            mrfSize = size(obj.Parent.MRFData);
-            mrfMaps = 1;
-            if numel(mrfSize) >= 4
-                mrfMaps = mrfSize(4);
-            end
+            mrfT1Idx = obj.findMapIndexForMetric('mrf', 't1');
+            gtT1Idx  = obj.findMapIndexForMetric('gt',  't1', mrfT1Idx);
+            mrfT2Idx = obj.findMapIndexForMetric('mrf', 't2');
+            gtT2Idx  = obj.findMapIndexForMetric('gt',  't2', mrfT2Idx);
 
-            gtSize = size(obj.Parent.GTData);
-            gtMaps = 1;
-            if numel(gtSize) >= 4
-                gtMaps = gtSize(4);
-            end
+            hasT1 = ~isnan(mrfT1Idx) && ~isnan(gtT1Idx);
+            hasT2 = ~isnan(mrfT2Idx) && ~isnan(gtT2Idx);
 
-            % Determine which maps to correlate
-            mrfNames = obj.MapDropdown.Items;
-            gtNames = {'GT'};
-            if gtMaps > 1
-                for i = 1:gtMaps
-                    gtNames{i} = sprintf('GT %d', i);
-                end
-            end
-
-            % Create list of matches
-            mrfMeanList = [];
-            gtMeanList = [];
-            matchNames = {};
-
-            % Match by keyword (T1, T2, etc)
-            for mrfIdx = 1:mrfMaps
-                for gtIdx = 1:gtMaps
-                    if obj.Parent.mapNamesMatch(mrfNames{mrfIdx}, gtNames{gtIdx})
-                        % Extract MRF
-                        prevMap = obj.Parent.CurrentMap;
-                        obj.Parent.CurrentMap = mrfIdx;
-                        mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
-                        obj.Parent.CurrentMap = prevMap;
-
-                        % Extract GT
-                        prevMap = obj.Parent.CurrentMap;
-                        obj.Parent.CurrentMap = gtIdx;
-                        gtImg = obj.Parent.extractImage(obj.Parent.GTData);
-                        obj.Parent.CurrentMap = prevMap;
-
-                        % Get mask and values
-                        mrfVals = obj.Parent.extractROIMask(mrfImg, roi);
-                        gtVals = obj.Parent.extractROIMask(gtImg, roi);
-
-                        if ~isempty(mrfVals) && ~isempty(gtVals)
-                            mrfMeanList(end+1) = mrfIdx;
-                            gtMeanList(end+1) = gtIdx;
-                            matchNames{end+1} = sprintf('%s vs %s', mrfNames{mrfIdx}, gtNames{gtIdx});
-                        end
-                    end
-                end
-            end
-
-            % If no keyword matches, use index-based fallback
-            if isempty(matchNames) && mrfMaps == gtMaps
-                for mapIdx = 1:mrfMaps
-                    mrfMeanList(end+1) = mapIdx;
-                    gtMeanList(end+1) = mapIdx;
-                    matchNames{end+1} = sprintf('%s vs %s', mrfNames{mapIdx}, gtNames{mapIdx});
-                end
-            end
-
-            if isempty(matchNames)
+            if ~hasT1 && ~hasT2
                 uialert(obj.Parent.Fig, ...
-                    'No matching maps found between MRF and GT.', ...
+                    'Could not find matching T1/T2 maps in both MRF and GT data.', ...
                     'Correlation plot', ...
                     'Icon','warning');
                 return
             end
 
-            % Create figure with subplots
-            figure('Name','ROI Correlation Plot','NumberTitle','off');
-            nPlots = numel(mrfMeanList);
-            nCols = ceil(sqrt(nPlots));
-            nRows = ceil(nPlots / nCols);
+            if hasT1
+                if useROIMeans
+                    [xT1, yT1, yErrT1] = obj.collectROIMeanPairs(mrfT1Idx, gtT1Idx);
+                else
+                    [xT1, yT1] = obj.collectROIPixelPairs(mrfT1Idx, gtT1Idx);
+                    yErrT1 = [];
+                end
+            else
+                xT1 = [];
+                yT1 = [];
+                yErrT1 = [];
+            end
 
-            for plotIdx = 1:nPlots
-                ax = subplot(nRows, nCols, plotIdx);
+            if hasT2
+                if useROIMeans
+                    [xT2, yT2, yErrT2] = obj.collectROIMeanPairs(mrfT2Idx, gtT2Idx);
+                else
+                    [xT2, yT2] = obj.collectROIPixelPairs(mrfT2Idx, gtT2Idx);
+                    yErrT2 = [];
+                end
+            else
+                xT2 = [];
+                yT2 = [];
+                yErrT2 = [];
+            end
 
-                % Extract values for this map pair
-                prevMap = obj.Parent.CurrentMap;
-                obj.Parent.CurrentMap = mrfMeanList(plotIdx);
+            validT1 = numel(xT1) >= 2;
+            validT2 = numel(xT2) >= 2;
+
+            if ~validT1 && ~validT2
+                uialert(obj.Parent.Fig, ...
+                    'Need at least 2 ROI mean pairs for regression (after NaN filtering).', ...
+                    'Correlation plot', ...
+                    'Icon','warning');
+                return
+            end
+            if validT1
+                obj.plotRegressionFigure(xT1, yT1, yErrT1, 'T1', modeChoice);
+            end
+
+            if validT2
+                obj.plotRegressionFigure(xT2, yT2, yErrT2, 'T2', modeChoice);
+            end
+        end
+
+        function plotBlandAltman(obj)
+            if isempty(obj.Parent.ROIs)
+                uialert(obj.Parent.Fig, ...
+                    'Draw at least one ROI before running Bland-Altman analysis.', ...
+                    'Bland-Altman plot', ...
+                    'Icon','warning');
+                return
+            end
+
+            if isempty(obj.Parent.MRFData) || isempty(obj.Parent.GTData)
+                uialert(obj.Parent.Fig, ...
+                    'Load both MRF and GT data to compute Bland-Altman plots.', ...
+                    'Bland-Altman plot', ...
+                    'Icon','warning');
+                return
+            end
+
+            modeChoice = questdlg( ...
+                ['Choose Bland-Altman mode:' newline ...
+                 '• ROI means: one point per ROI' newline ...
+                 '• Pooled pixels: all pixels from all ROIs'], ...
+                'Bland-Altman mode', ...
+                'ROI means', 'Pooled pixels', 'Cancel', ...
+                'ROI means');
+
+            if isempty(modeChoice) || strcmpi(modeChoice, 'Cancel')
+                return
+            end
+
+            useROIMeans = strcmpi(modeChoice, 'ROI means');
+
+            mrfT1Idx = obj.findMapIndexForMetric('mrf', 't1');
+            gtT1Idx  = obj.findMapIndexForMetric('gt',  't1', mrfT1Idx);
+            mrfT2Idx = obj.findMapIndexForMetric('mrf', 't2');
+            gtT2Idx  = obj.findMapIndexForMetric('gt',  't2', mrfT2Idx);
+
+            hasT1 = ~isnan(mrfT1Idx) && ~isnan(gtT1Idx);
+            hasT2 = ~isnan(mrfT2Idx) && ~isnan(gtT2Idx);
+
+            if ~hasT1 && ~hasT2
+                uialert(obj.Parent.Fig, ...
+                    'Could not find matching T1/T2 maps in both MRF and GT data.', ...
+                    'Bland-Altman plot', ...
+                    'Icon','warning');
+                return
+            end
+
+            if hasT1
+                if useROIMeans
+                    [gtT1, mrfT1] = obj.collectROIMeanPairs(mrfT1Idx, gtT1Idx);
+                else
+                    [gtT1, mrfT1] = obj.collectROIPixelPairs(mrfT1Idx, gtT1Idx);
+                end
+            else
+                gtT1 = [];
+                mrfT1 = [];
+            end
+
+            if hasT2
+                if useROIMeans
+                    [gtT2, mrfT2] = obj.collectROIMeanPairs(mrfT2Idx, gtT2Idx);
+                else
+                    [gtT2, mrfT2] = obj.collectROIPixelPairs(mrfT2Idx, gtT2Idx);
+                end
+            else
+                gtT2 = [];
+                mrfT2 = [];
+            end
+
+            validT1 = numel(gtT1) >= 2 && numel(mrfT1) >= 2;
+            validT2 = numel(gtT2) >= 2 && numel(mrfT2) >= 2;
+
+            if ~validT1 && ~validT2
+                uialert(obj.Parent.Fig, ...
+                    'Need at least 2 valid paired points for Bland-Altman analysis.', ...
+                    'Bland-Altman plot', ...
+                    'Icon','warning');
+                return
+            end
+
+            if validT1
+                obj.plotBlandAltmanFigure(gtT1, mrfT1, 'T1', modeChoice);
+            end
+
+            if validT2
+                obj.plotBlandAltmanFigure(gtT2, mrfT2, 'T2', modeChoice);
+            end
+        end
+
+        function mapIdx = findMapIndexForMetric(obj, datasetType, metric, mrfFallbackIdx)
+            if nargin < 4
+                mrfFallbackIdx = NaN;
+            end
+
+            mapIdx = NaN;
+
+            switch lower(datasetType)
+                case 'mrf'
+                    if isempty(obj.Parent.MRFData)
+                        return
+                    end
+                    names = obj.Parent.MapNames;
+                    nMaps = size(obj.Parent.MRFData, 4);
+                    if ndims(obj.Parent.MRFData) < 4
+                        nMaps = 1;
+                    end
+                case 'gt'
+                    if isempty(obj.Parent.GTData)
+                        return
+                    end
+                    names = obj.Parent.GTMapNames;
+                    nMaps = size(obj.Parent.GTData, 4);
+                    if ndims(obj.Parent.GTData) < 4
+                        nMaps = 1;
+                    end
+                otherwise
+                    return
+            end
+
+            if isempty(names)
+                names = cell(1, nMaps);
+                for k = 1:nMaps
+                    names{k} = sprintf('Map %d', k);
+                end
+            end
+
+            names = names(:)';
+
+            for k = 1:min(numel(names), nMaps)
+                n = lower(string(names{k}));
+                switch lower(metric)
+                    case 't1'
+                        if contains(n, "t1") && ~contains(n, "t1rho")
+                            mapIdx = k;
+                            return
+                        end
+                    case 't2'
+                        if contains(n, "t2")
+                            mapIdx = k;
+                            return
+                        end
+                end
+            end
+
+            if strcmpi(datasetType, 'gt') && ~isnan(mrfFallbackIdx)
+                mapIdx = obj.getEquivalentGTMapIndex(mrfFallbackIdx);
+            end
+        end
+
+        function [gtMeans, mrfMeans, mrfStds] = collectROIMeanPairs(obj, mrfMapIdx, gtMapIdx)
+            gtMeans = [];
+            mrfMeans = [];
+            mrfStds = [];
+
+            prevSlice = obj.Parent.CurrentSlice;
+            prevMap = obj.Parent.CurrentMap;
+            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap)); %#ok<NASGU>
+
+            for roiIdx = 1:numel(obj.Parent.ROIs)
+                roi = obj.Parent.ROIs(roiIdx);
+
+                obj.Parent.CurrentSlice = roi.Slice;
+
+                obj.Parent.CurrentMap = mrfMapIdx;
                 mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
-                obj.Parent.CurrentMap = prevMap;
-
-                prevMap = obj.Parent.CurrentMap;
-                obj.Parent.CurrentMap = gtMeanList(plotIdx);
-                gtImg = obj.Parent.extractImage(obj.Parent.GTData);
-                obj.Parent.CurrentMap = prevMap;
-
-                % Extract pixel values
                 mrfVals = obj.Parent.extractROIMask(mrfImg, roi);
+                mrfMean = mean(mrfVals(:), 'omitnan');
+                mrfStd = std(mrfVals(:), 'omitnan');
+
+                obj.Parent.CurrentMap = gtMapIdx;
+                gtImg = obj.Parent.extractImage(obj.Parent.GTData);
+                gtVals = obj.Parent.extractROIMask(gtImg, roi);
+                gtMean = mean(gtVals(:), 'omitnan');
+
+                if ~isnan(mrfMean) && ~isnan(gtMean)
+                    gtMeans(end+1,1) = gtMean; %#ok<AGROW>
+                    mrfMeans(end+1,1) = mrfMean; %#ok<AGROW>
+                    if isnan(mrfStd)
+                        mrfStd = 0;
+                    end
+                    mrfStds(end+1,1) = mrfStd; %#ok<AGROW>
+                end
+            end
+        end
+
+        function [gtPixels, mrfPixels] = collectROIPixelPairs(obj, mrfMapIdx, gtMapIdx)
+            gtPixels = [];
+            mrfPixels = [];
+
+            prevSlice = obj.Parent.CurrentSlice;
+            prevMap = obj.Parent.CurrentMap;
+            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap)); %#ok<NASGU>
+
+            for roiIdx = 1:numel(obj.Parent.ROIs)
+                roi = obj.Parent.ROIs(roiIdx);
+
+                obj.Parent.CurrentSlice = roi.Slice;
+
+                obj.Parent.CurrentMap = mrfMapIdx;
+                mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
+                mrfVals = obj.Parent.extractROIMask(mrfImg, roi);
+
+                obj.Parent.CurrentMap = gtMapIdx;
+                gtImg = obj.Parent.extractImage(obj.Parent.GTData);
                 gtVals = obj.Parent.extractROIMask(gtImg, roi);
 
-                % Scatter plot
-                scatter(ax, mrfVals, gtVals, 20, 'filled', 'MarkerFaceAlpha', 0.5);
-                hold(ax, 'on')
+                pairCount = min(numel(mrfVals), numel(gtVals));
+                if pairCount <= 0
+                    continue
+                end
 
-                % Linear regression
-                p_coeff = polyfit(mrfVals, gtVals, 1);
-                slope = p_coeff(1);
-                intercept = p_coeff(2);
+                mrfVals = mrfVals(1:pairCount);
+                gtVals = gtVals(1:pairCount);
+                validMask = ~(isnan(mrfVals) | isnan(gtVals));
 
-                xRange = [min(mrfVals), max(mrfVals)];
-                yFit = slope * xRange + intercept;
-                plot(ax, xRange, yFit, 'r-', 'LineWidth', 2);
-
-                % Calculate statistics
-                corr_coeff = corrcoef(mrfVals, gtVals);
-                r_squared = corr_coeff(1,2)^2;
-
-                % Labels and title
-                xlabel(ax, mrfNames{mrfMeanList(plotIdx)});
-                ylabel(ax, gtNames{gtMeanList(plotIdx)});
-                title(ax, matchNames{plotIdx});
-                grid(ax, 'on');
-
-                % Add equation text
-                eq_text = sprintf('y=%.3fx+%.3f\nR²=%.3f', slope, intercept, r_squared);
-                text(ax, 0.05, 0.95, eq_text, 'Units', 'normalized', ...
-                    'VerticalAlignment', 'top', 'FontSize', 10, ...
-                    'BackgroundColor', 'white', 'EdgeColor', 'black');
+                if any(validMask)
+                    gtPixels = [gtPixels; gtVals(validMask)]; %#ok<AGROW>
+                    mrfPixels = [mrfPixels; mrfVals(validMask)]; %#ok<AGROW>
+                end
             end
+        end
+
+        function restoreSliceMapState(obj, sliceIdx, mapIdx)
+            obj.Parent.CurrentSlice = sliceIdx;
+            obj.Parent.CurrentMap = mapIdx;
+        end
+
+        function plotBlandAltmanFigure(~, gtVals, mrfVals, metricName, modeLabel)
+            avgVals = (gtVals + mrfVals) / 2;
+            diffVals = mrfVals - gtVals;
+
+            bias = mean(diffVals, 'omitnan');
+            sdDiff = std(diffVals, 'omitnan');
+            loaUpper = bias + 1.96 * sdDiff;
+            loaLower = bias - 1.96 * sdDiff;
+
+            fig = figure( ...
+                'Name', sprintf('%s Bland-Altman: MRF - GT', upper(metricName)), ...
+                'NumberTitle', 'off', ...
+                'Color', 'w', ...
+                'Units', 'pixels', ...
+                'Position', [200 140 760 640]);
+
+            ax = axes('Parent', fig);
+            hold(ax, 'on');
+            box(ax, 'on');
+            grid(ax, 'on');
+            ax.LineWidth = 1.2;
+            ax.FontSize = 12;
+            ax.FontName = 'Arial';
+
+            scatter(ax, avgVals, diffVals, 32, ...
+                'MarkerFaceColor', [0.2 0.45 0.85], ...
+                'MarkerEdgeColor', [0.05 0.2 0.45], ...
+                'MarkerFaceAlpha', 0.5, ...
+                'MarkerEdgeAlpha', 0.6);
+
+            xMin = min(avgVals);
+            xMax = max(avgVals);
+            if xMin == xMax
+                xMin = xMin - 0.5;
+                xMax = xMax + 0.5;
+            end
+
+            plot(ax, [xMin xMax], [bias bias], '-', 'Color', [0.75 0.1 0.1], 'LineWidth', 2.0);
+            plot(ax, [xMin xMax], [loaUpper loaUpper], '--', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.5);
+            plot(ax, [xMin xMax], [loaLower loaLower], '--', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.5);
+
+            xlabel(ax, sprintf('Mean of GT and MRF %s', upper(metricName)), 'FontWeight', 'bold');
+            ylabel(ax, sprintf('Difference (MRF - GT) %s', upper(metricName)), 'FontWeight', 'bold');
+            title(ax, sprintf('%s Bland-Altman (%s)', upper(metricName), modeLabel), ...
+                'FontWeight', 'bold', 'FontSize', 14);
+
+            annotationText = sprintf(['Bias = %.4g' newline ...
+                'Upper LoA = %.4g' newline ...
+                'Lower LoA = %.4g' newline ...
+                'N = %d'], bias, loaUpper, loaLower, numel(diffVals));
+            text(ax, 0.04, 0.96, annotationText, ...
+                'Units', 'normalized', ...
+                'VerticalAlignment', 'top', ...
+                'FontSize', 11, ...
+                'BackgroundColor', 'white', ...
+                'EdgeColor', [0.7 0.7 0.7], ...
+                'Margin', 6);
+
+            axis(ax, 'tight');
+        end
+
+        function plotRegressionFigure(~, xVals, yVals, yErrVals, metricName, modeLabel)
+            fig = figure( ...
+                'Name', sprintf('%s Correlation: GT vs MRF', upper(metricName)), ...
+                'NumberTitle', 'off', ...
+                'Color', 'w', ...
+                'Units', 'pixels', ...
+                'Position', [160 120 760 640]);
+
+            ax = axes('Parent', fig);
+            hold(ax, 'on');
+            box(ax, 'on');
+            grid(ax, 'on');
+            ax.LineWidth = 1.2;
+            ax.FontSize = 12;
+            ax.FontName = 'Arial';
+
+            if ~isempty(yErrVals)
+                errorbar(ax, xVals, yVals, yErrVals, ...
+                    'o', ...
+                    'MarkerSize', 6, ...
+                    'LineWidth', 1.1, ...
+                    'CapSize', 8, ...
+                    'Color', [0.1 0.35 0.7], ...
+                    'MarkerEdgeColor', [0.1 0.35 0.7], ...
+                    'MarkerFaceColor', [0.45 0.67 0.95]);
+            else
+                scatter(ax, xVals, yVals, 26, ...
+                    'MarkerFaceColor', [0.2 0.45 0.85], ...
+                    'MarkerEdgeColor', [0.05 0.2 0.45], ...
+                    'MarkerFaceAlpha', 0.45, ...
+                    'MarkerEdgeAlpha', 0.6);
+            end
+
+            hold(ax, 'on');
+
+            fitCoeffs = polyfit(xVals, yVals, 1);
+            slope = fitCoeffs(1);
+            intercept = fitCoeffs(2);
+
+            xMin = min(xVals);
+            xMax = max(xVals);
+            if xMin == xMax
+                xFit = [xMin - 0.5, xMax + 0.5];
+            else
+                xFit = linspace(xMin, xMax, 100);
+            end
+            yFit = slope * xFit + intercept;
+            plot(ax, xFit, yFit, '-', 'Color', [0.8 0.1 0.1], 'LineWidth', 2.2);
+
+            minVal = min([xVals(:); yVals(:)]);
+            maxVal = max([xVals(:); yVals(:)]);
+            if minVal < maxVal
+                plot(ax, [minVal maxVal], [minVal maxVal], '--', ...
+                    'Color', [0.35 0.35 0.35], 'LineWidth', 1.2);
+            end
+
+            rMat = corrcoef(xVals, yVals);
+            r2 = rMat(1,2)^2;
+
+            xlabel(ax, sprintf('Ground Truth %s', upper(metricName)), 'FontWeight', 'bold');
+            ylabel(ax, sprintf('MRF %s', upper(metricName)), 'FontWeight', 'bold');
+            title(ax, sprintf('%s correlation (%s)', upper(metricName), modeLabel), ...
+                'FontWeight', 'bold', 'FontSize', 14);
+
+            annotationText = sprintf('MRF = %.4g · GT + %.4g\nR^2 = %.4f\nN = %d', ...
+                slope, intercept, r2, numel(xVals));
+            text(ax, 0.04, 0.96, annotationText, ...
+                'Units', 'normalized', ...
+                'VerticalAlignment', 'top', ...
+                'FontSize', 11, ...
+                'BackgroundColor', 'white', ...
+                'EdgeColor', [0.7 0.7 0.7], ...
+                'Margin', 6);
+
+            axis(ax, 'tight');
         end
     end
 end

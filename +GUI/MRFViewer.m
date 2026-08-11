@@ -136,6 +136,10 @@ classdef MRFViewer < handle
                 return
             end
 
+            if ~app.isViewerTabScrollTarget()
+                return
+            end
+
             app.scrollSlices(event);
         end
 
@@ -156,6 +160,72 @@ classdef MRFViewer < handle
             end
 
             tf = isequal(app.TabGroup.SelectedTab, app.ReconImagesTabObj.TabHandle);
+        end
+
+        function tf = isViewerTabScrollTarget(app)
+            tf = false;
+
+            if isempty(app.TabGroup) || ~isvalid(app.TabGroup) || ...
+                    isempty(app.ViewerTabObj) || ~isvalid(app.ViewerTabObj)
+                return
+            end
+
+            if ~isequal(app.TabGroup.SelectedTab, app.ViewerTabObj.TabHandle)
+                return
+            end
+
+            hoveredObj = app.getHoveredUIObject();
+            if isempty(hoveredObj)
+                return
+            end
+
+            if app.isDescendantOf(hoveredObj, app.ViewerTabObj.ROIPanel)
+                return
+            end
+
+            tf = app.isDescendantOf(hoveredObj, app.ViewerTabObj.TabHandle);
+        end
+
+        function hoveredObj = getHoveredUIObject(app)
+            hoveredObj = [];
+
+            if isempty(app.Fig) || ~isvalid(app.Fig)
+                return
+            end
+
+            try
+                hoveredObj = hittest(app.Fig);
+            catch
+                hoveredObj = [];
+            end
+
+            if isempty(hoveredObj)
+                hoveredObj = app.Fig.CurrentObject;
+                if isempty(hoveredObj)
+                    hoveredObj = [];
+                end
+            end
+        end
+
+        function tf = isDescendantOf(~, childObj, parentObj)
+            tf = false;
+
+            if isempty(childObj) || isempty(parentObj)
+                return
+            end
+
+            currentObj = childObj;
+            while ~isempty(currentObj)
+                if isequal(currentObj, parentObj)
+                    tf = true;
+                    return
+                end
+                try
+                    currentObj = currentObj.Parent;
+                catch
+                    break
+                end
+            end
         end
 
         function openReconstructionImagesTab(app)
@@ -200,6 +270,8 @@ classdef MRFViewer < handle
             [file,path] = uigetfile( ...
                 {'*.mat;*.nii','MAT/NIFTI Files'}, ...
                 'Select MRF Dataset');
+
+            app.restoreFigureFocus();
 
             if isequal(file,0)
                 return
@@ -264,6 +336,8 @@ classdef MRFViewer < handle
             [file,path] = uigetfile( ...
                 {'*.mat;*.nii','MAT/NIFTI Files'}, ...
                 'Select Ground Truth Dataset');
+
+            app.restoreFigureFocus();
 
             if isequal(file,0)
                 return
@@ -653,6 +727,8 @@ classdef MRFViewer < handle
                 {'*.mat;*.nii;*.nii.gz', 'Mask files (*.mat, *.nii, *.nii.gz)'}, ...
                 'Select Reference Mask');
 
+            app.restoreFigureFocus();
+
             if isequal(file,0)
                 return
             end
@@ -850,6 +926,7 @@ classdef MRFViewer < handle
             end
 
             [file,path] = uiputfile('*.mat','Save ROIs');
+            app.restoreFigureFocus();
             if isequal(file,0)
                 return
             end
@@ -862,6 +939,7 @@ classdef MRFViewer < handle
             % Load ROI data from file
 
             [file,path] = uigetfile('*.mat','Load ROIs');
+            app.restoreFigureFocus();
             if isequal(file,0)
                 return
             end
@@ -893,6 +971,7 @@ classdef MRFViewer < handle
             end
 
             [file,path] = uiputfile('*.csv','Export ROIs to CSV');
+            app.restoreFigureFocus();
             if isequal(file,0)
                 return
             end
@@ -1312,6 +1391,22 @@ classdef MRFViewer < handle
                     rows{ii} = sprintf('%.3f %.3f', pos(ii,1), pos(ii,2));
                 end
                 posStr = ['[' strjoin(rows,'; ') ']'];
+            end
+        end
+
+        function restoreFigureFocus(app)
+            if isempty(app.Fig) || ~isvalid(app.Fig)
+                return
+            end
+
+            try
+                figure(app.Fig);
+            catch
+            end
+
+            try
+                drawnow limitrate nocallbacks;
+            catch
             end
         end
 
