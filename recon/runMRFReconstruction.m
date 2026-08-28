@@ -25,41 +25,40 @@ maskReferenceImage = buildMaskReferenceImageFromKspace(data);
 
 disp("Starting reconstruction...")
 
-if strcmpi(reconTarget, 'T1')
-    result = runT1ReconstructionAndFitting(data, MRFParams, settings, context, geometry, regularizer, runtimeOptions);
+
+if strcmp(settings.MRFReconMode, 'Direct')
+    %% Direct recon pathway
+    disp("Direct reconstruction of MRF data pathway")
+    result = runDirectMRFReconstruction(data,context, geometry);
 else
-    if strcmp(settings.MRFReconMode, 'Direct')
-        %% Direct recon pathway
-        disp("Direct reconstruction of MRF data pathway")
-        result = runDirectMRFReconstruction(data,context, geometry);
-    else
-        %% Sub-space recon pathway
-        [iterData, scalingInfo] = scaleMRFReconData(data, context);
-        result = runADMMReconstruction(context, geometry, regularizer, iterData);
+    disp("Sub-space reconstruction of MRF data pathway")
+    %% Sub-space recon pathway
+    [iterData, scalingInfo] = scaleMRFReconData(data, context);
+    result = runADMMReconstruction(context, geometry, regularizer, iterData);
 
-        if isfield(result, 'images') && ~isempty(result.images)
-            result.images = unscaleMRFReconImages(result.images, scalingInfo);
-            result.Image = result.images;
-        end
-
-        result.Scaling = scalingInfo;
-        if isfield(scalingInfo, 'Message') && ~isempty(scalingInfo.Message)
-            result.Log{end+1} = char(scalingInfo.Message);
-        end
-
-        nTemporalFrames = size(data, 4);
-        retentionPct = context.SubspaceComponentRetentionPct;
-        nRetainedComponents = max(1, min(nTemporalFrames, ceil((retentionPct / 100) * nTemporalFrames)));
-        result.SubspaceTotalComponents = nTemporalFrames;
-        result.SubspaceRetainedComponents = nRetainedComponents;
-        result.SubspaceImageCount = nRetainedComponents;
-        result.SubspaceComponentRetentionPct = retentionPct;
-        result.Log{end+1} = sprintf('Selected regularizer(s): %s.', char(strjoin(context.RegularizationModes, ', ')));
-        result.Log{end+1} = sprintf('Subspace retention set to %.2f%%%% (%d/%d components).', ...
-            retentionPct, nRetainedComponents, nTemporalFrames);
-        result.Log{end+1} = sprintf('Sub-space images retained: %d.', nRetainedComponents);
+    if isfield(result, 'images') && ~isempty(result.images)
+        result.images = unscaleMRFReconImages(result.images, scalingInfo);
+        result.Image = result.images;
     end
+
+    result.Scaling = scalingInfo;
+    if isfield(scalingInfo, 'Message') && ~isempty(scalingInfo.Message)
+        result.Log{end+1} = char(scalingInfo.Message);
+    end
+
+    %nTemporalFrames = size(data, 4);
+    %retentionPct = context.SubspaceComponentRetentionPct;
+    %nRetainedComponents = max(1, min(nTemporalFrames, ceil((retentionPct / 100) * nTemporalFrames)));
+    %result.SubspaceTotalComponents = nTemporalFrames;
+    %result.SubspaceRetainedComponents = nRetainedComponents;
+    %result.SubspaceImageCount = nRetainedComponents;
+    %result.SubspaceComponentRetentionPct = retentionPct;
+    %result.Log{end+1} = sprintf('Selected regularizer(s): %s.', char(strjoin(context.RegularizationModes, ', ')));
+    %result.Log{end+1} = sprintf('Subspace retention set to %.2f%%%% (%d/%d components).', ...
+        %retentionPct, nRetainedComponents, nTemporalFrames);
+    %result.Log{end+1} = sprintf('Sub-space images retained: %d.', nRetainedComponents);
 end
+
 if isempty(result) || ~isstruct(result)
     result = struct();
 end

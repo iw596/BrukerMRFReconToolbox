@@ -76,34 +76,36 @@ function params = LoadBrukerData(path,loadDataFlag)
     % Get number of read points
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_EncMatrix'));
     line = TextAsCells(mask);
-    line = strtrim(extractAfter(cell2mat(line),'='));
-    line = splitlines(line);
-    line = split(line(2),' ');
-    params.NCol = str2num(cell2mat(line(1))); % NCol is Siemens language for number of points in a PE line/radial spoke
-    params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
-    if (length(line) > 2)
-        params.NPar = str2num(cell2mat(line(3))); % NLin is Siemens language for Phase encoding in 3d dimension
-    else
-        params.NPar = 1;
+    if (isempty(line) == false)
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        line = split(line(2),' ');
+        params.NCol = str2num(cell2mat(line(1))); % NCol is Siemens language for number of points in a PE line/radial spoke
+        params.NLin = str2num(cell2mat(line(2))); % NLin is Siemens language for number of lines
+        if (length(line) > 2)
+            params.NPar = str2num(cell2mat(line(3))); % NLin is Siemens language for Phase encoding in 3d dimension
+        else
+            params.NPar = 1;
+        end
     end
     
     % Find the entry containing PVM_SpatDimEnum
     idx = find(contains(TextAsCells,'$PVM_SpatDimEnum='),1);
-    
-    if isempty(idx)
-        error('PVM_SpatDimEnum not found');
+    if (isempty(idx) ~=1)
+        if isempty(idx)
+            error('PVM_SpatDimEnum not found');
+        end
+        
+        % Extract 2D or 3D
+        token = regexp(TextAsCells{idx},'<(2D|3D)>','tokens','once');
+        
+        if isempty(token)
+            error('Could not parse dimensionality');
+        end
+        
+        dim = token{1};     % '2D' or '3D'
+        params.NDim = str2num(dim(1));
     end
-    
-    % Extract 2D or 3D
-    token = regexp(TextAsCells{idx},'<(2D|3D)>','tokens','once');
-    
-    if isempty(token)
-        error('Could not parse dimensionality');
-    end
-    
-    dim = token{1};     % '2D' or '3D'
-    params.NDim = str2num(dim(1));
-
 
     k = strfind(TextAsCells,"$PVM_NMovieFrames=");
     idx = find(~cellfun(@isempty,k));
@@ -149,16 +151,18 @@ function params = LoadBrukerData(path,loadDataFlag)
 
     % Extract the FOV
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_Fov='));
+    
     line = TextAsCells(mask);
-    line = strtrim(extractAfter(cell2mat(line),'='));
-    line = splitlines(line);
-    line = split(line(2),' ');
-    if (size(line,1) == 2)
-        params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
-    else
-        params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2))) str2num(cell2mat(line(3)))];
+    if (isempty(line) ~=1)
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        line = splitlines(line);
+        line = split(line(2),' ');
+        if (size(line,1) == 2)
+            params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2)))];
+        else
+            params.FOV = [str2num(cell2mat(line(1))) str2num(cell2mat(line(2))) str2num(cell2mat(line(3)))];
+        end
     end
-
     % Extract number of repetitions
     mask = ~cellfun(@isempty, strfind(TextAsCells,'$PVM_NRepetitions'));
     line = TextAsCells(mask);
@@ -757,33 +761,33 @@ function params = LoadBrukerData(path,loadDataFlag)
     idx = find(contains(TextAsCells,'$PVM_EncSteps1='),1);
 
     if isempty(idx)
-        error('PVM_EncSteps1 not found in method file.');
+        warning('PVM_EncSteps1 not found in method file.');
+    else
+
+        entry = TextAsCells{idx};
+    
+        % Extract the number of encoding steps
+        nSteps = sscanf(entry,'$PVM_EncSteps1=( %d )',1);
+    
+        % Extract everything after the closing parenthesis
+        tokens = regexp(entry,'\)\s*(.*)','tokens','once');
+    
+        if isempty(tokens)
+            error('Could not parse PVM_EncSteps1 values.');
+        end
+    
+        % Convert all numbers to a vector
+        EncSteps1 = sscanf(tokens{1},'%f');
+    
+        % Check that the correct number of values was read
+        if numel(EncSteps1) ~= nSteps
+            error('Expected %d encoding steps, but read %d.', ...
+                nSteps, numel(EncSteps1));
+        end
+    
+        % Convert to row vector (optional)
+        params.EncSteps1 = EncSteps1.';
     end
-
-    entry = TextAsCells{idx};
-
-    % Extract the number of encoding steps
-    nSteps = sscanf(entry,'$PVM_EncSteps1=( %d )',1);
-
-    % Extract everything after the closing parenthesis
-    tokens = regexp(entry,'\)\s*(.*)','tokens','once');
-
-    if isempty(tokens)
-        error('Could not parse PVM_EncSteps1 values.');
-    end
-
-    % Convert all numbers to a vector
-    EncSteps1 = sscanf(tokens{1},'%f');
-
-    % Check that the correct number of values was read
-    if numel(EncSteps1) ~= nSteps
-        error('Expected %d encoding steps, but read %d.', ...
-            nSteps, numel(EncSteps1));
-    end
-
-    % Convert to row vector (optional)
-    params.EncSteps1 = EncSteps1.';
-
 
     %% Load imaging data if required
     if (loadDataFlag == true)
