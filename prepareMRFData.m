@@ -9,6 +9,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
 
     %% Check if undersampled or not
     if (MRFParams.Traj.cartesianUndersamplingYesNo == true)
+        disp("MRF Undersampling detected....")
         nRead = MRFParams.NCol;
         nLin = MRFParams.NLin;
         nPar = MRFParams.NPar;
@@ -39,6 +40,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         clear("fid");
 
     else
+        disp("MRF dataset is fully sampled...")
         nextMultiple = 128 * ceil((MRFParams.NCol) / 128);
         data = MRFParams.data;
         data = reshape(data,[nextMultiple,MRFParams.NPointsPerPrep*MRFParams.MRFNPrepModules MRFParams.NLin MRFParams.NPar]);
