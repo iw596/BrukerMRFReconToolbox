@@ -27,12 +27,12 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         data = zeros(nextMultiple, nLin, nPar, nFA, 'like', MRFParams.data);
         samplingmask = zeros(nRead, nLin, nPar, nFA, 'like', real(MRFParams.data));
 
-        fid = reshape(MRFParams.data, [nRead nSamples]);
+        fid = reshape(MRFParams.data, [nextMultiple nSamples]);
 
         linIdx3D = sub2ind([nLin nPar nFA], ...
             MRFParams.Traj.CartPE1(:), MRFParams.Traj.CartPE2(:), FAIndex(:));
-        baseOffset = (linIdx3D - 1) * nRead;
-        rowOffset = (0:nRead-1)';
+        baseOffset = (linIdx3D - 1) * nextMultiple;
+        rowOffset = (0:nextMultiple-1)';
         linearIdx = rowOffset + baseOffset.';
 
         data(linearIdx) = fid;
