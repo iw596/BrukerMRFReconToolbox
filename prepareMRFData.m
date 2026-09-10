@@ -25,7 +25,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         FAIndex = repmat(FAIndex, 1, repFactor);
 
         data = zeros(nextMultiple, nLin, nPar, nFA, 'like', MRFParams.data);
-        samplingmask = zeros(nRead, nLin, nPar, nFA, 'like', real(MRFParams.data));
+        samplingmask = zeros(nextMultiple, nLin, nPar, nFA, 'like', real(MRFParams.data));
 
         fid = reshape(MRFParams.data, [nextMultiple nSamples]);
 
@@ -39,6 +39,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         samplingmask(linearIdx) = 1.0;
         clear("fid");
         data = data(1:nRead,:,:,:);
+        samplingmask = samplingmask(1:nRead,:,:,:);
 
     else
         disp("MRF dataset is fully sampled...")
