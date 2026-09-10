@@ -15,7 +15,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         nPar = MRFParams.NPar;
         nFA = MRFParams.NPointsPerPrep * MRFParams.MRFNPrepModules;
         nSamples = size(MRFParams.Traj.CartPE1, 1);
-
+        nextMultiple = 128 * ceil((nRead) / 128);
         repFactor = nSamples / nFA;
         if abs(repFactor - round(repFactor)) > eps(max(repFactor,1))
             error('prepareMRFData:InvalidTrajectoryLength', ...
@@ -24,7 +24,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         repFactor = round(repFactor);
         FAIndex = repmat(FAIndex, 1, repFactor);
 
-        data = zeros(nRead, nLin, nPar, nFA, 'like', MRFParams.data);
+        data = zeros(nextMultiple, nLin, nPar, nFA, 'like', MRFParams.data);
         samplingmask = zeros(nRead, nLin, nPar, nFA, 'like', real(MRFParams.data));
 
         fid = reshape(MRFParams.data, [nRead nSamples]);
@@ -38,6 +38,7 @@ function [data,samplingmask] = prepareMRFData(MRFParams)
         data(linearIdx) = fid;
         samplingmask(linearIdx) = 1.0;
         clear("fid");
+        data = data(1:nRead,:,:,:);
 
     else
         disp("MRF dataset is fully sampled...")
