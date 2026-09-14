@@ -29,7 +29,7 @@ end
 MRFParams = LoadBrukerData(inputSource, true);
 
 
-%% Now we format the data into the following dimensions NRo x NPE1 x NPE2 x NPoints
+%% Now we format the data into the following dimensions NRo x NPE1 x NPE2 x NPoints, also return the sampling mask
 [data,samplingmask] = prepareMRFData(MRFParams); % Returns zero-filled data and sampling mask
 
 
@@ -60,6 +60,7 @@ function options = validateOptions(varargin)
     defaults = struct();
     defaults.B1CorrectionMode = "None";
     defaults.B1Map = [];
+    defaults.MRFReconMode = "direct";
 
     options = defaults;
 

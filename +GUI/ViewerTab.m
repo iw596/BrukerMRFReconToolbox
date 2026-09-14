@@ -16,6 +16,8 @@ classdef ViewerTab < handle
         ReferenceMaskInfoLabel
         SliceSlider
         SliceLabel
+        PlaneDropdown
+        PlaneLabel
 
         MapDropdown
         MapLabel
@@ -64,6 +66,7 @@ classdef ViewerTab < handle
 
         % Per-map-type manual scaling memory
         ManualScaleByMapType = struct('T1', [], 'T2', [], 'Default', [])
+        LastMaskPlaneWarning = ''
     end
 
     methods
@@ -276,6 +279,16 @@ classdef ViewerTab < handle
                 'Position',[180 135 1000 3],...
                 'ValueChangedFcn',@(src,event)obj.changeSlice());
 
+            obj.PlaneLabel = uilabel(obj.TabHandle,...
+                'Position',[50 145 120 25],...
+                'Text','Plane');
+
+            obj.PlaneDropdown = uidropdown(obj.TabHandle,...
+                'Position',[180 145 130 30],...
+                'Items',{'Axial','Coronal','Sagittal'},...
+                'Value',obj.Parent.normalizePlaneName(obj.Parent.CurrentPlane),...
+                'ValueChangedFcn',@(src,event)obj.changePlane());
+
             % ---------------------------------------------------------
             % Info
             % ---------------------------------------------------------
@@ -387,8 +400,10 @@ classdef ViewerTab < handle
             obj.GTAxes.Position = [60 + axisWidth 90 axisWidth axisHeight];
 
             mainContentRight = obj.GTAxes.Position(1) + obj.GTAxes.Position(3);
-            obj.SliceLabel.Position = [50 40 120 25];
-            obj.SliceSlider.Position = [180 65 max(mainContentRight - 180, 220) 3];
+            obj.PlaneLabel.Position = [50 60 45 25];
+            obj.PlaneDropdown.Position = [95 60 130 30];
+            obj.SliceLabel.Position = [240 60 70 25];
+            obj.SliceSlider.Position = [315 65 max(mainContentRight - 315, 220) 3];
             obj.InfoLabel.Position = [50 10 max(mainContentRight - 50, 220) 25];
         end
 
@@ -406,6 +421,23 @@ classdef ViewerTab < handle
 
             obj.SliceLabel.Text = sprintf('Slice: %d', obj.Parent.CurrentSlice);
 
+            obj.updateDisplay();
+        end
+
+        function changePlane(obj)
+
+            if isempty(obj.Parent.MRFData)
+                obj.Parent.CurrentPlane = 'Axial';
+                obj.PlaneDropdown.Value = 'Axial';
+                obj.configureSliceSlider();
+                obj.updateDisplay();
+                return
+            end
+
+            obj.Parent.CurrentPlane = obj.Parent.normalizePlaneName(obj.PlaneDropdown.Value);
+            obj.LastMaskPlaneWarning = '';
+            obj.configureSliceSlider();
+            obj.updateROIStats();
             obj.updateDisplay();
         end
 
@@ -491,13 +523,23 @@ classdef ViewerTab < handle
             cla(obj.MRFAxes)
             cla(obj.GTAxes)
 
+            obj.Parent.CurrentPlane = obj.Parent.normalizePlaneName(obj.Parent.CurrentPlane);
+            if ~isempty(obj.PlaneDropdown) && isvalid(obj.PlaneDropdown)
+                obj.PlaneDropdown.Value = obj.Parent.CurrentPlane;
+            end
+
             mrfImg = [];
             gtImg = [];
 
             if ~isempty(obj.Parent.MRFData)
                 mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
                 if obj.ApplyMRFMaskCheckbox.Value && ~isempty(obj.Parent.MRFMask)
-                    mrfImg = obj.Parent.applyMaskToImage(mrfImg, obj.getMaskSlice(obj.Parent.MRFMask));
+                    [mrfMaskSlice, isMRFMaskCompatible, mrfMaskMsg] = obj.getMaskSlice(obj.Parent.MRFMask, size(mrfImg), 'MRF');
+                    if isMRFMaskCompatible
+                        mrfImg = obj.Parent.applyMaskToImage(mrfImg, mrfMaskSlice);
+                    else
+                        obj.handleMaskPlaneMismatch(mrfMaskMsg);
+                    end
                 end
             end
 
@@ -505,11 +547,14 @@ classdef ViewerTab < handle
                 prevMap = obj.Parent.CurrentMap;
                 gtMapIdx = obj.getEquivalentGTMapIndex(prevMap);
                 if ~isnan(gtMapIdx)
-                    obj.Parent.CurrentMap = gtMapIdx;
-                    gtImg = obj.Parent.extractImage(obj.Parent.GTData);
-                    obj.Parent.CurrentMap = prevMap;
+                    gtImg = obj.Parent.extractImage(obj.Parent.GTData, 'Axial', obj.Parent.CurrentSlice, gtMapIdx);
                     if obj.ApplyGTMaskCheckbox.Value && ~isempty(obj.Parent.GTMask)
-                        gtImg = obj.Parent.applyMaskToImage(gtImg, obj.getMaskSlice(obj.Parent.GTMask));
+                        [gtMaskSlice, isGTMaskCompatible, gtMaskMsg] = obj.getMaskSlice(obj.Parent.GTMask, size(gtImg), 'Ground Truth', 'Axial');
+                        if isGTMaskCompatible
+                            gtImg = obj.Parent.applyMaskToImage(gtImg, gtMaskSlice);
+                        else
+                            obj.handleMaskPlaneMismatch(gtMaskMsg);
+                        end
                     end
                 else
                     obj.Parent.CurrentMap = prevMap;
@@ -600,23 +645,82 @@ classdef ViewerTab < handle
             obj.updateROIStats();
         end
 
-        function msk = getMaskSlice(obj, mask)
-            % Extract the 2D mask slice matching the current slice index
+        function [msk, isCompatible, messageText] = getMaskSlice(obj, mask, targetImageSize, datasetLabel, planeName)
+            % Extract a 2D mask slice for the currently selected plane.
 
             msk = [];
+            isCompatible = true;
+            messageText = '';
 
             if isempty(mask)
                 return
             end
 
-            sz = size(mask);
-
-            if numel(sz) >= 3
-                sliceIdx = min(max(round(obj.Parent.CurrentSlice),1), sz(3));
-                msk = logical(mask(:,:,sliceIdx));
-            else
-                msk = logical(mask);
+            if nargin < 3
+                targetImageSize = [];
             end
+            if nargin < 4 || isempty(datasetLabel)
+                datasetLabel = 'Selected';
+            end
+            if nargin < 5 || isempty(planeName)
+                planeName = obj.Parent.CurrentPlane;
+            end
+
+            sz = size(mask);
+            sz(end+1:3) = 1;
+
+            planeName = obj.Parent.normalizePlaneName(planeName);
+            sliceIdx = max(1, round(obj.Parent.CurrentSlice));
+
+            switch planeName
+                case 'Sagittal'
+                    if sliceIdx > sz(1)
+                        isCompatible = false;
+                        messageText = sprintf('%s mask is missing sagittal slice %d (mask size: %dx%dx%d).', datasetLabel, sliceIdx, sz(1), sz(2), sz(3));
+                        return
+                    end
+                    msk = reshape(mask(sliceIdx,:,:), sz(2), sz(3));
+                case 'Coronal'
+                    if sliceIdx > sz(2)
+                        isCompatible = false;
+                        messageText = sprintf('%s mask is missing coronal slice %d (mask size: %dx%dx%d).', datasetLabel, sliceIdx, sz(1), sz(2), sz(3));
+                        return
+                    end
+                    msk = reshape(mask(:,sliceIdx,:), sz(1), sz(3));
+                otherwise
+                    if sliceIdx > sz(3)
+                        isCompatible = false;
+                        messageText = sprintf('%s mask is missing axial slice %d (mask size: %dx%dx%d).', datasetLabel, sliceIdx, sz(1), sz(2), sz(3));
+                        return
+                    end
+                    msk = mask(:,:,sliceIdx);
+            end
+
+            msk = logical(msk);
+
+            if ~isempty(targetImageSize)
+                targetRows = targetImageSize(1);
+                targetCols = targetImageSize(2);
+                if size(msk,1) ~= targetRows || size(msk,2) ~= targetCols
+                    isCompatible = false;
+                    messageText = sprintf('%s mask dimensions (%dx%d) do not match %s plane image dimensions (%dx%d).', ...
+                        datasetLabel, size(msk,1), size(msk,2), planeName, targetRows, targetCols);
+                    msk = [];
+                end
+            end
+        end
+
+        function handleMaskPlaneMismatch(obj, messageText)
+            if isempty(messageText)
+                return
+            end
+
+            if strcmp(obj.LastMaskPlaneWarning, messageText)
+                return
+            end
+
+            obj.LastMaskPlaneWarning = messageText;
+            uialert(obj.Parent.Fig, messageText, 'Mask Plane Mismatch', 'Icon', 'warning');
         end
 
         function gtMapIdx = getEquivalentGTMapIndex(obj, mrfMapIdx)
@@ -855,7 +959,10 @@ classdef ViewerTab < handle
             if ~isempty(obj.Parent.MRFData)
                 mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
                 if obj.ApplyMRFMaskCheckbox.Value && ~isempty(obj.Parent.MRFMask)
-                    mrfImg = obj.Parent.applyMaskToImage(mrfImg, obj.getMaskSlice(obj.Parent.MRFMask));
+                    [mrfMaskSlice, isMRFMaskCompatible] = obj.getMaskSlice(obj.Parent.MRFMask, size(mrfImg), 'MRF');
+                    if isMRFMaskCompatible
+                        mrfImg = obj.Parent.applyMaskToImage(mrfImg, mrfMaskSlice);
+                    end
                 end
             end
 
@@ -863,11 +970,12 @@ classdef ViewerTab < handle
                 prevMap = obj.Parent.CurrentMap;
                 gtMapIdx = obj.getEquivalentGTMapIndex(prevMap);
                 if ~isnan(gtMapIdx)
-                    obj.Parent.CurrentMap = gtMapIdx;
-                    gtImg = obj.Parent.extractImage(obj.Parent.GTData);
-                    obj.Parent.CurrentMap = prevMap;
+                    gtImg = obj.Parent.extractImage(obj.Parent.GTData, 'Axial', obj.Parent.CurrentSlice, gtMapIdx);
                     if obj.ApplyGTMaskCheckbox.Value && ~isempty(obj.Parent.GTMask)
-                        gtImg = obj.Parent.applyMaskToImage(gtImg, obj.getMaskSlice(obj.Parent.GTMask));
+                        [gtMaskSlice, isGTMaskCompatible] = obj.getMaskSlice(obj.Parent.GTMask, size(gtImg), 'Ground Truth', 'Axial');
+                        if isGTMaskCompatible
+                            gtImg = obj.Parent.applyMaskToImage(gtImg, gtMaskSlice);
+                        end
                     end
                 else
                     obj.Parent.CurrentMap = prevMap;
@@ -879,11 +987,28 @@ classdef ViewerTab < handle
 
         function configureSliceSlider(obj)
 
+            obj.Parent.CurrentPlane = obj.Parent.normalizePlaneName(obj.Parent.CurrentPlane);
+            if ~isempty(obj.PlaneDropdown) && isvalid(obj.PlaneDropdown)
+                obj.PlaneDropdown.Value = obj.Parent.CurrentPlane;
+            end
+
             activeData = [];
             if ~isempty(obj.Parent.MRFData)
                 activeData = obj.Parent.MRFData;
+                if ~isempty(obj.PlaneDropdown) && isvalid(obj.PlaneDropdown)
+                    obj.PlaneDropdown.Enable = 'on';
+                end
             elseif ~isempty(obj.Parent.GTData)
                 activeData = obj.Parent.GTData;
+                obj.Parent.CurrentPlane = 'Axial';
+                if ~isempty(obj.PlaneDropdown) && isvalid(obj.PlaneDropdown)
+                    obj.PlaneDropdown.Value = 'Axial';
+                    obj.PlaneDropdown.Enable = 'off';
+                end
+            else
+                if ~isempty(obj.PlaneDropdown) && isvalid(obj.PlaneDropdown)
+                    obj.PlaneDropdown.Enable = 'off';
+                end
             end
 
             if isempty(activeData)
@@ -894,12 +1019,10 @@ classdef ViewerTab < handle
                 return
             end
 
-            sz = size(activeData);
-
-            if numel(sz) < 3
-                nSlices = 1;
+            if ~isempty(obj.Parent.MRFData)
+                nSlices = obj.Parent.getSliceCountForData(activeData, obj.Parent.CurrentPlane);
             else
-                nSlices = sz(3);
+                nSlices = obj.Parent.getSliceCountForData(activeData, 'Axial');
             end
 
             % IMPORTANT: ensure valid range
@@ -915,9 +1038,11 @@ classdef ViewerTab < handle
                 obj.Parent.CurrentSlice = 1;
             else
                 obj.SliceSlider.Limits = [1 nSlices];
-                centerSlice = ceil(nSlices / 2);
-                obj.Parent.CurrentSlice = centerSlice;
-                obj.SliceSlider.Value = centerSlice;
+                obj.Parent.CurrentSlice = min(max(round(obj.Parent.CurrentSlice),1), nSlices);
+                if obj.Parent.CurrentSlice < 1 || obj.Parent.CurrentSlice > nSlices
+                    obj.Parent.CurrentSlice = ceil(nSlices / 2);
+                end
+                obj.SliceSlider.Value = obj.Parent.CurrentSlice;
                 obj.SliceSlider.Enable = 'on';
             end
             obj.SliceLabel.Text = sprintf('Slice: %d', obj.Parent.CurrentSlice);
@@ -1034,6 +1159,7 @@ classdef ViewerTab < handle
             end
 
             obj.Parent.ROIs(end+1).Slice = obj.Parent.CurrentSlice;
+            obj.Parent.ROIs(end).Plane = obj.Parent.normalizePlaneName(obj.Parent.CurrentPlane);
             obj.Parent.ROIs(end).Position = roi.Position;
             obj.Parent.ROIs(end).Type = drawMode;
 
@@ -1070,7 +1196,8 @@ classdef ViewerTab < handle
 
             labels = cell(1,numel(obj.Parent.ROIs));
             for k = 1:numel(obj.Parent.ROIs)
-                labels{k} = sprintf('ROI %d (slice %d)', k, obj.Parent.ROIs(k).Slice);
+                roiPlane = obj.Parent.getROIPlane(obj.Parent.ROIs(k));
+                labels{k} = sprintf('ROI %d (%s slice %d)', k, roiPlane, obj.Parent.ROIs(k).Slice);
             end
 
             obj.ROIListBox.Items = labels;
@@ -1108,6 +1235,13 @@ classdef ViewerTab < handle
             if isempty(obj.Parent.MRFData)
                 obj.ROIStatsMeanLabel.Text = 'Mean: -';
                 obj.ROIStatsStdLabel.Text  = 'Std: -';
+                return
+            end
+
+            roiPlane = obj.Parent.getROIPlane(roi);
+            if ~strcmpi(roiPlane, obj.Parent.CurrentPlane)
+                obj.ROIStatsMeanLabel.Text = sprintf('Mean (map %d): -', obj.Parent.CurrentMap);
+                obj.ROIStatsStdLabel.Text  = sprintf('Std (map %d): ROI on %s plane', obj.Parent.CurrentMap, roiPlane);
                 return
             end
 
@@ -1302,6 +1436,15 @@ classdef ViewerTab < handle
                     'Icon','warning');
                 return
             end
+
+            prevSlice = obj.Parent.CurrentSlice;
+            prevMap = obj.Parent.CurrentMap;
+            prevPlane = obj.Parent.CurrentPlane;
+            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap, prevPlane)); %#ok<NASGU>
+
+            roiPlane = obj.Parent.getROIPlane(roi);
+            obj.Parent.CurrentPlane = roiPlane;
+            obj.Parent.CurrentSlice = min(max(round(roi.Slice),1), obj.Parent.getSliceCountForData(obj.Parent.MRFData, roiPlane));
 
             mrfSize = size(obj.Parent.MRFData);
             mrfMaps = 1;
@@ -1610,12 +1753,15 @@ classdef ViewerTab < handle
 
             prevSlice = obj.Parent.CurrentSlice;
             prevMap = obj.Parent.CurrentMap;
-            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap)); %#ok<NASGU>
+            prevPlane = obj.Parent.CurrentPlane;
+            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap, prevPlane)); %#ok<NASGU>
 
             for roiIdx = 1:numel(obj.Parent.ROIs)
                 roi = obj.Parent.ROIs(roiIdx);
 
-                obj.Parent.CurrentSlice = roi.Slice;
+                roiPlane = obj.Parent.getROIPlane(roi);
+                obj.Parent.CurrentPlane = roiPlane;
+                obj.Parent.CurrentSlice = min(max(round(roi.Slice),1), obj.Parent.getSliceCountForData(obj.Parent.MRFData, roiPlane));
 
                 obj.Parent.CurrentMap = mrfMapIdx;
                 mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
@@ -1645,12 +1791,15 @@ classdef ViewerTab < handle
 
             prevSlice = obj.Parent.CurrentSlice;
             prevMap = obj.Parent.CurrentMap;
-            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap)); %#ok<NASGU>
+            prevPlane = obj.Parent.CurrentPlane;
+            cleanupState = onCleanup(@()obj.restoreSliceMapState(prevSlice, prevMap, prevPlane)); %#ok<NASGU>
 
             for roiIdx = 1:numel(obj.Parent.ROIs)
                 roi = obj.Parent.ROIs(roiIdx);
 
-                obj.Parent.CurrentSlice = roi.Slice;
+                roiPlane = obj.Parent.getROIPlane(roi);
+                obj.Parent.CurrentPlane = roiPlane;
+                obj.Parent.CurrentSlice = min(max(round(roi.Slice),1), obj.Parent.getSliceCountForData(obj.Parent.MRFData, roiPlane));
 
                 obj.Parent.CurrentMap = mrfMapIdx;
                 mrfImg = obj.Parent.extractImage(obj.Parent.MRFData);
@@ -1676,9 +1825,10 @@ classdef ViewerTab < handle
             end
         end
 
-        function restoreSliceMapState(obj, sliceIdx, mapIdx)
+        function restoreSliceMapState(obj, sliceIdx, mapIdx, planeName)
             obj.Parent.CurrentSlice = sliceIdx;
             obj.Parent.CurrentMap = mapIdx;
+            obj.Parent.CurrentPlane = obj.Parent.normalizePlaneName(planeName);
         end
 
         function plotBlandAltmanFigure(~, gtVals, mrfVals, metricName, modeLabel)

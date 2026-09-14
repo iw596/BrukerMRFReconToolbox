@@ -38,6 +38,7 @@ classdef MRFViewer < handle
 
         CurrentSlice = 1
         CurrentMap = 1
+        CurrentPlane = 'Axial'
 
         MapNames = {}
 
@@ -288,7 +289,7 @@ classdef MRFViewer < handle
             app.NativeMRFMask = loadedMask;
             app.MRFMask = app.applyReferenceMaskToMask(app.NativeMRFMask, app.MRFData, 'MRF');
 
-            app.CurrentSlice = app.defaultSliceForData(app.MRFData);
+            app.CurrentSlice = app.defaultSliceForData(app.MRFData, app.CurrentPlane);
             app.CurrentMap = 1;
 
             app.ViewerTabObj.configureSliceSlider();
@@ -361,7 +362,7 @@ classdef MRFViewer < handle
                 app.GTMapNames = mapNames;
                 app.GTMask = app.applyReferenceMaskToMask(mask, app.GTData, 'Ground Truth');
                 if isempty(app.MRFData)
-                    app.CurrentSlice = app.defaultSliceForData(app.GTData);
+                    app.CurrentSlice = app.defaultSliceForData(app.GTData, app.CurrentPlane);
                     app.CurrentMap = 1;
                 end
             else
@@ -865,9 +866,27 @@ classdef MRFViewer < handle
             sz(end+1:3) = 1;
             target = dataSize3D;
 
+            % Accept 2D masks that match any display plane of the 3D data.
+            % This supports masks drawn/exported in non-axial planes.
+            if sz(3) == 1
+                if isequal(sz(1:2), target(1:2))
+                    % Axial (x-y), replicate along z.
+                    maskAligned = repmat(logical(mask(:,:,1)), 1, 1, target(3));
+                    return
+                elseif isequal(sz(1:2), [target(1) target(3)])
+                    % Coronal (x-z), replicate along y.
+                    maskAligned = repmat(reshape(logical(mask(:,:,1)), target(1), 1, target(3)), 1, target(2), 1);
+                    return
+                elseif isequal(sz(1:2), [target(2) target(3)])
+                    % Sagittal (y-z), replicate along x.
+                    maskAligned = repmat(reshape(logical(mask(:,:,1)), 1, target(2), target(3)), target(1), 1, 1);
+                    return
+                end
+            end
+
             if ~isequal(sz(1:2), target(1:2))
-                uialert(app.Fig, sprintf('%s size mismatch: mask is %dx%d but data is %dx%d.', ...
-                    maskLabel, sz(1), sz(2), target(1), target(2)), ...
+                uialert(app.Fig, sprintf('%s size mismatch: mask is %dx%d but data planes are %dx%d (axial), %dx%d (coronal), %dx%d (sagittal).', ...
+                    maskLabel, sz(1), sz(2), target(1), target(2), target(1), target(3), target(2), target(3)), ...
                     'Mask Size Mismatch', 'Icon', 'error');
                 return
             end
@@ -896,17 +915,61 @@ classdef MRFViewer < handle
             sz3 = double(sz(1:3));
         end
 
-        function sliceIdx = defaultSliceForData(~, data)
-            sz = size(data);
-            if numel(sz) < 3
-                sliceIdx = 1;
-                return
+        function sliceIdx = defaultSliceForData(app, data, planeName)
+            if nargin < 3 || isempty(planeName)
+                planeName = app.CurrentPlane;
             end
-            nSlices = max(1, round(double(sz(3))));
+
+            nSlices = app.getSliceCountForData(data, planeName);
             if nSlices > 1
                 sliceIdx = ceil(nSlices / 2);
             else
                 sliceIdx = 1;
+            end
+        end
+
+        function plane = normalizePlaneName(~, planeName)
+            plane = 'Axial';
+            if nargin < 2 || isempty(planeName)
+                return
+            end
+
+            candidate = lower(string(planeName));
+            if candidate == "sagittal"
+                plane = 'Sagittal';
+            elseif candidate == "coronal"
+                plane = 'Coronal';
+            else
+                plane = 'Axial';
+            end
+        end
+
+        function nSlices = getSliceCountForData(app, data, planeName)
+            if isempty(data)
+                nSlices = 1;
+                return
+            end
+
+            sz = size(data);
+            sz(end+1:3) = 1;
+
+            switch app.normalizePlaneName(planeName)
+                case 'Sagittal'
+                    nSlices = sz(1);
+                case 'Coronal'
+                    nSlices = sz(2);
+                otherwise
+                    nSlices = sz(3);
+            end
+
+            nSlices = max(1, round(double(nSlices)));
+        end
+
+        function plane = getROIPlane(app, roi)
+            if isstruct(roi) && isfield(roi, 'Plane') && ~isempty(roi.Plane)
+                plane = app.normalizePlaneName(roi.Plane);
+            else
+                plane = 'Axial';
             end
         end
 
@@ -978,7 +1041,8 @@ classdef MRFViewer < handle
 
             prevSlice = app.CurrentSlice;
             prevMap = app.CurrentMap;
-            stateGuard = onCleanup(@()app.restoreSliceMap(prevSlice, prevMap));
+            prevPlane = app.CurrentPlane;
+            stateGuard = onCleanup(@()app.restoreViewerState(prevSlice, prevMap, prevPlane));
 
             mrfMaps = 0;
             if ~isempty(app.MRFData)
@@ -1036,7 +1100,7 @@ classdef MRFViewer < handle
                 mapPairs = struct('MRFIdx', NaN, 'GTIdx', 1, 'MapName', 'GT');
             end
 
-            baseHeader = {'ROIIndex','Slice','Type','Position'};
+            baseHeader = {'ROIIndex','Plane','Slice','Type','Position'};
             dynamicHeader = {};
 
             for p = 1:numel(mapPairs)
@@ -1058,9 +1122,10 @@ classdef MRFViewer < handle
                 posStr = app.roiPositionToString(roi.Position);
 
                 row = cell(1, numel(header));
-                row(1:4) = {k, roi.Slice, roi.Type, posStr};
+                roiPlane = app.getROIPlane(roi);
+                row(1:5) = {k, roiPlane, roi.Slice, roi.Type, posStr};
 
-                colOffset = 4;
+                colOffset = 5;
                 for p = 1:numel(mapPairs)
                     mrfIdx = mapPairs(p).MRFIdx;
                     gtIdx = mapPairs(p).GTIdx;
@@ -1069,7 +1134,8 @@ classdef MRFViewer < handle
                     gtMean = NaN; gtStd = NaN; gtArea = NaN;
 
                     if ~isnan(mrfIdx) && ~isempty(app.MRFData)
-                        app.CurrentSlice = roi.Slice;
+                        app.CurrentPlane = roiPlane;
+                        app.CurrentSlice = min(max(round(roi.Slice),1), app.getSliceCountForData(app.MRFData, roiPlane));
                         app.CurrentMap = mrfIdx;
                         mrfImg = app.extractImage(app.MRFData);
                         mrfVals = app.extractROIMask(mrfImg, roi);
@@ -1077,7 +1143,8 @@ classdef MRFViewer < handle
                     end
 
                     if ~isnan(gtIdx) && ~isempty(app.GTData)
-                        app.CurrentSlice = roi.Slice;
+                        app.CurrentPlane = roiPlane;
+                        app.CurrentSlice = min(max(round(roi.Slice),1), app.getSliceCountForData(app.GTData, roiPlane));
                         app.CurrentMap = gtIdx;
                         gtImg = app.extractImage(app.GTData);
                         gtVals = app.extractROIMask(gtImg, roi);
@@ -1129,22 +1196,47 @@ classdef MRFViewer < handle
         % Helper Methods for Display
         %% ============================================================
 
-        function img = extractImage(app,data)
+        function img = extractImage(app,data,planeName,sliceIdx,mapIdx)
             % Extract 2D image from data volume
             %   Handles 2D, 3D, and 4D data arrays
+
+            if nargin < 3 || isempty(planeName)
+                planeName = app.CurrentPlane;
+            end
+            if nargin < 4 || isempty(sliceIdx)
+                sliceIdx = app.CurrentSlice;
+            end
+            if nargin < 5 || isempty(mapIdx)
+                mapIdx = app.CurrentMap;
+            end
 
             sz = size(data);
 
             if numel(sz) < 3
                 img = data;
             else
-                sliceIdx = min(max(round(app.CurrentSlice),1), sz(3));
+                plane = app.normalizePlaneName(planeName);
+                sliceIdx = min(max(round(sliceIdx),1), app.getSliceCountForData(data, plane));
 
                 if numel(sz) == 3
-                    img = data(:,:,sliceIdx);
+                    switch plane
+                        case 'Sagittal'
+                            img = reshape(data(sliceIdx,:,:), sz(2), sz(3));
+                        case 'Coronal'
+                            img = reshape(data(:,sliceIdx,:), sz(1), sz(3));
+                        otherwise
+                            img = data(:,:,sliceIdx);
+                    end
                 else
-                    mapIdx = min(max(round(app.CurrentMap),1), sz(4));
-                    img = data(:,:,sliceIdx,mapIdx);
+                    mapIdx = min(max(round(mapIdx),1), sz(4));
+                    switch plane
+                        case 'Sagittal'
+                            img = reshape(data(sliceIdx,:,:,mapIdx), sz(2), sz(3));
+                        case 'Coronal'
+                            img = reshape(data(:,sliceIdx,:,mapIdx), sz(1), sz(3));
+                        otherwise
+                            img = data(:,:,sliceIdx,mapIdx);
+                    end
                 end
             end
         end
@@ -1159,7 +1251,7 @@ classdef MRFViewer < handle
             for k = 1:numel(app.ROIs)
                 roi = app.ROIs(k);
 
-                if roi.Slice == app.CurrentSlice
+                if roi.Slice == app.CurrentSlice && strcmpi(app.getROIPlane(roi), app.CurrentPlane)
 
                     switch roi.Type
                         case 'Rectangle'
@@ -1212,6 +1304,8 @@ classdef MRFViewer < handle
 
             infoStr = sprintf('Slice: %d | Map: %d', ...
                 app.CurrentSlice, app.CurrentMap);
+
+            infoStr = sprintf('%s | Plane: %s', infoStr, app.normalizePlaneName(app.CurrentPlane));
 
             if ~isempty(app.MapNames) && app.CurrentMap <= numel(app.MapNames)
                 infoStr = sprintf('%s (%s)', infoStr, app.MapNames{app.CurrentMap});
@@ -1306,6 +1400,12 @@ classdef MRFViewer < handle
             % Restore viewer state after temporary slice/map changes.
             app.CurrentSlice = sliceIdx;
             app.CurrentMap = mapIdx;
+        end
+
+        function restoreViewerState(app, sliceIdx, mapIdx, planeName)
+            app.CurrentSlice = sliceIdx;
+            app.CurrentMap = mapIdx;
+            app.CurrentPlane = app.normalizePlaneName(planeName);
         end
 
         function [meanVal, stdVal, areaPx] = roiStatsFromValues(~, vals)
