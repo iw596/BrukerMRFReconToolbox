@@ -1846,14 +1846,25 @@ classdef ViewerTab < handle
                 'Color', 'w', ...
                 'Units', 'pixels', ...
                 'Position', [200 140 760 640]);
+            % Explicitly force a light theme so the plot is readable regardless of app/OS dark mode.
+            if isprop(fig, 'Theme')
+                try
+                    fig.Theme = 'light';
+                catch
+                end
+            end
 
-            ax = axes('Parent', fig);
+            ax = axes('Parent', fig, 'Color', 'w');
             hold(ax, 'on');
             box(ax, 'on');
             grid(ax, 'on');
             ax.LineWidth = 1.2;
             ax.FontSize = 12;
             ax.FontName = 'Arial';
+            ax.XColor = [0 0 0];
+            ax.YColor = [0 0 0];
+            ax.GridColor = [0.15 0.15 0.15];
+            ax.GridAlpha = 0.25;
 
             scatter(ax, avgVals, diffVals, 32, ...
                 'MarkerFaceColor', [0.2 0.45 0.85], ...
@@ -1872,10 +1883,10 @@ classdef ViewerTab < handle
             plot(ax, [xMin xMax], [loaUpper loaUpper], '--', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.5);
             plot(ax, [xMin xMax], [loaLower loaLower], '--', 'Color', [0.25 0.25 0.25], 'LineWidth', 1.5);
 
-            xlabel(ax, sprintf('Mean of GT and MRF %s', upper(metricName)), 'FontWeight', 'bold');
-            ylabel(ax, sprintf('Difference (MRF - GT) %s', upper(metricName)), 'FontWeight', 'bold');
+            xlabel(ax, sprintf('Mean of GT and MRF %s', upper(metricName)), 'FontWeight', 'bold', 'Color', 'k');
+            ylabel(ax, sprintf('Difference (MRF - GT) %s', upper(metricName)), 'FontWeight', 'bold', 'Color', 'k');
             title(ax, sprintf('%s Bland-Altman (%s)', upper(metricName), modeLabel), ...
-                'FontWeight', 'bold', 'FontSize', 14);
+                'FontWeight', 'bold', 'FontSize', 14, 'Color', 'k');
 
             annotationText = sprintf(['Bias = %.4g' newline ...
                 'Upper LoA = %.4g' newline ...
@@ -1885,6 +1896,7 @@ classdef ViewerTab < handle
                 'Units', 'normalized', ...
                 'VerticalAlignment', 'top', ...
                 'FontSize', 11, ...
+                'Color', 'k', ...
                 'BackgroundColor', 'white', ...
                 'EdgeColor', [0.7 0.7 0.7], ...
                 'Margin', 6);
@@ -1899,14 +1911,25 @@ classdef ViewerTab < handle
                 'Color', 'w', ...
                 'Units', 'pixels', ...
                 'Position', [160 120 760 640]);
+            % Explicitly force a light theme so the plot is readable regardless of app/OS dark mode.
+            if isprop(fig, 'Theme')
+                try
+                    fig.Theme = 'light';
+                catch
+                end
+            end
 
-            ax = axes('Parent', fig);
+            ax = axes('Parent', fig, 'Color', 'w');
             hold(ax, 'on');
             box(ax, 'on');
             grid(ax, 'on');
             ax.LineWidth = 1.2;
             ax.FontSize = 12;
             ax.FontName = 'Arial';
+            ax.XColor = [0 0 0];
+            ax.YColor = [0 0 0];
+            ax.GridColor = [0.15 0.15 0.15];
+            ax.GridAlpha = 0.25;
 
             if ~isempty(yErrVals)
                 errorbar(ax, xVals, yVals, yErrVals, ...
@@ -1951,10 +1974,10 @@ classdef ViewerTab < handle
             rMat = corrcoef(xVals, yVals);
             r2 = rMat(1,2)^2;
 
-            xlabel(ax, sprintf('Ground Truth %s', upper(metricName)), 'FontWeight', 'bold');
-            ylabel(ax, sprintf('MRF %s', upper(metricName)), 'FontWeight', 'bold');
+            xlabel(ax, sprintf('Ground Truth %s', upper(metricName)), 'FontWeight', 'bold', 'Color', 'k');
+            ylabel(ax, sprintf('MRF %s', upper(metricName)), 'FontWeight', 'bold', 'Color', 'k');
             title(ax, sprintf('%s correlation (%s)', upper(metricName), modeLabel), ...
-                'FontWeight', 'bold', 'FontSize', 14);
+                'FontWeight', 'bold', 'FontSize', 14, 'Color', 'k');
 
             annotationText = sprintf('MRF = %.4g · GT + %.4g\nR^2 = %.4f\nN = %d', ...
                 slope, intercept, r2, numel(xVals));
@@ -1962,6 +1985,7 @@ classdef ViewerTab < handle
                 'Units', 'normalized', ...
                 'VerticalAlignment', 'top', ...
                 'FontSize', 11, ...
+                'Color', 'k', ...
                 'BackgroundColor', 'white', ...
                 'EdgeColor', [0.7 0.7 0.7], ...
                 'Margin', 6);
