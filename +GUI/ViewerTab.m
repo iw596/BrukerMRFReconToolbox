@@ -63,6 +63,7 @@ classdef ViewerTab < handle
         AdvancedCorrelationButton
         AdvancedBlandAltmanButton
         AdvancedExportButton
+        AdvancedExportPlotsButton
 
         % Per-map-type manual scaling memory
         ManualScaleByMapType = struct('T1', [], 'T2', [], 'Default', [])
@@ -1323,6 +1324,11 @@ classdef ViewerTab < handle
                     'Text', 'Export ROI CSV', ...
                     'ButtonPushedFcn', @(src,event)obj.Parent.exportROIsCSV());
 
+                obj.AdvancedExportPlotsButton = uibutton(obj.AdvancedExportTab, ...
+                    'Text', 'Export Plots (TIFF)', ...
+                    'ButtonPushedFcn', @(src,event)obj.exportCombinedPlotsTIFF(), ...
+                    'Tooltip', 'Combine correlation and Bland-Altman plots into a single TIFF file');
+
                 obj.layoutAdvancedAnalysisWindow();
             end
 
@@ -1378,7 +1384,11 @@ classdef ViewerTab < handle
             end
 
             if ~isempty(obj.AdvancedExportButton) && isvalid(obj.AdvancedExportButton)
-                obj.AdvancedExportButton.Position = [btnX btnY btnW btnH];
+                obj.AdvancedExportButton.Position = [btnX btnY+22 btnW btnH];
+            end
+
+            if ~isempty(obj.AdvancedExportPlotsButton) && isvalid(obj.AdvancedExportPlotsButton)
+                obj.AdvancedExportPlotsButton.Position = [btnX btnY-22 btnW btnH];
             end
         end
 
@@ -1401,6 +1411,7 @@ classdef ViewerTab < handle
             obj.AdvancedCorrelationButton = [];
             obj.AdvancedBlandAltmanButton = [];
             obj.AdvancedExportButton = [];
+            obj.AdvancedExportPlotsButton = [];
         end
 
         function showAllMapStats(obj)
@@ -1686,6 +1697,145 @@ classdef ViewerTab < handle
             end
         end
 
+        function exportCombinedPlotsTIFF(obj)
+            if isempty(obj.Parent.ROIs)
+                uialert(obj.Parent.Fig, ...
+                    'Draw at least one ROI before exporting plots.', ...
+                    'Export Plots', ...
+                    'Icon','warning');
+                return
+            end
+
+            if isempty(obj.Parent.MRFData) || isempty(obj.Parent.GTData)
+                uialert(obj.Parent.Fig, ...
+                    'Load both MRF and GT data to export plots.', ...
+                    'Export Plots', ...
+                    'Icon','warning');
+                return
+            end
+
+            modeChoice = questdlg( ...
+                ['Choose data mode for the exported plots:' newline ...
+                 '• ROI means: one point per ROI, with MRF std error bars' newline ...
+                 '• Pooled pixels: all pixels from all ROIs'], ...
+                'Export Plots mode', ...
+                'ROI means', 'Pooled pixels', 'Cancel', ...
+                'ROI means');
+
+            if isempty(modeChoice) || strcmpi(modeChoice, 'Cancel')
+                return
+            end
+
+            useROIMeans = strcmpi(modeChoice, 'ROI means');
+
+            mrfT1Idx = obj.findMapIndexForMetric('mrf', 't1');
+            gtT1Idx  = obj.findMapIndexForMetric('gt',  't1', mrfT1Idx);
+            mrfT2Idx = obj.findMapIndexForMetric('mrf', 't2');
+            gtT2Idx  = obj.findMapIndexForMetric('gt',  't2', mrfT2Idx);
+
+            hasT1 = ~isnan(mrfT1Idx) && ~isnan(gtT1Idx);
+            hasT2 = ~isnan(mrfT2Idx) && ~isnan(gtT2Idx);
+
+            if ~hasT1 && ~hasT2
+                uialert(obj.Parent.Fig, ...
+                    'Could not find matching T1/T2 maps in both MRF and GT data.', ...
+                    'Export Plots', ...
+                    'Icon','warning');
+                return
+            end
+
+            if hasT1
+                if useROIMeans
+                    [gtT1, mrfT1, mrfStdT1] = obj.collectROIMeanPairs(mrfT1Idx, gtT1Idx);
+                else
+                    [gtT1, mrfT1] = obj.collectROIPixelPairs(mrfT1Idx, gtT1Idx);
+                    mrfStdT1 = [];
+                end
+            else
+                gtT1 = [];
+                mrfT1 = [];
+                mrfStdT1 = [];
+            end
+
+            if hasT2
+                if useROIMeans
+                    [gtT2, mrfT2, mrfStdT2] = obj.collectROIMeanPairs(mrfT2Idx, gtT2Idx);
+                else
+                    [gtT2, mrfT2] = obj.collectROIPixelPairs(mrfT2Idx, gtT2Idx);
+                    mrfStdT2 = [];
+                end
+            else
+                gtT2 = [];
+                mrfT2 = [];
+                mrfStdT2 = [];
+            end
+
+            validT1 = numel(gtT1) >= 2;
+            validT2 = numel(gtT2) >= 2;
+
+            if ~validT1 && ~validT2
+                uialert(obj.Parent.Fig, ...
+                    'Need at least 2 valid paired points to export plots.', ...
+                    'Export Plots', ...
+                    'Icon','warning');
+                return
+            end
+
+            outDir = uigetdir(pwd, 'Select output folder for combined plot TIFF');
+            if isequal(outDir, 0)
+                return
+            end
+
+            nRows = double(validT1) + double(validT2);
+
+            fig = obj.createPublicationFigure('Combined MRF vs GT Plots', ...
+                [80 60 1200 nRows*520]);
+            fig.Visible = 'off';
+
+            tl = tiledlayout(fig, nRows, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+            if validT1
+                axCorr = nexttile(tl);
+                obj.styleAxesForPublication(axCorr);
+                obj.drawRegressionOnAxes(axCorr, gtT1, mrfT1, mrfStdT1, 'T1', modeChoice);
+
+                axBA = nexttile(tl);
+                obj.styleAxesForPublication(axBA);
+                obj.drawBlandAltmanOnAxes(axBA, gtT1, mrfT1, 'T1', modeChoice);
+            end
+
+            if validT2
+                axCorr2 = nexttile(tl);
+                obj.styleAxesForPublication(axCorr2);
+                obj.drawRegressionOnAxes(axCorr2, gtT2, mrfT2, mrfStdT2, 'T2', modeChoice);
+
+                axBA2 = nexttile(tl);
+                obj.styleAxesForPublication(axBA2);
+                obj.drawBlandAltmanOnAxes(axBA2, gtT2, mrfT2, 'T2', modeChoice);
+            end
+
+            timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+            outFile = fullfile(outDir, sprintf('MRF_GT_CombinedPlots_%s.tiff', timestamp));
+
+            try
+                exportgraphics(fig, outFile, 'Resolution', 300);
+            catch err
+                delete(fig);
+                uialert(obj.Parent.Fig, ...
+                    sprintf('Failed to export TIFF: %s', err.message), ...
+                    'Export Plots', ...
+                    'Icon','error');
+                return
+            end
+
+            delete(fig);
+
+            uialert(obj.Parent.Fig, ...
+                sprintf('Combined plots exported to:\n%s', outFile), ...
+                'Export Plots', ...
+                'Icon','success');
+        end
+
         function mapIdx = findMapIndexForMetric(obj, datasetType, metric, mrfFallbackIdx)
             if nargin < 4
                 mrfFallbackIdx = NaN;
@@ -1831,21 +1981,14 @@ classdef ViewerTab < handle
             obj.Parent.CurrentPlane = obj.Parent.normalizePlaneName(planeName);
         end
 
-        function plotBlandAltmanFigure(~, gtVals, mrfVals, metricName, modeLabel)
-            avgVals = (gtVals + mrfVals) / 2;
-            diffVals = mrfVals - gtVals;
-
-            bias = mean(diffVals, 'omitnan');
-            sdDiff = std(diffVals, 'omitnan');
-            loaUpper = bias + 1.96 * sdDiff;
-            loaLower = bias - 1.96 * sdDiff;
-
+        function fig = createPublicationFigure(~, figName, figPosition)
+            % Create a figure/axes pair with explicit light-theme styling for publication-quality export.
             fig = figure( ...
-                'Name', sprintf('%s Bland-Altman: MRF - GT', upper(metricName)), ...
+                'Name', figName, ...
                 'NumberTitle', 'off', ...
                 'Color', 'w', ...
                 'Units', 'pixels', ...
-                'Position', [200 140 760 640]);
+                'Position', figPosition);
             % Explicitly force a light theme so the plot is readable regardless of app/OS dark mode.
             if isprop(fig, 'Theme')
                 try
@@ -1853,11 +1996,13 @@ classdef ViewerTab < handle
                 catch
                 end
             end
+        end
 
-            ax = axes('Parent', fig, 'Color', 'w');
+        function styleAxesForPublication(~, ax)
             hold(ax, 'on');
             box(ax, 'on');
             grid(ax, 'on');
+            ax.Color = 'w';
             ax.LineWidth = 1.2;
             ax.FontSize = 12;
             ax.FontName = 'Arial';
@@ -1865,6 +2010,26 @@ classdef ViewerTab < handle
             ax.YColor = [0 0 0];
             ax.GridColor = [0.15 0.15 0.15];
             ax.GridAlpha = 0.25;
+        end
+
+        function plotBlandAltmanFigure(obj, gtVals, mrfVals, metricName, modeLabel)
+            fig = obj.createPublicationFigure( ...
+                sprintf('%s Bland-Altman: MRF - GT', upper(metricName)), ...
+                [200 140 760 640]);
+
+            ax = axes('Parent', fig);
+            obj.styleAxesForPublication(ax);
+            obj.drawBlandAltmanOnAxes(ax, gtVals, mrfVals, metricName, modeLabel);
+        end
+
+        function drawBlandAltmanOnAxes(~, ax, gtVals, mrfVals, metricName, modeLabel)
+            avgVals = (gtVals + mrfVals) / 2;
+            diffVals = mrfVals - gtVals;
+
+            bias = mean(diffVals, 'omitnan');
+            sdDiff = std(diffVals, 'omitnan');
+            loaUpper = bias + 1.96 * sdDiff;
+            loaLower = bias - 1.96 * sdDiff;
 
             scatter(ax, avgVals, diffVals, 32, ...
                 'MarkerFaceColor', [0.2 0.45 0.85], ...
@@ -1901,36 +2066,34 @@ classdef ViewerTab < handle
                 'EdgeColor', [0.7 0.7 0.7], ...
                 'Margin', 6);
 
-            axis(ax, 'tight');
+            % Pad limits so the bias/LoA lines aren't flush with the axes box
+            % (axis('tight') pins them to the exact edge, which can hide them on export).
+            xPad = (xMax - xMin) * 0.05;
+            if ~isfinite(xPad) || xPad <= 0
+                xPad = 0.5;
+            end
+            xlim(ax, [xMin - xPad, xMax + xPad]);
+
+            yMinAll = min([diffVals(:); loaLower]);
+            yMaxAll = max([diffVals(:); loaUpper]);
+            yPad = (yMaxAll - yMinAll) * 0.15;
+            if ~isfinite(yPad) || yPad <= 0
+                yPad = 1;
+            end
+            ylim(ax, [yMinAll - yPad, yMaxAll + yPad]);
         end
 
-        function plotRegressionFigure(~, xVals, yVals, yErrVals, metricName, modeLabel)
-            fig = figure( ...
-                'Name', sprintf('%s Correlation: GT vs MRF', upper(metricName)), ...
-                'NumberTitle', 'off', ...
-                'Color', 'w', ...
-                'Units', 'pixels', ...
-                'Position', [160 120 760 640]);
-            % Explicitly force a light theme so the plot is readable regardless of app/OS dark mode.
-            if isprop(fig, 'Theme')
-                try
-                    fig.Theme = 'light';
-                catch
-                end
-            end
+        function plotRegressionFigure(obj, xVals, yVals, yErrVals, metricName, modeLabel)
+            fig = obj.createPublicationFigure( ...
+                sprintf('%s Correlation: GT vs MRF', upper(metricName)), ...
+                [160 120 760 640]);
 
-            ax = axes('Parent', fig, 'Color', 'w');
-            hold(ax, 'on');
-            box(ax, 'on');
-            grid(ax, 'on');
-            ax.LineWidth = 1.2;
-            ax.FontSize = 12;
-            ax.FontName = 'Arial';
-            ax.XColor = [0 0 0];
-            ax.YColor = [0 0 0];
-            ax.GridColor = [0.15 0.15 0.15];
-            ax.GridAlpha = 0.25;
+            ax = axes('Parent', fig);
+            obj.styleAxesForPublication(ax);
+            obj.drawRegressionOnAxes(ax, xVals, yVals, yErrVals, metricName, modeLabel);
+        end
 
+        function drawRegressionOnAxes(~, ax, xVals, yVals, yErrVals, metricName, modeLabel)
             if ~isempty(yErrVals)
                 errorbar(ax, xVals, yVals, yErrVals, ...
                     'o', ...
