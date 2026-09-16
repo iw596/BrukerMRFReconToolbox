@@ -23,7 +23,7 @@ if (isstruct(options) == false)
 end
 
 %% Validate that the user has passed a valid set of options
-
+options = validateOptions(options);
 
 %% Attempt to load the data file
 MRFParams = LoadBrukerData(inputSource, true);
@@ -31,6 +31,9 @@ MRFParams = LoadBrukerData(inputSource, true);
 
 %% Now we format the data into the following dimensions NRo x NPE1 x NPE2 x NPoints, also return the sampling mask
 [data,samplingmask] = prepareMRFData(MRFParams); % Returns zero-filled data and sampling mask
+
+%% Extract dimensionality information
+options.Dimensionality = MRFParams.NDim;
 
 
 %% Depending on user option we either do direct recon or subspace recon

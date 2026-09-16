@@ -724,6 +724,23 @@ function params = LoadBrukerData(path,loadDataFlag)
     end
     
 
+    k = strfind(TextAsCells,"MRFNDummyScans=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.MRFNDummyScans = str2double(line);
+    end
+
+    k = strfind(TextAsCells,"MRFRelaxationDelay=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.MRFRelaxationDelay = str2double(line) ./ 1000; % Convert to seconds
+    end
+
+
     k = strfind(TextAsCells,"PVM_ObjOrderList=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)

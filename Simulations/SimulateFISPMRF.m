@@ -44,6 +44,13 @@ else
     thickness = 0.002;
 end
 
+
+if (isfield(MRFParams,"MRFNDummyScans"))
+    dummyScans = MRFParams.MRFNDummyScans;
+else
+    dummyScans = 0;
+end
+
 dp = zeros([nSpin, 3]);
 dp(:,3) = linspace(-thickness, thickness, nSpin) * 100; % m -> cm
 
@@ -247,7 +254,7 @@ if useParallel
             dict(:,i) = simulateSingleLUTEntryFISP(i, LUT, prepList, nPointsPerPrep, ...
                 instantInversionFlag, inversionB1, gInvSpoiler, gSliSpoiler, ...
                 dt, df, dp, dv, faList, TR, TE, riseT, sliceSpoilerDuration, ...
-                waitTimes, nSpin);
+                waitTimes, nSpin,dummyScans,waitTime);
             send(progressQueue, 1);
         end
     catch ME
@@ -270,7 +277,7 @@ if ~useParallel
         dict(:,i) = simulateSingleLUTEntryFISP(i, LUT, prepList, nPointsPerPrep, ...
             instantInversionFlag, inversionB1, gInvSpoiler, gSliSpoiler, ...
             dt, df, dp, dv, faList, TR, TE, riseT, sliceSpoilerDuration, ...
-            waitTimes, nSpin);
+            waitTimes, nSpin,dummyScans,waitTime);
         progressTick(1);
     end
 end

@@ -14,9 +14,16 @@ dict_comp.phi  = dict_phi;
 dict_comp.svd  = dict_svd;
 dict_comp.NPCs = NPCs;
 clear S V svals;
+sprintf("First %d principle components kept",NPCs);
+
+
 % Determine if we are handling 2D or 3D data
 
+
+
 % Build regularizers
+
+
 
 % Run ADMM reconstruction
 
