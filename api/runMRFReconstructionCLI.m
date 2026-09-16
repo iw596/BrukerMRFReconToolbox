@@ -77,6 +77,7 @@ function options = validateOptions(varargin)
     defaults.Rho = 1;
     defaults.SubspaceComponentRetentionPct = 99.99;
     defaults.Dimensionality = []; % This will be determined from the actual data
+    defaults.BlockShifting = true;
     options = defaults;
 
 
