@@ -16,8 +16,14 @@ if strcmp(settings.MRFReconMode, 'Direct')
     disp("Direct reconstruction for T1 target")
     result = runDirectMRFReconstruction(data, context, geometry);
 else
-    disp("Iterative reconstruction skeleton for T1 target")
-    result = runADMMReconstruction(context, geometry, regularizer, data);
+    disp("Iterative reconstruction for T1 target")
+    dictionary = load(settings.DictionaryPath, 'dict');
+    [~, ~, rightSingularVectors] = svd(dictionary.dict, 'econ');
+    nComponents = max(1, min(size(rightSingularVectors, 2), ...
+        ceil(context.SubspaceComponentRetentionPct / 100 * size(data, 4))));
+    basis = single(rightSingularVectors(:, 1:nComponents));
+    operators = buildMRFSubspaceOperators(true(size(data)), basis);
+    result = runADMMReconstruction(context, geometry, regularizer, data, operators);
 end
 
 if isempty(result) || ~isstruct(result)

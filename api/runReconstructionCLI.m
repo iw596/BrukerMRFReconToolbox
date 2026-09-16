@@ -173,6 +173,11 @@ if isempty(options.RegularizationModes)
 else
     options.RegularizationModes = normalizeRegularizationModes(options.RegularizationModes);
 end
+if numel(options.RegularizationModes) ~= 1 || ...
+        ~strcmpi(strtrim(options.RegularizationModes(1)), 'locally-low rank')
+    error('runReconstructionCLI:UnsupportedRegularizer', ...
+        'Iterative MRF reconstruction currently supports LLR only.');
+end
 options.RegularizationMode = options.RegularizationModes(1);
 options.DictionaryPath = string(options.DictionaryPath);
 options.B1CorrectionMode = string(options.B1CorrectionMode);

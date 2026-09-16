@@ -4,9 +4,14 @@ function context = buildMRFReconContext(settings)
 context = struct();
 context.Settings = settings;
 context.Dimensionality = lower(string(getfield_default(settings, 'Dimensionality', '2D')));
-context.RegularizationModes = normalizeRegularizationModes(settings);
-context.RegularizationMode = context.RegularizationModes(1);
-context.RegularizationWeights = normalizeRegularizationWeights(settings, context.RegularizationModes);
+requestedModes = normalizeRegularizationModes(settings);
+if numel(requestedModes) ~= 1
+    error('buildMRFReconContext:MultipleRegularizersNotSupported', ...
+        'Iterative MRF reconstruction currently supports LLR only. Select one regularizer.');
+end
+context.RegularizationMode = requestedModes(1);
+context.RegularizationModes = context.RegularizationMode;
+context.RegularizationWeights = 1;
 context.Lambda = getfield_default(settings, 'Lambda', 0.01);
 context.EstimateMask = logical(getfield_default(settings, 'EstimateMask', false));
 context.OuterIterations = round(getfield_default(settings, 'OuterIterations', 10));
@@ -74,41 +79,6 @@ if isempty(regModes)
     regModes = "Locally-low rank";
 end
 regModes = unique(regModes, 'stable');
-end
-
-function weights = normalizeRegularizationWeights(settings, regModes)
-nModes = numel(regModes);
-weights = ones(nModes, 1);
-
-if ~(isstruct(settings) && isfield(settings, 'RegularizationWeights'))
-    return;
-end
-
-raw = settings.RegularizationWeights;
-if isempty(raw)
-    return;
-end
-
-if ischar(raw) || (isstring(raw) && isscalar(raw))
-    raw = str2num(char(raw)); %#ok<ST2NM>
-end
-
-if ~isnumeric(raw)
-    return;
-end
-
-raw = double(raw(:));
-raw = raw(isfinite(raw) & raw > 0);
-if isempty(raw)
-    return;
-end
-
-if numel(raw) == 1
-    weights = repmat(raw, nModes, 1);
-else
-    nCopy = min(numel(raw), nModes);
-    weights(1:nCopy) = raw(1:nCopy);
-end
 end
 
 function mode = normalizeScalingMode(rawMode)

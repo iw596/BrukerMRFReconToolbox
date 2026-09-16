@@ -737,7 +737,8 @@ function params = LoadBrukerData(path,loadDataFlag)
     if (isempty(idx) ~=1)
         line = TextAsCells(idx);
         line = strtrim(extractAfter(cell2mat(line),'='));
-        params.MRFRelaxationDelay = str2double(line) ./ 1000; % Convert to seconds
+        tmp = split(line,{' ', ')', '\n','$$'});
+        params.MRFRelaxationDelay = str2double(tmp{1}) ./ 1000; % Convert to seconds
     end
 
 

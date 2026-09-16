@@ -12,7 +12,6 @@ function result = runMRFReconstruction(MRFParams,settings,runtimeOptions)
 
 context = buildMRFReconContext(settings);
 geometry = buildMRFReconGeometry(context);
-regularizer = buildMRFReconRegularizer(context);
 reconTarget = string(getfield_default(settings, 'ReconstructionTarget', 'MRF'));
 
 if nargin < 3 || isempty(runtimeOptions)
@@ -33,8 +32,15 @@ if strcmp(settings.MRFReconMode, 'Direct')
 else
     disp("Sub-space reconstruction of MRF data pathway")
     %% Sub-space recon pathway
+    regularizer = buildMRFReconRegularizer(context);
+    basis = buildTemporalBasis(settings.DictionaryPath, size(data, 4), ...
+        context.SubspaceComponentRetentionPct);
+    operators = buildMRFSubspaceOperators(samplingmask, basis);
     [iterData, scalingInfo] = scaleMRFReconData(data, context);
-    result = runADMMReconstruction(context, geometry, regularizer, iterData);
+    result = runADMMReconstruction(context, geometry, regularizer, iterData, operators);
+    result.SubspaceTotalComponents = size(data, 4);
+    result.SubspaceRetainedComponents = size(basis, 2);
+    result.SubspaceComponentRetentionPct = context.SubspaceComponentRetentionPct;
 
     if isfield(result, 'images') && ~isempty(result.images)
         result.images = unscaleMRFReconImages(result.images, scalingInfo);
@@ -304,4 +310,28 @@ if isstruct(s) && isfield(s, field) && ~isempty(s.(field))
 else
     value = defaultValue;
 end
+end
+
+function basis = buildTemporalBasis(dictionaryPath, nTimePoints, retentionPct)
+%buildTemporalBasis Return an orthonormal temporal basis from the dictionary.
+% The retention setting denotes the percentage of available temporal
+% components retained by count. The SVD right singular vectors are used
+% because dictionary rows are entries and dictionary columns are time.
+
+dictionaryPath = resolveDictionaryPath(dictionaryPath);
+if isempty(dictionaryPath) || ~isfile(dictionaryPath)
+    error('runMRFReconstruction:DictionaryRequired', ...
+        'A valid dictionary is required for iterative subspace reconstruction.');
+end
+
+dictionary = load(dictionaryPath, 'dict');
+if ~isfield(dictionary, 'dict') || size(dictionary.dict, 2) ~= nTimePoints
+    error('runMRFReconstruction:DictionaryLengthMismatch', ...
+        'Dictionary time points must match the measured data.');
+end
+
+[~, ~, rightSingularVectors] = svd(dictionary.dict, 'econ');
+nComponents = max(1, min(size(rightSingularVectors, 2), ...
+    ceil(double(retentionPct) / 100 * nTimePoints)));
+basis = single(rightSingularVectors(:, 1:nComponents));
 end

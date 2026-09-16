@@ -1,125 +1,125 @@
-function result = runADMMReconstruction(context, geometry, regularizer, data)
-% runADMMReconstruction  ADMM skeleton for 2D/3D MRF reconstruction.
+function result = runADMMReconstruction(context, geometry, regularizer, data, operators)
+%runADMMReconstruction Reconstruct subspace coefficients with LLR-ADMM.
 %
-%   This implementation uses a simple consensus-style ADMM update that
-%   applies the selected regularizer proximal operator on image-domain data.
+% This function solves the split problem
+%
+%   minimize 0.5*||A*x - d||_2^2 + lambda*R(x),  subject to x = z,
+%
+% where x contains subspace coefficient images and R is the LLR penalty.
+% With scaled dual variable u, the updates are
+%
+%   x <- solve((A'*A + rho*I)x = A'*d + rho*(z-u))
+%   z <- prox_(lambda/rho R)(x+u)
+%   u <- u + x-z.
+%
+% The x equation is solved by conjugate gradients because A'*A is not
+% generally diagonal after sampling and temporal projection. InnerIterations
+% controls the maximum number of CG iterations per ADMM iteration.
+
+if nargin < 5 || isempty(operators)
+    error('runADMMReconstruction:MissingOperators', ...
+        'The masked subspace forward and adjoint operators are required.');
+end
+if nargin < 4 || isempty(data)
+    error('runADMMReconstruction:MissingData', 'K-space data is required.');
+end
+if ~isa(regularizer, 'LLR')
+    error('runADMMReconstruction:InvalidRegularizer', ...
+        'Iterative MRF reconstruction currently supports the LLR object only.');
+end
+
+rho = positiveScalar(context.Rho, 'Rho');
+lambda = positiveScalar(context.Lambda, 'Lambda');
+outerIterations = positiveInteger(context.OuterIterations, 'OuterIterations');
+cgIterations = positiveInteger(context.InnerIterations, 'InnerIterations');
+
+adjointData = operators.Adjoint(data);
+x = adjointData;
+z = x;
+u = zeros(size(x), 'like', x);
 
 result = struct();
-result.Status = 'Skeleton completed';
-result.Dimensionality = context.Dimensionality;
+result.Status = 'Running';
+result.Dimensionality = geometry.Dimensionality;
 result.Geometry = geometry;
 result.Regularizer = regularizer;
-result.Iterations = struct('Outer', 0, 'Inner', 0);
-result.Log = {};
-result.SubspaceComponentRetentionPct = context.SubspaceComponentRetentionPct;
-
-outerMax = context.OuterIterations;
-innerMax = context.InnerIterations;
-rho = context.Rho;
-
-result.Log{end+1} = sprintf('Starting %s reconstruction with %s regularizer.', ...
-    upper(char(context.Dimensionality)), regularizer.Description);
-result.Log{end+1} = sprintf('Outer iterations: %d, inner iterations: %d, rho: %.6g', ...
-    outerMax, innerMax, rho);
-result.Log{end+1} = sprintf('Temporal subspace retention: %.2f%%.', context.SubspaceComponentRetentionPct);
-result.Log{end+1} = 'Using image-domain ADMM consensus updates (data-consistency term + selected regularizer prox).';
-
-if nargin < 4 || isempty(data)
-    error('runADMMReconstruction:MissingData', ...
-        'Iterative reconstruction requires k-space data input.');
-end
-
-% Initial image estimate from k-space data.
-xData = ifftcn(data, [1 2 3]);
-x = xData;
-
-if isempty(regularizer) || ~isstruct(regularizer) || ~isfield(regularizer, 'Prox') || isempty(regularizer.Prox)
-    error('runADMMReconstruction:InvalidRegularizer', ...
-        'Regularizer must provide a valid proximal operator.');
-end
-
-components = resolveRegularizerComponents(regularizer);
-nComponents = numel(components);
-result.RegularizerComponentCount = nComponents;
-result.Log{end+1} = sprintf('Split-ADMM enabled with %d regularizer component(s).', nComponents);
-
-zList = cell(nComponents, 1);
-uList = cell(nComponents, 1);
-for iComp = 1:nComponents
-    zList{iComp} = x;
-    uList{iComp} = zeros(size(x), 'like', x);
-end
-
-result.ResidualHistory = struct('Primal', zeros(outerMax, 1), 'Dual', zeros(outerMax, 1));
-
-for outerIter = 1:outerMax
-    for innerIter = 1:innerMax
-        zPrev = zList;
-
-        for iComp = 1:nComponents
-            zList{iComp} = components{iComp}.Prox(x + uList{iComp}, rho);
-        end
-
-        zMinusU = zeros(size(x), 'like', x);
-        for iComp = 1:nComponents
-            zMinusU = zMinusU + (zList{iComp} - uList{iComp});
-        end
-
-        % Data-consistency update for split-ADMM consensus.
-        x = (xData + rho .* zMinusU) ./ (1 + rho * nComponents);
-
-        for iComp = 1:nComponents
-            uList{iComp} = uList{iComp} + (x - zList{iComp});
-        end
-
-        [primalResidual, dualResidual] = computeResiduals(x, zList, zPrev, rho);
-
-        result.Iterations.Inner = innerIter;
-    end
-
-    result.Iterations.Outer = outerIter;
-    result.Iterations.Inner = innerMax;
-    result.ResidualHistory.Primal(outerIter) = primalResidual;
-    result.ResidualHistory.Dual(outerIter) = dualResidual;
-    result.Log{end+1} = sprintf('Completed outer iteration %d (primal=%.4e, dual=%.4e).', ...
-        outerIter, primalResidual, dualResidual);
-end
-
-result.images = x;
-result.Image = x;
-result.DualVariable = uList;
-result.AuxiliaryVariable = zList;
 result.Rho = rho;
+result.Lambda = lambda;
+result.Iterations = struct('Outer', 0, 'Inner', 0);
+result.ResidualHistory = struct('Primal', zeros(outerIterations, 1), ...
+    'Dual', zeros(outerIterations, 1), 'CG', zeros(outerIterations, 1));
+result.Log = {sprintf('ADMM with LLR: %d outer iterations, %d CG iterations.', ...
+    outerIterations, cgIterations)};
+
+for outer = 1:outerIterations
+    zPrevious = z;
+    rightHandSide = adjointData + rho * (z - u);
+    normalEquation = @(candidate) operators.Normal(candidate) + rho * candidate;
+    [x, cgCount] = conjugateGradient(normalEquation, rightHandSide, x, cgIterations, 1e-4);
+
+    % The LLR proximal threshold is lambda/rho for the objective above.
+    z = regularizer.prox(x + u, lambda / rho);
+    u = u + x - z;
+
+    primal = norm(x(:) - z(:));
+    dual = rho * norm(z(:) - zPrevious(:));
+    result.ResidualHistory.Primal(outer) = primal;
+    result.ResidualHistory.Dual(outer) = dual;
+    result.ResidualHistory.CG(outer) = cgCount;
+    result.Iterations.Outer = outer;
+    result.Iterations.Inner = cgCount;
+end
+
+result.Coefficients = x;
+result.images = operators.TemporalForward(x);
+result.Image = result.images;
+result.DualVariable = u;
+result.AuxiliaryVariable = z;
 result.Status = 'Completed';
+result.Log{end + 1} = sprintf('Final primal residual %.4e; dual residual %.4e.', primal, dual);
 end
 
-function components = resolveRegularizerComponents(regularizer)
-if isfield(regularizer, 'Components') && ~isempty(regularizer.Components)
-    components = regularizer.Components;
-else
-    components = {regularizer};
+function [x, iterations] = conjugateGradient(operator, b, x, maxIterations, tolerance)
+%conjugateGradient Solve a Hermitian positive-definite linear system.
+r = b - operator(x);
+p = r;
+rrOld = real(sum(conj(r(:)) .* r(:)));
+initialNorm = sqrt(rrOld);
+if initialNorm == 0
+    iterations = 0;
+    return;
 end
 
-for iComp = 1:numel(components)
-    if ~isfield(components{iComp}, 'Prox') || isempty(components{iComp}.Prox)
-        error('runADMMReconstruction:InvalidRegularizerComponent', ...
-            'Regularizer component %d is missing a proximal operator.', iComp);
+for iterations = 1:maxIterations
+    Ap = operator(p);
+    denominator = real(sum(conj(p(:)) .* Ap(:)));
+    if denominator <= 0 || ~isfinite(denominator)
+        error('runADMMReconstruction:InvalidNormalOperator', ...
+            'The normal-equation operator is not positive definite.');
     end
+    step = rrOld / denominator;
+    x = x + step * p;
+    r = r - step * Ap;
+    rrNew = real(sum(conj(r(:)) .* r(:)));
+    if sqrt(rrNew) <= tolerance * initialNorm
+        return;
+    end
+    p = r + (rrNew / rrOld) * p;
+    rrOld = rrNew;
 end
 end
 
-function [primalResidual, dualResidual] = computeResiduals(x, zList, zPrev, rho)
-primalSq = 0;
-dualSq = 0;
-
-for iComp = 1:numel(zList)
-    r = x - zList{iComp};
-    primalSq = primalSq + sum(abs(r(:)).^2);
-
-    dz = zList{iComp} - zPrev{iComp};
-    dualSq = dualSq + sum(abs((rho .* dz(:))).^2);
+function value = positiveScalar(value, name)
+value = double(value);
+if ~isscalar(value) || ~isfinite(value) || value <= 0
+    error('runADMMReconstruction:InvalidOption', '%s must be a positive scalar.', name);
+end
 end
 
-primalResidual = sqrt(primalSq);
-dualResidual = sqrt(dualSq);
+function value = positiveInteger(value, name)
+value = positiveScalar(value, name);
+if value ~= round(value)
+    error('runADMMReconstruction:InvalidOption', '%s must be a positive integer.', name);
+end
+value = round(value);
 end

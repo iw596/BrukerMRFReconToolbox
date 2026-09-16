@@ -1,86 +1,169 @@
 classdef LLR < Regularizer
-    %LLR Locally low rank regularizer.
+    %LLR Locally low-rank regularizer for MRF coefficient images.
     %
-    %   obj = LLR(blockSize,randshift) creates a locally low rank regularizer.
-    %   blockSize controls the spatial patch size used for low-rank
-    %   shrinkage. randshift is a boolean that controls if random shifting
-    %   of blocks should be used to suppress artefacts
-    %   
-    %   x = prox(obj, x, tau) applies blockwise nuclear norm soft-thresholding
-    %   to each spatial patch in x.
+    % The input is arranged as [x y coefficients] for 2-D data or
+    % [x y z coefficients] for 3-D data. Each spatial block is reshaped to
+    % a matrix whose rows are voxels and whose columns are coefficients.
+    % Singular-value soft-thresholding is then applied to that matrix.
     %
-    %   Supports both 3D data (nx, ny, nt) and 4D data (nx, ny, nz, nt).
+    % Blocks may overlap. In that case the block results are averaged. This
+    % is the standard practical LLR denoiser, but it is an approximation to
+    % the exact proximal operator of a sum of overlapping nuclear norms.
 
     properties
-        patchSize = [8 8]
-        windowSize = [1]
-        randshift = true
+        BlockSize
+        Stride
+        Lambda = 0.01
+        Description = 'Locally low-rank regularization'
     end
 
     methods
-        function obj = LLR(patchSize,windowSize,randshift)
-            if nargin >= 1 && ~isempty(blockSize)
-                obj.BlockSize = blockSize;
+        function obj = LLR(blockSize, stride, lambda)
+            if nargin < 1 || isempty(blockSize)
+                blockSize = 8;
+            end
+            if nargin < 2 || isempty(stride)
+                stride = blockSize;
+            end
+            if nargin >= 3 && ~isempty(lambda)
+                obj.Lambda = double(lambda);
             end
 
-            if ~isempty(randshift)
-                obj.randshift = randshift;
-            end
+            obj.BlockSize = validateSpatialVector(blockSize, 'blockSize');
+            obj.Stride = validateSpatialVector(stride, 'stride');
         end
 
-        function y= mtimes(obj, x)
-            % For LR regularization, the "multiplication" operator is just the identity, since the regularizer is defined via its proximal operator.
-            y = x
-        end
-        
-        
-        function x = prox(obj, x, lambda)
-            % Calculates the proximal operator of LLR using thresholding
-            if nargin < 3
-                error('LLR:prox', 'prox requires x and tau.');
+        function xOut = prox(obj, xIn, tau)
+            %PROX Apply blockwise singular-value soft-thresholding.
+            if nargin < 3 || ~isscalar(tau) || ~isfinite(tau) || tau < 0
+                error('LLR:InvalidThreshold', 'prox requires a finite non-negative threshold.');
             end
-            if isempty(x)
+            if isempty(xIn) || tau == 0
+                xOut = xIn;
                 return;
             end
-            
-            
 
-            if (ndim(x) == 3)
-                % 2D (+ time) pathway
-                alpha_thresh = llr_thresh_2d(x,lambda);
-            else
-                % 3D (+ time) pathway
-
+            nSpatial = ndims(xIn) - 1;
+            if nSpatial ~= 2 && nSpatial ~= 3
+                error('LLR:InvalidInput', ...
+                    'Expected [x y coefficients] or [x y z coefficients].');
             end
 
-            % Convert the images into patches
+            spatialSize = size(xIn);
+            spatialSize = spatialSize(1:nSpatial);
+            nCoefficients = size(xIn, nSpatial + 1);
+            blockSize = expandVector(obj.BlockSize, nSpatial);
+            stride = expandVector(obj.Stride, nSpatial);
+            blockSize = min(blockSize, spatialSize);
+            stride = max(1, min(stride, blockSize));
 
-            x = obj.applyBlockwiseNuclearProx(x, lambda);
-        end
-    end
+            output = zeros(size(xIn), 'like', xIn);
+            weights = zeros(spatialSize);
+            starts = cell(1, nSpatial);
+            for iDim = 1:nSpatial
+                starts{iDim} = blockStarts(spatialSize(iDim), blockSize(iDim), stride(iDim));
+            end
 
-    methods (Access = private)
-        
-        function alpha_thresh = llr_thresh_3d(obj)
-            Wx = obj.patchSize;
-            Wy = obj.patchSize;
-        
-        end
+            for xStart = starts{1}
+                xIndex = xStart:min(xStart + blockSize(1) - 1, spatialSize(1));
+                for yStart = starts{2}
+                    yIndex = yStart:min(yStart + blockSize(2) - 1, spatialSize(2));
+                    if nSpatial == 3
+                        zStarts = starts{3};
+                    else
+                        zStarts = 1;
+                    end
+                    for zStart = zStarts
+                        if nSpatial == 3
+                            zIndex = zStart:min(zStart + blockSize(3) - 1, spatialSize(3));
+                            block = xIn(xIndex, yIndex, zIndex, :);
+                        else
+                            zIndex = 1;
+                            block = xIn(xIndex, yIndex, :);
+                        end
 
-        function alpha_thresh = llr_thresh_2d(obj,x,lambda)
-                Wx = obj.patchSize(1);
-                Wx = obj.patchSize(1);
-                step = obj.windowSize;
-                
-                % Reshape data into patches
+                        matrix = reshape(block, [], nCoefficients);
+                        [left, singularValues, right] = svd(matrix, 'econ');
+                        shrunk = max(diag(singularValues) - tau, 0);
+                        matrixOut = left * (diag(shrunk) * right');
 
-                if (obj.randshift)
-                
-                
+                        if nSpatial == 3
+                            blockOut = reshape(matrixOut, [numel(xIndex), numel(yIndex), numel(zIndex), nCoefficients]);
+                            output(xIndex, yIndex, zIndex, :) = output(xIndex, yIndex, zIndex, :) + blockOut;
+                            weights(xIndex, yIndex, zIndex) = weights(xIndex, yIndex, zIndex) + 1;
+                        else
+                            blockOut = reshape(matrixOut, [numel(xIndex), numel(yIndex), nCoefficients]);
+                            output(xIndex, yIndex, :) = output(xIndex, yIndex, :) + blockOut;
+                            weights(xIndex, yIndex) = weights(xIndex, yIndex) + 1;
+                        end
+                    end
                 end
-            
+            end
+
+            weights(weights == 0) = 1;
+            xOut = output ./ reshape(weights, [spatialSize 1]);
         end
 
-
+        function value = evaluate(obj, xIn)
+            %EVALUATE Return the sum of block nuclear norms.
+            value = 0;
+            nSpatial = ndims(xIn) - 1;
+            spatialSize = size(xIn);
+            spatialSize = spatialSize(1:nSpatial);
+            blockSize = min(expandVector(obj.BlockSize, nSpatial), spatialSize);
+            stride = max(1, min(expandVector(obj.Stride, nSpatial), blockSize));
+            starts = cell(1, nSpatial);
+            for iDim = 1:nSpatial
+                starts{iDim} = blockStarts(spatialSize(iDim), blockSize(iDim), stride(iDim));
+            end
+            for xStart = starts{1}
+                for yStart = starts{2}
+                    if nSpatial == 3
+                        zStarts = starts{3};
+                    else
+                        zStarts = 1;
+                    end
+                    for zStart = zStarts
+                        xIndex = xStart:min(xStart + blockSize(1) - 1, spatialSize(1));
+                        yIndex = yStart:min(yStart + blockSize(2) - 1, spatialSize(2));
+                        if nSpatial == 3
+                            zIndex = zStart:min(zStart + blockSize(3) - 1, spatialSize(3));
+                            block = xIn(xIndex, yIndex, zIndex, :);
+                        else
+                            block = xIn(xIndex, yIndex, :);
+                        end
+                        value = value + sum(svd(reshape(block, [], size(xIn, nSpatial + 1)), 'econ'), 'all');
+                    end
+                end
+            end
+        end
     end
+end
+
+function vector = validateSpatialVector(value, name)
+vector = double(value(:)).';
+if isempty(vector) || any(~isfinite(vector)) || any(vector < 1) || any(vector ~= round(vector))
+    error('LLR:InvalidSpatialParameter', '%s must contain positive integers.', name);
+end
+end
+
+function vector = expandVector(value, nSpatial)
+if isscalar(value)
+    vector = repmat(value, 1, nSpatial);
+else
+    vector = [value, repmat(value(end), 1, max(0, nSpatial - numel(value)))];
+    vector = vector(1:nSpatial);
+end
+end
+
+function starts = blockStarts(n, blockSize, stride)
+if n <= blockSize
+    starts = 1;
+else
+    starts = 1:stride:(n - blockSize + 1);
+    lastStart = n - blockSize + 1;
+    if starts(end) ~= lastStart
+        starts(end + 1) = lastStart;
+    end
+end
 end

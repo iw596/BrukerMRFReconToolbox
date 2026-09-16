@@ -51,6 +51,12 @@ else
     dummyScans = 0;
 end
 
+if (isfield(MRFParams,"MRFRelaxationDelay"))
+    MRFRelaxationDelay = MRFParams.MRFRelaxationDelay;
+else
+    MRFRelaxationDelay = 0;
+end
+
 dp = zeros([nSpin, 3]);
 dp(:,3) = linspace(-thickness, thickness, nSpin) * 100; % m -> cm
 
@@ -254,7 +260,7 @@ if useParallel
             dict(:,i) = simulateSingleLUTEntryFISP(i, LUT, prepList, nPointsPerPrep, ...
                 instantInversionFlag, inversionB1, gInvSpoiler, gSliSpoiler, ...
                 dt, df, dp, dv, faList, TR, TE, riseT, sliceSpoilerDuration, ...
-                waitTimes, nSpin,dummyScans,waitTime);
+                waitTimes, nSpin,dummyScans,MRFRelaxationDelay);
             send(progressQueue, 1);
         end
     catch ME
@@ -277,7 +283,7 @@ if ~useParallel
         dict(:,i) = simulateSingleLUTEntryFISP(i, LUT, prepList, nPointsPerPrep, ...
             instantInversionFlag, inversionB1, gInvSpoiler, gSliSpoiler, ...
             dt, df, dp, dv, faList, TR, TE, riseT, sliceSpoilerDuration, ...
-            waitTimes, nSpin,dummyScans,waitTime);
+            waitTimes, nSpin,dummyScans,MRFRelaxationDelay);
         progressTick(1);
     end
 end
