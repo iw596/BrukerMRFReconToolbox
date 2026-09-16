@@ -34,16 +34,7 @@ MRFParams = LoadBrukerData(inputSource, true);
 
 
 %% Depending on user option we either do direct recon or subspace recon
-if (options.MRFReconMode == "direct")
-    results = runDirectMRFReconstruction(data);
-else
-    results = runSubSpaceMRFReconstruction(data);
-end
-
-
-
-%% After reconstruction we our set of MRF images. Now we perform dictionary matching
-
+if options.
 
 
 outputArg1 = inputArg1;
@@ -83,8 +74,6 @@ function options = validateOptions(varargin)
     if (strcmp(options.B1CorrectionMode,"None") == false && isempty(options.B1Map) == true)
         error("B1 correction is desired but no B1 map has been supplied!");
     end
-
-   
 
 
 end
