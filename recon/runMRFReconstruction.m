@@ -147,46 +147,6 @@ else
     result.Log{end+1} = 'Dictionary matching skipped (target is not MRF).';
 end
 
-function dictionaryPath = resolveDictionaryPath(inputPath)
-dictionaryPath = char(string(inputPath));
-
-if isempty(dictionaryPath)
-    return;
-end
-
-if isfile(dictionaryPath)
-    return;
-end
-
-toolboxRoot = fileparts(fileparts(mfilename('fullpath')));
-
-candidateRoots = {pwd, toolboxRoot};
-for iRoot = 1:numel(candidateRoots)
-    candidateRoot = candidateRoots{iRoot};
-
-    candidatePath = fullfile(candidateRoot, dictionaryPath);
-    if isfile(candidatePath)
-        dictionaryPath = candidatePath;
-        return;
-    end
-
-    matches = dir(fullfile(candidateRoot, '**', dictionaryPath));
-    if ~isempty(matches)
-        dictionaryPath = fullfile(matches(1).folder, matches(1).name);
-        return;
-    end
-
-    [~,baseName,baseExt] = fileparts(dictionaryPath);
-    if ~isempty(baseName)
-        matches = dir(fullfile(candidateRoot, '**', [baseName baseExt]));
-        if ~isempty(matches)
-            dictionaryPath = fullfile(matches(1).folder, matches(1).name);
-            return;
-        end
-    end
-end
-end
-
 if logical(getfield_default(settings, 'SaveOutputs', false))
     saveBasePath = getfield_default(settings, 'SaveBasePath', '');
     if isempty(saveBasePath)
@@ -325,13 +285,60 @@ if isempty(dictionaryPath) || ~isfile(dictionaryPath)
 end
 
 dictionary = load(dictionaryPath, 'dict');
-if ~isfield(dictionary, 'dict') || size(dictionary.dict, 2) ~= nTimePoints
+if ~isfield(dictionary, 'dict') || size(dictionary.dict, 1) ~= nTimePoints
     error('runMRFReconstruction:DictionaryLengthMismatch', ...
         'Dictionary time points must match the measured data.');
 end
 
-[~, ~, rightSingularVectors] = svd(dictionary.dict, 'econ');
-nComponents = max(1, min(size(rightSingularVectors, 2), ...
-    ceil(double(retentionPct) / 100 * nTimePoints)));
-basis = single(rightSingularVectors(:, 1:nComponents));
+[U, S, V] = svd(dictionary.dict, 'econ');
+
+singularValues = diag(S);
+energy = singularValues.^2;
+cumulativeEnergy = cumsum(energy) / sum(energy);
+
+nComponents = find(cumulativeEnergy >= retentionPct/100, 1, 'first');
+
+basis = single(U(:, 1:nComponents));
+
+fprintf("%d dictionary components retained \n\n",nComponents)
+end
+
+function dictionaryPath = resolveDictionaryPath(inputPath)
+dictionaryPath = char(string(inputPath));
+
+if isempty(dictionaryPath)
+    return;
+end
+
+if isfile(dictionaryPath)
+    return;
+end
+
+toolboxRoot = fileparts(fileparts(mfilename('fullpath')));
+
+candidateRoots = {pwd, toolboxRoot};
+for iRoot = 1:numel(candidateRoots)
+    candidateRoot = candidateRoots{iRoot};
+
+    candidatePath = fullfile(candidateRoot, dictionaryPath);
+    if isfile(candidatePath)
+        dictionaryPath = candidatePath;
+        return;
+    end
+
+    matches = dir(fullfile(candidateRoot, '**', dictionaryPath));
+    if ~isempty(matches)
+        dictionaryPath = fullfile(matches(1).folder, matches(1).name);
+        return;
+    end
+
+    [~,baseName,baseExt] = fileparts(dictionaryPath);
+    if ~isempty(baseName)
+        matches = dir(fullfile(candidateRoot, '**', [baseName baseExt]));
+        if ~isempty(matches)
+            dictionaryPath = fullfile(matches(1).folder, matches(1).name);
+            return;
+        end
+    end
+end
 end
