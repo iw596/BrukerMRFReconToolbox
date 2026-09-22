@@ -55,14 +55,16 @@ end
 
 
 function options = validateOptions(varargin)
-
+    
+  
     if isempty(varargin)
         error("No options have been passed into the function!");
     end
-
+    
+    userOptions = varargin{1};
     
     % Extract all field names from option struct
-    fieldNames = fieldnames(options);
+    fieldNames = fieldnames(userOptions);
     if isempty(fieldNames)
         error("Options struct is empty, please provide valid options.");
     end

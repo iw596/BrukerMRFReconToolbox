@@ -1,0 +1,34 @@
+function results = GenerateUndersamplingMask(dims,R,opts)
+% Generates a poisson disc undersampling mask of dimensions dims with an
+% acceleration factor R. The mask can be made variable density by
+% controlling the roll off using sigma. An ell
+arguments (Input)
+    inputArg1
+    inputArg2
+end
+
+arguments (Output)
+    outputArg1
+    outputArg2
+end
+
+Ny = dims(1);
+Nz = dims(2);
+Nt = dims(3);
+
+
+sigma = opts.sigma;
+ellipticalMaskFlag = opts.ellipticalMask;
+
+
+%% First determine ACS region
+cy = floor(Ny/2)+1; % Center of y
+cz = floor(Nz/2)+1; % Center of z
+
+
+
+
+
+outputArg1 = inputArg1;
+outputArg2 = inputArg2;
+end

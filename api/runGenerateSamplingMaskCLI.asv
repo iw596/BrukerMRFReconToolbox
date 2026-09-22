@@ -1,0 +1,42 @@
+%% This function is used to generate MRF undersampling masks
+%% user passes in dimensions (dim) and opts which is a matlab struct containing
+%% options relevant to generating sampling ma
+function results = runGenerateSamplingMaskCLI(dims,opts)
+
+arguments (Input)
+    dims % Data input dimensions, typically Ny X Nz X NFA
+    opts
+end
+
+arguments (Output)
+    outputArg1
+    outputArg2
+end
+
+outputArg1 = inputArg1;
+outputArg2 = inputArg2;
+end
+
+
+function options = ValidateOptions(varargin)
+    
+    if isempty(varargin)
+        error("No options have been passed into the function!");
+    end
+    userOptions = varargin{1};
+    % Extract all field names from option struct
+    fieldNames = fieldnames(options);
+    if isempty(fieldNames)
+        error("Options struct is empty, please provide valid options.");
+    end
+
+
+
+    % Create default arrray of options
+    defaults = struct();
+    defaults.plotMask = false;
+    deafults.sigma = 80;
+
+
+
+end
