@@ -1,10 +1,17 @@
-function [dataScaled, scaling] = scaleMRFReconData(data, context)
+function [dataScaled, scaling] = scaleMRFReconData(data, context, operators)
 % scaleMRFReconData  Optional k-space scaling for iterative reconstruction.
 %
 %   Modes:
 %     - off: no scaling
 %     - global: robust scalar from all k-space points
 %     - per-frame: robust scalar per temporal frame (dim 4)
+%     - auto: robust scalar from the adjoint (coefficient/image-domain)
+%             magnitude; requires operators.Adjoint. K-space magnitude is
+%             dominated by a small fraction of very large low-frequency
+%             samples, so a raw k-space percentile does not control the
+%             actual reconstructed coefficient scale. Scaling from the
+%             adjoint image instead keeps coefficients near O(1), which
+%             the Lambda/Rho ADMM settings assume.
 %     - manual: use DataScalingFactor from context
 
 scaling = struct();
@@ -17,6 +24,9 @@ scaling.Message = 'Scaling disabled.';
 
 if nargin < 2
     context = struct();
+end
+if nargin < 3
+    operators = [];
 end
 
 dataScaled = data;
@@ -64,6 +74,20 @@ switch mode
         scaling.Applied = true;
         scaling.GlobalScale = scaleVal;
         scaling.Message = sprintf('Global scaling applied using p%.1f = %.6g.', pct, scaleVal);
+
+    case {'auto', 'coefficient', 'adjoint'}
+        if isempty(operators) || ~isfield(operators, 'Adjoint')
+            error('scaleMRFReconData:MissingOperators', ...
+                'DataScalingMode ''auto'' requires the subspace operators (with Adjoint) to be passed in.');
+        end
+        coefficients = operators.Adjoint(data);
+        scaleVal = robustScaleEstimate(coefficients, pct);
+        dataScaled = data ./ scaleVal;
+
+        scaling.Mode = 'auto';
+        scaling.Applied = true;
+        scaling.GlobalScale = scaleVal;
+        scaling.Message = sprintf('Auto (adjoint-magnitude) scaling applied using p%.1f = %.6g.', pct, scaleVal);
 
     case {'perframe', 'per-frame', 'frame'}
         if ndims(data) < 4
