@@ -775,6 +775,16 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.CartPE2 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
     end
 
+    k = strfind(TextAsCells,"EPIC_SpiralAngleList=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'('));
+        tmp = split(line,{' ', ')', '\n','$$'});
+        tmp = tmp(~cellfun(@isempty, regexp(tmp, '\d')));
+        tmp = str2double(tmp);
+        params.Traj.EPIC_SpiralAngleList = tmp(2:end); % Add 1 as going from zero indexing to 1 indexing
+    end
     % Find the PVM_EncSteps1 entry
     idx = find(contains(TextAsCells,'$PVM_EncSteps1='),1);
 
