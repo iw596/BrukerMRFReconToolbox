@@ -775,6 +775,14 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.Traj.CartPE2 = tmp(2:end)+1; % Add 1 as going from zero indexing to 1 indexing
     end
 
+    k = strfind(TextAsCells,"EPIC_NoMRF=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.EPICMRF.EPIC_NoMRF = str2double(line);
+    end
+
     k = strfind(TextAsCells,"EPIC_SpiralAngleList=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
