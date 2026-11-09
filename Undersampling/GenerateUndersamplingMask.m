@@ -33,6 +33,7 @@ arguments
     opts.sigma (1,1) double {mustBePositive} = 0.35
     opts.ellipticalMask (1,1) logical = false
     opts.autoCalibSize (1,2) double {mustBeNonnegative, mustBeInteger} = [0 0]
+    opts.plotMask(1,1) logical = false;
 end
 
 Ny = dims(1);

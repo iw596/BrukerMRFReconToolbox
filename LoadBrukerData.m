@@ -783,6 +783,24 @@ function params = LoadBrukerData(path,loadDataFlag)
         params.EPICMRF.EPIC_NoMRF = str2double(line);
     end
 
+    k = strfind(TextAsCells,"EPIC_NoImRR=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.EPICMRF.EPIC_NoImRR = str2double(line);
+    end
+    
+    k = strfind(TextAsCells,"EPIC_NoDSRR=");
+    idx = find(~cellfun(@isempty,k));
+    if (isempty(idx) ~=1)
+        line = TextAsCells(idx);
+        line = strtrim(extractAfter(cell2mat(line),'='));
+        params.EPICMRF.EPIC_NoDSRR = str2double(line);
+    end
+
+
+
     k = strfind(TextAsCells,"EPIC_SpiralAngleList=");
     idx = find(~cellfun(@isempty,k));
     if (isempty(idx) ~=1)
