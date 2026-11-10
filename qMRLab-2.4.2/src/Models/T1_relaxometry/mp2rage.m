@@ -162,14 +162,7 @@ methods
             MP2RAGE.TRFLASH = RepetitionTimeExcitation; % TR of the GRE readout
             MP2RAGE.TIs = InversionTime; % inversion times - time between middle of refocusing pulse and excitatoin of the k-space center encoding
             MP2RAGE.NZslices = NumberShots; % Excitations [before, after] the k-space center
-            MP2RAGE.FlipDegrees = FlipAngle; % Flip angle of the two readouts in degrees
-
-            % If both NumberShots are equal, then assume half/half for before/after
-        if NumberShots(1) == NumberShots(2)
-
-            MP2RAGE.NZslices = [ceil(NumberShots(1)/2) floor(NumberShots(1)/2)]; 
-
-        end 
+            MP2RAGE.FlipDegrees = FlipAngle; % Flip angle of the two readouts in degrees 
 
         % LOAD OPTIONS ========================================= 
 
